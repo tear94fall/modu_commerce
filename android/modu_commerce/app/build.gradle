@@ -1,0 +1,48 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace 'com.example.moducommerce'
+    compileSdk 34
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    defaultConfig {
+        applicationId "com.example.moducommerce"
+        minSdk 28
+        targetSdk 34
+        versionCode 1
+        versionName "0.1.0"
+        // 모두의 채팅과 같은 개발 게이트웨이. auth-service 는 게이트웨이 경유로 부른다.
+        buildConfigField "String", "API_BASE_URL", "\"http://192.168.0.3:8000/\""
+        // 커머스 서비스(backend/commerce-service). 같은 모두 계정 토큰(aud=modu-commerce)으로 부른다.
+        buildConfigField "String", "COMMERCE_API_URL", "\"http://192.168.0.3:8200/\""
+    }
+
+    testOptions {
+        unitTests.returnDefaultValues = true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.4.2'
+    implementation 'com.google.android.material:material:1.6.1'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'com.google.android.gms:play-services-auth:20.4.0'
+    implementation 'com.squareup.okhttp3:okhttp:4.2.1'
+    implementation 'com.google.code.gson:gson:2.10.1'
+    testImplementation 'junit:junit:4.13.2'
+}

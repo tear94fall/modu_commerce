@@ -1,0 +1,52 @@
+server:
+  port: 8200
+
+spring:
+  application:
+    name: commerce-service
+
+  # 접속 정보는 환경변수로 주입한다. 기본값은 backend/docker-compose.yml 의 mysql-commerce(호스트 3316) 용이다.
+  # 개발 환경은 레플리카가 없어 replica 기본값도 master 를 가리킨다.
+  datasource:
+    master:
+      url: ${DB_MASTER_URL:jdbc:mysql://localhost:3316/commerce?useSSL=false&characterEncoding=UTF-8&serverTimezone=Asia/Seoul&allowPublicKeyRetrieval=true}
+      username: ${DB_MASTER_USERNAME:root}
+      password: ${DB_MASTER_PASSWORD:commerce}
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      hikari:
+        pool-name: master-pool
+        maximum-pool-size: 10
+        minimum-idle: 2
+        connection-timeout: 30000
+
+    replica:
+      url: ${DB_REPLICA_URL:${DB_MASTER_URL:jdbc:mysql://localhost:3316/commerce?useSSL=false&characterEncoding=UTF-8&serverTimezone=Asia/Seoul&allowPublicKeyRetrieval=true}}
+      username: ${DB_REPLICA_USERNAME:${DB_MASTER_USERNAME:root}}
+      password: ${DB_REPLICA_PASSWORD:${DB_MASTER_PASSWORD:commerce}}
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      hikari:
+        pool-name: replica-pool
+        maximum-pool-size: 10
+        minimum-idle: 2
+        connection-timeout: 30000
+        read-only: true
+
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:update}
+    properties:
+      hibernate:
+        format_sql: true
+        default_batch_fetch_size: 1000
+    open-in-view: false
+
+modu:
+  oauth:
+    # 모두의 채팅 auth-service. 커머스 앱이 SSO 로 받은 modu-commerce 토큰을 여기 JWKS 로 검증한다.
+    issuer: ${MODU_OAUTH_ISSUER:http://192.168.0.3:8000/auth-service}
+    jwks-uri: ${MODU_OAUTH_JWKS_URI:http://192.168.0.3:8000/auth-service/oauth2/jwks}
+    audience: modu-commerce
+
+logging:
+  level:
+    org.hibernate.SQL: ${SQL_LOG_LEVEL:DEBUG}

@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">모두의 커머스</string>
+    <!-- 모두의 채팅과 같은 구글 프로젝트의 웹 클라이언트 ID(비밀 아님). requestIdToken 용. -->
+    <string name="default_web_client_id">529862674339-34f6a7he3npv9kkufh8u8ie6mma3f92j.apps.googleusercontent.com</string>
+</resources>

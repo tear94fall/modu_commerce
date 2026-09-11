@@ -1,0 +1,28 @@
+spring:
+  datasource:
+    master:
+      url: jdbc:h2:mem:api;MODE=MYSQL;DB_CLOSE_DELAY=-1
+      username: sa
+      password:
+      driver-class-name: org.h2.Driver
+
+    replica:
+      url: jdbc:h2:mem:api;MODE=MYSQL;DB_CLOSE_DELAY=-1
+      username: sa
+      password:
+      driver-class-name: org.h2.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+        default_batch_fetch_size: 1000
+    open-in-view: false
+
+modu:
+  oauth:
+    issuer: http://auth.test/auth-service
+    jwks-uri: http://auth.test/auth-service/oauth2/jwks
+    audience: modu-commerce
