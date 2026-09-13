@@ -1,23 +1,9 @@
-services:
-  mysql-commerce:
-    image: mysql:8.0
-    container_name: mysql-commerce
-    ports:
-      - 3316:3306
-    volumes:
-      - mysql-commerce:/var/lib/mysql
-    environment:
-      MYSQL_DATABASE: commerce
-      MYSQL_ROOT_HOST: '%'
-      MYSQL_ROOT_PASSWORD: ${COMMERCE_DB_PASSWORD:-commerce}
-    command: ["mysqld", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
-    healthcheck:
-      test: ['CMD-SHELL', 'mysqladmin ping -h 127.0.0.1 -u root --password=$$MYSQL_ROOT_PASSWORD']
-      interval: 10s
-      timeout: 2s
-      retries: 30
-    restart: always
+name: modu-commerce
 
+# mysql-commerce 등 인프라는 ~/workspace/modu_infra/data 에서 먼저 띄운다.
+# commerce-service 는 external 네트워크 modu-infra 에서 컨테이너 이름으로 인프라와 auth-service 에 접근한다.
+
+services:
   commerce-service:
     build:
       context: ./commerce-service
@@ -29,13 +15,14 @@ services:
       - DB_MASTER_URL=jdbc:mysql://mysql-commerce:3306/commerce?useSSL=false&characterEncoding=UTF-8&serverTimezone=Asia/Seoul&allowPublicKeyRetrieval=true
       - DB_MASTER_USERNAME=root
       - DB_MASTER_PASSWORD=${COMMERCE_DB_PASSWORD:-commerce}
-      # 모두의 채팅 auth-service (게이트웨이 경유). 컨테이너에서 호스트 LAN IP 로 나간다.
+      # issuer 는 auth-service 가 발급한 토큰의 iss 클레임과 문자열이 같아야 하므로 게이트웨이 경유 주소를 유지한다.
       - MODU_OAUTH_ISSUER=${MODU_OAUTH_ISSUER:-http://192.168.0.3:8000/auth-service}
-      - MODU_OAUTH_JWKS_URI=${MODU_OAUTH_JWKS_URI:-http://192.168.0.3:8000/auth-service/oauth2/jwks}
-    depends_on:
-      mysql-commerce:
-        condition: service_healthy
+      # JWKS 는 modu-infra 네트워크에서 auth-service 에 직접 받는다 (게이트웨이와 같은 주소).
+      - MODU_OAUTH_JWKS_URI=${MODU_OAUTH_JWKS_URI:-http://auth-service:9900/oauth2/jwks}
+    networks:
+      - modu-infra
     restart: always
 
-volumes:
-  mysql-commerce:
+networks:
+  modu-infra:
+    external: true
