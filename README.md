@@ -25,7 +25,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```bash
 cd backend/commerce-service
 ./gradlew test bootJar          # 테스트 15개, commerce-api/build/libs/commerce-api-0.0.1-SNAPSHOT.jar
-cd .. && docker compose up -d --build   # mysql-commerce(3316) + commerce-service(8200)
+cd .. && docker compose up -d --build   # commerce-service(8200). mysql-commerce(3316)는 modu_infra(https://github.com/tear94fall/modu_infra, 이 저장소 옆에 clone)의 data 에서 먼저 띄운다
 ```
 
 접속 정보는 `DB_MASTER_URL`/`DB_MASTER_USERNAME`/`DB_MASTER_PASSWORD`(선택 `DB_REPLICA_*`), 토큰 검증은 `MODU_OAUTH_ISSUER`/`MODU_OAUTH_JWKS_URI` 환경변수로 바꿉니다. 커머스 앱은 로그인 후 `COMMERCE_API_URL`(`app/build.gradle`) 로 상품 목록을 불러옵니다.
