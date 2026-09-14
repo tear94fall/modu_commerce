@@ -16,7 +16,12 @@ data class Product(
 ) {
     fun priceLabel(): String = NumberFormat.getNumberInstance(Locale.KOREA).format(price) + "원"
 
+    /** 쓸 수 있는 이미지 주소. 비어 있으면 목록에서 플레이스홀더를 깐다. */
+    fun imageUrlOrNull(): String? = imageUrl?.trim()?.takeIf { it.isNotEmpty() }
+
     companion object {
+        fun parse(json: String): Product = Gson().fromJson(json, Product::class.java)
+
         fun parseList(json: String): List<Product> = Gson().fromJson(json, object : TypeToken<List<Product>>() {}.type)
     }
 }

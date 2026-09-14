@@ -46,6 +46,8 @@ modu:
     issuer: ${MODU_OAUTH_ISSUER:http://192.168.0.3:8000/auth-service}
     jwks-uri: ${MODU_OAUTH_JWKS_URI:http://192.168.0.3:8000/auth-service/oauth2/jwks}
     audience: modu-commerce
+    # 백오피스(/api-admin/**) 토큰의 aud. 게이트웨이 AuthorizationHeaderFilter=ROLE_ADMIN,modu-admin 과 같은 값.
+    admin-audience: modu-admin
 
 logging:
   level:

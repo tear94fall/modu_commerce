@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Test
+import java.time.LocalDateTime
 
 class ProductTest {
     @Test
@@ -22,5 +23,28 @@ class ProductTest {
         assertEquals("텀블러", product.name)
         assertEquals(24_000L, product.price)
         assertEquals(null, product.imageUrl)
+    }
+
+    @Test
+    fun `update는 이름 설명 가격 이미지를 바꾼다`() {
+        val product = Product.create(name = "텀블러", description = "차가운", price = 24_000)
+
+        product.update(name = "텀블러 L", description = "더 큰", price = 29_000, imageUrl = "https://img/t.png")
+
+        assertEquals("텀블러 L", product.name)
+        assertEquals("더 큰", product.description)
+        assertEquals(29_000L, product.price)
+        assertEquals("https://img/t.png", product.imageUrl)
+    }
+
+    @Test
+    fun `delete는 삭제 시각만 남긴다`() {
+        val product = Product.create(name = "텀블러", description = "차가운", price = 24_000)
+        val now = LocalDateTime.of(2026, 9, 14, 12, 0)
+
+        product.delete(now)
+
+        assertEquals(now, product.deletedAt)
+        assertEquals(true, product.isDeleted())
     }
 }

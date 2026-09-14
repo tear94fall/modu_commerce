@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 상품 이미지 자리. 서버가 imageUrl 을 주지 않는 상품은 이 플레이스홀더가 그대로 보인다
+     (commerce-service 의 테스트 상품 4개는 imageUrl 이 비어 있다). -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/product_surface" />
+            <corners android:radius="10dp" />
+        </shape>
+    </item>
+    <item
+        android:width="32dp"
+        android:height="31dp"
+        android:drawable="@drawable/modu_logo"
+        android:gravity="center" />
+</layer-list>

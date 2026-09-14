@@ -43,4 +43,14 @@ class ProductQueryServiceTest
         fun `없는 상품은 EntityNotFoundException`() {
             assertThrows(EntityNotFoundException::class.java) { productQueryService.findProduct(999_999L) }
         }
+
+        @Test
+        fun `admin 페이지 검색은 페이지 번호와 크기를 안전한 범위로 자른다`() {
+            val clamped = productQueryService.searchAdminProducts(null, -3, 1000)
+            assertEquals(0, clamped.number)
+            assertEquals(100, clamped.size)
+            assertEquals("모두 기계식 키보드", clamped.content.first().name)
+
+            assertEquals(1, productQueryService.searchAdminProducts(null, 0, 0).size)
+        }
     }
