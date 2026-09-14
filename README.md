@@ -2,6 +2,10 @@
 
 모두의 채팅과 같은 **모두 계정**으로 로그인하는 최소 안드로이드 앱입니다(Kotlin). 아이콘은 채팅 앱과 같은 번개 마크에 붉은 그라데이션을 입혔습니다.
 
+화면은 모두의 채팅과 같은 순서입니다: **초기 화면**(`SplashActivity`, 흰 바탕에 로고만) → **로그인 화면**(`LoginActivity`) → **상품 목록**(`ProductListActivity`). 초기 화면은 저장된 토큰이 있으면 로그인을 건너뛰고 바로 상품 목록으로 갑니다. 상품 목록은 카드 한 장에 사진·이름·가격·설명을 보여 주고, 앱바의 오버플로 메뉴에 로그아웃이 있습니다. 사진은 Glide 로 `imageUrl` 을 받아 그리고, 주소가 없는 상품은 로고 플레이스홀더가 보입니다.
+
+상품 목록 앱바의 돋보기로 이름·설명을 검색하고(검색 버튼을 누를 때만 조회), 카드를 누르면 **상품 상세**(`ProductDetailActivity`)로 가서 서버에서 최신 값을 다시 읽습니다. 액세스 토큰이 만료되면 `TokenRefresher` 가 refresh 토큰으로 한 번 갱신하고, 갱신도 실패하면 로그인 화면으로 돌아갑니다.
+
 - **모두 계정으로 로그인 (채팅 앱)**: 설치된 모두의 채팅 앱에 1회용 코드를 요청하고(PKCE), auth-service `/oauth2/token`(`sso_code` grant)으로 이 앱의 토큰을 받습니다. 채팅 앱이 로그인돼 있으면 확인 대화상자 한 번으로 끝납니다.
 - **Google 로 로그인**: 채팅 앱이 없을 때의 폴백. 구글 ID 토큰을 `google_id_token` grant 로 교환합니다. 구글 콘솔에 이 앱의 패키지 `com.example.moducommerce` 와 서명 SHA-1 이 Android 클라이언트로 등록돼 있어야 동작합니다.
 
@@ -19,12 +23,15 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 `~/Downloads/demo` 프로젝트 구조를 따른 Kotlin/Spring Boot 3.5 멀티모듈 서비스입니다.
 
-- `commerce-api`: 실행 모듈. `GET /api/v1/products`(`?q=` 검색), `GET /api/v1/products/{id}`. 모든 API 는 모두의 채팅 auth-service 가 발급한 RS256 토큰을 JWKS 로 검증하고 `aud=modu-commerce` 만 허용합니다.
-- `commerce-application`: 도메인/저장소/서비스. master(RW)·replica(RO) 데이터소스 분리, RO 는 DDL 을 실행하지 않음, QueryDSL(RO/RW 쿼리 팩토리). 시작 시 `products` 가 비어 있으면 테스트 상품 4개를 넣습니다.
+- `commerce-api`: 실행 모듈.
+  - 앱(`aud=modu-commerce`): `GET /api/v1/products`(`?q=` 검색), `GET /api/v1/products/{id}`.
+  - 백오피스(`aud=modu-admin` + `roles` 에 `ROLE_ADMIN`): `GET /api-admin/v1/products?q=&page=&size=`, `GET·PUT·DELETE /api-admin/v1/products/{id}`, `POST /api-admin/v1/products`. 게이트웨이의 `/commerce-service/api-admin/**` 로 들어오며, commerce 도 토큰을 다시 검증합니다. 삭제는 `deleted_at` 만 채우는 소프트 삭제입니다.
+  - 모든 토큰은 모두의 채팅 auth-service 가 발급한 RS256 토큰을 JWKS 로 검증합니다.
+- `commerce-application`: 도메인/저장소/서비스. master(RW)·replica(RO) 데이터소스 분리, RO 는 DDL 을 실행하지 않음, QueryDSL(RO/RW 쿼리 팩토리). 시작 시 `products` 가 비어 있으면 테스트 상품 4개를 넣습니다(사진은 `picsum.photos` 의 seed 주소라 매번 같은 사진이 옵니다). 이미 상품이 들어 있는 DB 는 건드리지 않으므로, 사진을 넣으려면 `products` 를 비우고 다시 띄워야 합니다.
 
 ```bash
 cd backend/commerce-service
-./gradlew test bootJar          # 테스트 15개, commerce-api/build/libs/commerce-api-0.0.1-SNAPSHOT.jar
+./gradlew test bootJar          # 테스트 37개, commerce-api/build/libs/commerce-api-0.0.1-SNAPSHOT.jar
 cd .. && docker compose up -d --build   # commerce-service(8200). mysql-commerce(3316)는 modu_infra(https://github.com/tear94fall/modu_infra, 이 저장소 옆에 clone)의 data 에서 먼저 띄운다
 ```
 
