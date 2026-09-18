@@ -5,6 +5,7 @@ plugins {
 dependencies {
     implementation(project(":commerce-application"))
     implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.cloud:spring-cloud-starter-config")
     // admin 상품 등록·수정 요청 검증(@Valid)
     implementation("org.springframework.boot:spring-boot-starter-validation")
     // 모두 계정(auth-service) 토큰을 JWKS 로 검증하는 리소스 서버
