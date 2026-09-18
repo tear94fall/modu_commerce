@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 브랜드 컬러: 런처 아이콘의 붉은 번개(#E0243F → #FF7A6B 그라데이션)에서 가져왔다.
+         모두의 채팅이 보라 계열인 자리를 커머스는 붉은 계열로 쓴다. -->
+    <color name="brand_red">#E0243F</color>
+    <color name="brand_red_dark">#B01C32</color>
+    <color name="brand_coral">#FF7A6B</color>
+    <color name="brand_coral_dark">#C85D51</color>
+    <!-- 흰 글자는 brand_red 위에서 대비 5.16:1 이다. 본문 크기 기준(4.5:1)을 넘는다. -->
+    <color name="on_brand_red">@color/white</color>
+    <!-- brand_coral 은 밝아서 흰 글자가 묻힌다. 그 위에는 검정을 쓴다. -->
+    <color name="on_brand_coral">@color/black</color>
+
+    <!-- 본문 글자. 순검정보다 살짝 눌러 긴 목록을 읽기 편하게 한다. -->
+    <color name="text_primary">#1F2430</color>
+    <!-- 상품 카드 바탕과 이미지 자리. 순백 위에서 카드 경계가 읽히도록 아주 옅게 깐다. -->
+    <color name="product_surface">#FFF6F6</color>
+    <color name="divider">#E6E4EC</color>
+
+    <color name="black">#FF000000</color>
+    <color name="grey">#808080</color>
+    <color name="white">#FFFFFFFF</color>
+</resources>

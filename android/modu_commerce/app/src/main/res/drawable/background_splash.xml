@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 초기 화면의 창 배경. 모두의 채팅과 같이 흰 바탕 가운데에 로고만 둔다. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/white" />
+    <item
+        android:width="110dp"
+        android:height="110dp"
+        android:drawable="@drawable/modu_logo"
+        android:gravity="center" />
+</layer-list>

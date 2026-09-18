@@ -1,4 +1,8 @@
 spring:
+  # 테스트는 config-server 를 쓰지 않는다. enabled: false 면 spring.config.import 필수 검사도 통과한다.
+  cloud:
+    config:
+      enabled: false
   datasource:
     master:
       url: jdbc:h2:mem:app;MODE=MYSQL;DB_CLOSE_DELAY=-1

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- 앱 기본 테마. 모두의 채팅과 같은 구성에 색만 커머스(붉은 계열)로 바꿨다.
+         화면들이 흰 바탕·어두운 글자를 못 박고 있어 DayNight 대신 Light 로 고정한다. -->
+    <style name="Theme.ModuCommerce" parent="Theme.MaterialComponents.Light.DarkActionBar">
+        <item name="colorPrimary">@color/brand_red</item>
+        <item name="colorPrimaryVariant">@color/brand_red_dark</item>
+        <item name="colorOnPrimary">@color/on_brand_red</item>
+        <item name="colorSecondary">@color/brand_coral</item>
+        <item name="colorSecondaryVariant">@color/brand_coral_dark</item>
+        <item name="colorOnSecondary">@color/on_brand_coral</item>
+        <item name="android:statusBarColor" tools:targetApi="l">?attr/colorPrimaryVariant</item>
+    </style>
+
+    <!-- 초기 화면. 액티비티가 뜨기 전부터 창 배경으로 로고를 보여 준다. -->
+    <style name="Theme.ModuCommerce.Splash" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="android:windowBackground">@drawable/background_splash</item>
+        <item name="android:statusBarColor" tools:targetApi="l">@color/white</item>
+    </style>
+
+    <!-- 로그인 화면. 로고·앱 이름을 화면 가운데 두므로 앱바를 띄우지 않는다. -->
+    <style name="Theme.ModuCommerce.Login" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="colorPrimary">@color/brand_red</item>
+        <item name="colorPrimaryVariant">@color/brand_red_dark</item>
+        <item name="colorOnPrimary">@color/on_brand_red</item>
+        <item name="android:statusBarColor" tools:targetApi="l">@color/white</item>
+    </style>
+
+    <!-- 상품 이미지를 둥글게 깎는다. ShapeableImageView 의 shapeAppearanceOverlay 로 쓴다. -->
+    <style name="ShapeAppearance.Modu.Thumbnail" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">10dp</item>
+    </style>
+</resources>

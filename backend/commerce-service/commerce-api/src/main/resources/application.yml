@@ -5,7 +5,16 @@ spring:
   application:
     name: commerce-service
 
-  # 접속 정보는 환경변수로 주입한다. 기본값은 backend/docker-compose.yml 의 mysql-commerce(호스트 3316) 용이다.
+  # modu_platform 의 config-service. 공통(application.yml) + commerce/commerce-service.yml 을 받는다.
+  # 설정 서버를 못 만나면 기본값으로 조용히 뜨지 않고 기동에 실패한다(compose 의 restart 가 다시 띄운다).
+  config:
+    import: optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}
+  cloud:
+    config:
+      name: commerce,${spring.application.name}
+      fail-fast: true
+
+  # 접속 정보는 config-service(commerce/commerce-service.yml)가 내려준다. 아래 기본값은 IDE 에서 설정 서버 없이 띄울 때(호스트 3316) 용이다.
   # 개발 환경은 레플리카가 없어 replica 기본값도 master 를 가리킨다.
   datasource:
     master:
@@ -46,6 +55,8 @@ modu:
     issuer: ${MODU_OAUTH_ISSUER:http://192.168.0.3:8000/auth-service}
     jwks-uri: ${MODU_OAUTH_JWKS_URI:http://192.168.0.3:8000/auth-service/oauth2/jwks}
     audience: modu-commerce
+    # 백오피스(/api-admin/**) 토큰의 aud. 게이트웨이 AuthorizationHeaderFilter=ROLE_ADMIN,modu-admin 과 같은 값.
+    admin-audience: modu-admin
 
 logging:
   level:
