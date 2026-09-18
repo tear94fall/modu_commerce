@@ -35,6 +35,8 @@ subprojects {
     configure<io.spring.gradle.dependencymanagement.dsl.DependencyManagementExtension> {
         imports {
             mavenBom(SpringBootPlugin.BOM_COORDINATES)
+            // Spring Cloud Config 클라이언트(modu_platform 의 config-service 에서 설정을 받는다). Boot 3.5 ↔ Cloud 2025.0.
+            mavenBom("org.springframework.cloud:spring-cloud-dependencies:2025.0.0")
         }
     }
 
