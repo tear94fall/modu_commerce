@@ -13,6 +13,8 @@ export default defineConfig({
     proxy: {
       '/api': { target: process.env.COMMERCE_URL ?? 'http://localhost:8200', changeOrigin: true },
       '/auth-service': { target: process.env.GATEWAY_URL ?? 'http://localhost:8000', changeOrigin: true },
+      // 프로필 사진(공개 다운로드). 게이트웨이를 거치면 토큰을 요구하므로 storage-service 로 바로 간다.
+      '/storage-service': { target: process.env.STORAGE_URL ?? 'http://localhost:9999', changeOrigin: true, rewrite: (path) => path.replace(/^\/storage-service/, '') },
     },
   },
   test: {

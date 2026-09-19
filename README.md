@@ -12,7 +12,10 @@
 # 1) 웹 (Mac, LAN 에 열림)
 cd web && npm install && npm run dev            # http://192.168.0.3:5174
 
-# 2) Android 앱 — 디버그 빌드는 위 dev 서버 주소(app/build.gradle.kts 의 WEB_URL)를 연다
+# 1') 웹 배포본 (nginx, 릴리스 빌드가 여는 주소)
+cd web && docker compose up -d --build          # http://192.168.0.3:8082
+
+# 2) Android 앱 — 디버그 빌드는 Vite dev 서버(:5174), 릴리스 빌드는 배포본(:8082)을 연다 (app/build.gradle.kts 의 WEB_URL)
 cd android/modu_commerce
 ANDROID_HOME=$HOME/Library/Android/sdk ./gradlew :app:testDebugUnitTest :app:assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk

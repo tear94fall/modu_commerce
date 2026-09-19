@@ -18,8 +18,22 @@ npm run build        # tsc + vite build → dist/
   (`vite.config.ts`, `COMMERCE_URL`/`GATEWAY_URL` 환경변수로 대상을 바꿈). 그래서 서버에 CORS 설정이 없어도 됩니다.
 - **앱에서 열기**: Android 디버그 빌드의 `WEB_URL`(`app/build.gradle.kts`)이 `http://192.168.0.3:5174/` 입니다. Mac 에서 `npm run dev` 를
   띄워 두면 폰의 앱이 그 화면을 열고, 파일을 저장하면 폰 화면이 바로 바뀝니다. `chrome://inspect` 로 WebView 를 디버깅할 수 있습니다.
-- **브라우저에서 열기**: `/login` 에서 모두 계정 액세스 토큰(aud=modu-commerce)을 붙여넣습니다(개발용 임시 로그인).
-  모두 계정 웹 로그인(auth-service OAuth2)은 다음 단계입니다.
+- **브라우저에서 열기**: `/login` 의 **Google 계정으로 로그인** → Google ID 토큰을 auth-service `/oauth2/token`(`google_id_token` grant,
+  client `modu-commerce`)으로 교환합니다. 앱의 Google 폴백과 같은 흐름이라 서버 변경이 없습니다. Google 콘솔의 웹 클라이언트
+  (`VITE_GOOGLE_CLIENT_ID`, 기본값은 앱들이 쓰는 ID)에 **승인된 JavaScript 원본**으로 이 웹의 출처(`http://localhost:5174`,
+  `http://192.168.0.3:5174`, `http://192.168.0.3:8082`)가 등록돼 있어야 버튼이 동작합니다. 접힌 "개발용: 토큰 직접 입력" 은 토큰을
+  바로 넣는 우회입니다(refresh 없음).
+- 프로필 사진은 storage-service 공개 다운로드(`/storage-service/api-public/download?file=`)를 같은 출처로 프록시합니다.
+
+## 배포 (nginx)
+
+```bash
+cd web && docker compose up -d --build     # modu-commerce-web → http://<Mac IP>:8082
+```
+
+`Dockerfile` 이 정적 빌드를 만들고 `nginx.conf` 가 `/api/` → commerce-service:8200, `/auth-service/` → gateway-service:8000,
+`/storage-service/` → storage-service:9999 로 프록시합니다(모두 external 네트워크 `modu-infra`). Android **릴리스** 빌드의 `WEB_URL` 이 이 주소이고,
+**디버그** 빌드는 Vite dev 서버(:5174)를 봅니다.
 
 ## 앱 브리지 (`src/bridge/app.ts` ↔ android `ModuAppBridge`)
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { getProfile, type Profile } from '../api/me'
-import { clearToken } from '../auth/token'
+import { logoutSession } from '../auth/session'
 import { bridge } from '../bridge/app'
 import { Screen, TopBar } from '../components/Layout'
 
@@ -21,8 +21,7 @@ export default function MyPage() {
       b.logout()
       return
     }
-    clearToken()
-    navigate('/login', { replace: true })
+    logoutSession().finally(() => navigate('/login', { replace: true }))
   }
 
   return (

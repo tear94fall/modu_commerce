@@ -27,9 +27,10 @@ export function serverMessage(body: string): string | undefined {
  * 401 이면 토큰을 한 번 갱신해 재시도하고, 그래도 401 이면 세션 만료 처리.
  */
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
-  let res = await send(path, init, getToken())
+  const token = getToken()
+  let res = await send(path, init, token)
   if (res.status === 401) {
-    const fresh = refreshToken()
+    const fresh = await refreshToken(token)
     if (fresh) res = await send(path, init, fresh)
   }
   if (res.status === 401) {

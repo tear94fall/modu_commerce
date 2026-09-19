@@ -30,12 +30,13 @@ class ModuAppBridge @Inject constructor(
     @JavascriptInterface
     fun getAccessToken(): String = runBlocking { sessionStore.accessToken().orEmpty() }
 
-    /** 웹이 401 을 받았을 때. 갱신에 실패하면 빈 문자열이고, 세션 정리·로그인 이동은 [SessionRefresher] 가 이미 했다. */
+    /**
+     * 웹이 [failedToken] 으로 401 을 받았을 때. 다른 요청이 먼저 갱신해 둔 토큰이 있으면 그걸 주고, 아니면 한 번 갱신한다.
+     * (현재 토큰을 실패 토큰으로 넘기면 병렬 401 마다 갱신이 반복돼 refresh 토큰 회전과 어긋난다.)
+     * 실패하면 빈 문자열이고, 세션 정리·로그인 이동은 [SessionRefresher] 가 이미 했다.
+     */
     @JavascriptInterface
-    fun refreshAccessToken(): String {
-        val failed = runBlocking { sessionStore.accessToken() }
-        return runBlocking { refresher.refresh(failed) }.orEmpty()
-    }
+    fun refreshAccessToken(failedToken: String): String = runBlocking { refresher.refresh(failedToken.ifBlank { null }) }.orEmpty()
 
     @JavascriptInterface
     fun onSessionExpired() {
