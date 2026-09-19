@@ -11,36 +11,26 @@
     </queries>
 
     <application
+        android:name=".CommerceApp"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
+        android:supportsRtl="true"
         android:theme="@style/Theme.ModuCommerce"
         android:usesCleartextTraffic="true">
 
-        <!-- 초기 화면 → 로그인 화면 → 상품 목록. 모두의 채팅과 같은 순서다. -->
+        <!-- 하나뿐인 액티비티. 스플래시 유지 → 세션 판정 → NavHost. -->
         <activity
-            android:name=".SplashActivity"
+            android:name=".MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.ModuCommerce.Splash">
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.ModuCommerce.Splash"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <activity
-            android:name=".LoginActivity"
-            android:exported="false"
-            android:theme="@style/Theme.ModuCommerce.Login" />
-
-        <activity
-            android:name=".ProductListActivity"
-            android:exported="false" />
-
-        <activity
-            android:name=".ProductDetailActivity"
-            android:exported="false"
-            android:parentActivityName=".ProductListActivity" />
     </application>
 </manifest>
