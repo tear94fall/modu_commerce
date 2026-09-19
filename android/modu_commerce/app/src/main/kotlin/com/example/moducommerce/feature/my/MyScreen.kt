@@ -13,6 +13,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -43,7 +45,7 @@ import com.example.moducommerce.core.ui.theme.ProductSurface
 import com.example.moducommerce.feature.login.GoogleSignInHelper
 
 @Composable
-fun MyScreen(viewModel: MyViewModel = hiltViewModel()) {
+fun MyScreen(onOpenOrders: () -> Unit, onOpenAddresses: () -> Unit, viewModel: MyViewModel = hiltViewModel()) {
     val profile by viewModel.profile.collectAsStateWithLifecycle()
     val working by viewModel.working.collectAsStateWithLifecycle()
     var confirm by remember { mutableStateOf(false) }
@@ -68,6 +70,8 @@ fun MyScreen(viewModel: MyViewModel = hiltViewModel()) {
             }
         }
         HorizontalDivider(thickness = 8.dp, color = ProductSurface)
+        SettingsRow(icon = Icons.Filled.ReceiptLong, title = stringResource(R.string.my_orders), onClick = onOpenOrders)
+        SettingsRow(icon = Icons.Filled.LocationOn, title = stringResource(R.string.my_addresses), onClick = onOpenAddresses)
         SettingsRow(icon = Icons.Filled.Info, title = stringResource(R.string.my_app_version), value = BuildConfig.VERSION_NAME)
         SettingsRow(icon = Icons.AutoMirrored.Filled.Logout, title = stringResource(R.string.my_logout), onClick = { if (!working) confirm = true })
     }

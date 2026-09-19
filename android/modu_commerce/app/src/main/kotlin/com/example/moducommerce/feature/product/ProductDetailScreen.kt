@@ -32,7 +32,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -55,6 +54,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.moducommerce.R
 import com.example.moducommerce.core.model.ProductDetail
+import com.example.moducommerce.core.ui.components.BottomPanel
 import com.example.moducommerce.core.ui.components.CommerceTopBar
 import com.example.moducommerce.core.ui.components.EmptyBox
 import com.example.moducommerce.core.ui.components.ErrorBox
@@ -69,11 +69,14 @@ import com.example.moducommerce.core.util.formatPrice
 @Composable
 fun ProductDetailScreen(
     onBack: () -> Unit,
+    onBuyNow: (productId: Long, skuId: Long, quantity: Int) -> Unit,
     viewModel: ProductDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+
+    LaunchedEffect(viewModel) { viewModel.buyNow.collect { onBuyNow(it.productId, it.skuId, it.quantity) } }
 
     LaunchedEffect(state.messageRes) {
         val res = state.messageRes ?: return@LaunchedEffect
@@ -114,10 +117,8 @@ fun ProductDetailScreen(
         }
     }
 
-    if (state.sheetOpen && state.detail != null) {
-        ModalBottomSheet(onDismissRequest = viewModel::closeSheet) {
-            OptionSheet(state = state, onSelect = viewModel::selectValue, onQuantity = viewModel::changeQuantity, onAddToCart = viewModel::addToCart)
-        }
+    BottomPanel(visible = state.sheetOpen && state.detail != null, onDismiss = viewModel::closeSheet) {
+        OptionSheet(state = state, onSelect = viewModel::selectValue, onQuantity = viewModel::changeQuantity, onAddToCart = viewModel::addToCart, onBuyNow = viewModel::buyNow)
     }
 }
 
@@ -193,10 +194,11 @@ private fun OptionSheet(
     onSelect: (Long, Long) -> Unit,
     onQuantity: (Int) -> Unit,
     onAddToCart: () -> Unit,
+    onBuyNow: () -> Unit,
 ) {
     val detail = state.detail ?: return
     val sku = state.selectedSku
-    Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = SHEET_BOTTOM_SPACE)) {
         Text(text = stringResource(R.string.option_sheet_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(12.dp))
         detail.optionGroups.forEach { group ->
@@ -245,9 +247,18 @@ private fun OptionSheet(
             Text(text = stringResource(R.string.price_format, formatPrice(state.totalPrice)), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         }
         Spacer(modifier = Modifier.height(12.dp))
-        Button(onClick = onAddToCart, enabled = sku != null && !sku.soldOut, modifier = Modifier.fillMaxWidth().height(48.dp)) {
-            Text(stringResource(R.string.option_add_to_cart))
+        val ready = sku != null && !sku.soldOut && !state.working
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            androidx.compose.material3.OutlinedButton(onClick = onAddToCart, enabled = ready, modifier = Modifier.weight(1f).height(48.dp)) {
+                Text(stringResource(R.string.option_add_to_cart))
+            }
+            Button(onClick = onBuyNow, enabled = ready, modifier = Modifier.weight(1f).height(48.dp)) {
+                Text(stringResource(R.string.option_buy_now))
+            }
         }
-        Spacer(modifier = Modifier.height(8.dp))
+        // 바텀시트 다이얼로그는 시스템 내비게이션 바 인셋을 못 받는 기기가 있다(Flip3 3버튼 바).
+        // 버튼이 그 밑으로 깔리면 탭이 앱에 오지 않으므로 여백을 넉넉히 둔다.
     }
 }
+
+private val SHEET_BOTTOM_SPACE = 16.dp

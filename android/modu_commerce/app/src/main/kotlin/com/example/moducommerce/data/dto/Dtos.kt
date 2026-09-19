@@ -1,6 +1,13 @@
 package com.example.moducommerce.data.dto
 
+import com.example.moducommerce.core.model.Address
+import com.example.moducommerce.core.model.Cart
+import com.example.moducommerce.core.model.CartItem
 import com.example.moducommerce.core.model.Category
+import com.example.moducommerce.core.model.OrderDetail
+import com.example.moducommerce.core.model.OrderItem
+import com.example.moducommerce.core.model.OrderStatus
+import com.example.moducommerce.core.model.OrderSummary
 import com.example.moducommerce.core.model.OptionGroup
 import com.example.moducommerce.core.model.OptionValue
 import com.example.moducommerce.core.model.Page
@@ -101,4 +108,103 @@ data class ProductDetailDto(
         },
         skus = skus.orEmpty().map { Sku(it.id, it.optionValueIds.orEmpty(), it.optionLabel.orEmpty(), it.extraPrice, it.stock) },
     )
+}
+
+data class CartItemDto(
+    val id: Long = 0,
+    val productId: Long = 0,
+    val skuId: Long = 0,
+    val productName: String? = null,
+    val optionLabel: String? = null,
+    val imageUrl: String? = null,
+    val unitPrice: Long = 0,
+    val quantity: Int = 0,
+    val stock: Int = 0,
+    val available: Boolean = true,
+    val lineAmount: Long = 0,
+) {
+    fun toModel() = CartItem(id, productId, skuId, productName.orEmpty(), optionLabel.orEmpty(), imageUrl, unitPrice, quantity, stock, available, lineAmount)
+}
+
+data class CartDto(val items: List<CartItemDto>? = null, val totalAmount: Long = 0, val itemCount: Int = 0) {
+    fun toModel() = Cart(items.orEmpty().map { it.toModel() }, totalAmount, itemCount)
+}
+
+data class AddressDto(
+    val id: Long = 0,
+    val recipient: String? = null,
+    val phone: String? = null,
+    val zipCode: String? = null,
+    val address1: String? = null,
+    val address2: String? = null,
+    val isDefault: Boolean = false,
+) {
+    fun toModel() = Address(id, recipient.orEmpty(), phone.orEmpty(), zipCode.orEmpty(), address1.orEmpty(), address2, isDefault)
+}
+
+data class AddressRequestDto(
+    val recipient: String,
+    val phone: String,
+    val zipCode: String,
+    val address1: String,
+    val address2: String?,
+    val isDefault: Boolean,
+)
+
+data class AddCartItemRequestDto(val skuId: Long, val quantity: Int)
+
+data class ChangeQuantityRequestDto(val quantity: Int)
+
+data class OrderLineDto(val skuId: Long, val quantity: Int)
+
+data class CreateOrderRequestDto(val addressId: Long, val items: List<OrderLineDto>, val cartItemIds: List<Long>)
+
+private fun statusOf(raw: String?): OrderStatus = runCatching { OrderStatus.valueOf(raw.orEmpty()) }.getOrDefault(OrderStatus.UNKNOWN)
+
+data class OrderItemDto(
+    val id: Long = 0,
+    val productId: Long = 0,
+    val productName: String? = null,
+    val optionLabel: String? = null,
+    val imageUrl: String? = null,
+    val unitPrice: Long = 0,
+    val quantity: Int = 0,
+    val lineAmount: Long = 0,
+) {
+    fun toModel() = OrderItem(id, productId, productName.orEmpty(), optionLabel.orEmpty(), imageUrl, unitPrice, quantity, lineAmount)
+}
+
+data class OrderSummaryDto(
+    val id: Long = 0,
+    val orderNo: String? = null,
+    val status: String? = null,
+    val totalAmount: Long = 0,
+    val itemCount: Int = 0,
+    val firstItemName: String? = null,
+    val firstImageUrl: String? = null,
+    val createdAt: String? = null,
+) {
+    fun toModel() = OrderSummary(id, orderNo.orEmpty(), statusOf(status), totalAmount, itemCount, firstItemName.orEmpty(), firstImageUrl, createdAt)
+}
+
+data class OrderDetailDto(
+    val id: Long = 0,
+    val orderNo: String? = null,
+    val status: String? = null,
+    val totalAmount: Long = 0,
+    val paymentMethod: String? = null,
+    val recipient: String? = null,
+    val phone: String? = null,
+    val zipCode: String? = null,
+    val address1: String? = null,
+    val address2: String? = null,
+    val paidAt: String? = null,
+    val cancelledAt: String? = null,
+    val items: List<OrderItemDto>? = null,
+) {
+    fun toModel() =
+        OrderDetail(
+            id, orderNo.orEmpty(), statusOf(status), totalAmount, paymentMethod.orEmpty(), recipient.orEmpty(), phone.orEmpty(),
+            zipCode.orEmpty(), address1.orEmpty(), address2, paidAt.orEmpty(), cancelledAt, items.orEmpty().map { it.toModel() },
+        )
 }

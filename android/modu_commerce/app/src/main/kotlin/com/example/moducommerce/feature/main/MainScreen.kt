@@ -8,6 +8,9 @@ import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationBar
@@ -43,8 +46,12 @@ enum class MainTab(val labelRes: Int, val icon: ImageVector) {
 @Composable
 fun MainScreen(
     onOpenSearch: () -> Unit,
+    onOpenCart: () -> Unit,
     onOpenProduct: (Long) -> Unit,
     onOpenCategory: (Long, String) -> Unit,
+    onOpenOrders: () -> Unit,
+    onOpenAddresses: () -> Unit,
+    cartCount: Int,
 ) {
     var tab by rememberSaveable { mutableStateOf(MainTab.HOME) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -56,6 +63,13 @@ fun MainScreen(
                 actions = {
                     if (tab == MainTab.HOME || tab == MainTab.CATEGORY) {
                         IconButton(onClick = onOpenSearch) { Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.action_search)) }
+                    }
+                    if (tab != MainTab.MY) {
+                        IconButton(onClick = onOpenCart) {
+                            BadgedBox(badge = { if (cartCount > 0) Badge { Text(cartCount.toString()) } }) {
+                                Icon(Icons.Filled.ShoppingCart, contentDescription = stringResource(R.string.cart_title))
+                            }
+                        }
                     }
                 },
             )
@@ -80,7 +94,7 @@ fun MainScreen(
                 MainTab.HOME -> HomeScreen(snackbarHostState = snackbarHostState, onOpenProduct = onOpenProduct, onOpenCategory = onOpenCategory)
                 MainTab.CATEGORY -> CategoryScreen(onOpenCategory = onOpenCategory)
                 MainTab.WISHLIST -> WishlistScreen(snackbarHostState = snackbarHostState, onOpenProduct = onOpenProduct)
-                MainTab.MY -> MyScreen()
+                MainTab.MY -> MyScreen(onOpenOrders = onOpenOrders, onOpenAddresses = onOpenAddresses)
             }
         }
     }

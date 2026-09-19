@@ -63,7 +63,68 @@
     <string name="option_choose_all">옵션을 모두 선택해 주세요</string>
     <string name="option_total">총 금액</string>
     <string name="option_add_to_cart">장바구니 담기</string>
-    <string name="option_cart_coming">장바구니는 준비 중입니다</string>
+    <string name="option_buy_now">바로 구매</string>
+    <string name="option_added">장바구니에 담았습니다</string>
+    <string name="option_add_failed">장바구니에 담지 못했습니다</string>
+
+    <!-- 장바구니 -->
+    <string name="cart_title">장바구니</string>
+    <string name="cart_empty">장바구니가 비었습니다.</string>
+    <string name="cart_unavailable">판매 중지</string>
+    <string name="cart_stock_short">재고 부족 (남은 수량 %1$d)</string>
+    <string name="cart_remove">삭제</string>
+    <string name="cart_total">총 %1$d개</string>
+    <string name="cart_checkout">주문하기</string>
+    <string name="cart_update_failed">수량을 바꾸지 못했습니다</string>
+    <string name="cart_remove_failed">삭제하지 못했습니다</string>
+
+    <!-- 주문서 -->
+    <string name="checkout_title">주문서</string>
+    <string name="checkout_address">배송지</string>
+    <string name="checkout_address_none">배송지를 등록해 주세요</string>
+    <string name="checkout_address_change">변경</string>
+    <string name="checkout_address_add">배송지 추가</string>
+    <string name="checkout_items">주문 상품</string>
+    <string name="checkout_payment">결제 수단</string>
+    <string name="checkout_payment_mock">모의 결제 (실제 결제 없음)</string>
+    <string name="checkout_total">결제 금액</string>
+    <string name="checkout_pay">결제하기</string>
+    <string name="checkout_done">주문이 완료됐습니다</string>
+    <string name="checkout_failed">주문하지 못했습니다</string>
+    <string name="checkout_default">기본</string>
+    <string name="checkout_select_address">배송지 선택</string>
+
+    <!-- 배송지 폼 -->
+    <string name="address_form_title">배송지</string>
+    <string name="address_recipient">받는 사람</string>
+    <string name="address_phone">연락처</string>
+    <string name="address_zip">우편번호</string>
+    <string name="address_line1">주소</string>
+    <string name="address_line2">상세 주소</string>
+    <string name="address_default">기본 배송지로 설정</string>
+    <string name="address_save">저장</string>
+    <string name="address_save_failed">배송지를 저장하지 못했습니다</string>
+
+    <!-- 주문 내역 -->
+    <string name="orders_title">주문 내역</string>
+    <string name="orders_empty">주문 내역이 없습니다.</string>
+    <string name="orders_more_items">외 %1$d건</string>
+    <string name="order_detail_title">주문 상세</string>
+    <string name="order_no">주문번호 %1$s</string>
+    <string name="order_status_paid">결제완료</string>
+    <string name="order_status_shipping">배송중</string>
+    <string name="order_status_delivered">배송완료</string>
+    <string name="order_status_cancelled">취소</string>
+    <string name="order_status_unknown">알 수 없음</string>
+    <string name="order_cancel">주문 취소</string>
+    <string name="order_cancel_message">주문을 취소할까요? 결제 금액은 즉시 환불(모의)됩니다.</string>
+    <string name="order_cancel_failed">주문을 취소하지 못했습니다</string>
+    <string name="order_cancelled_done">주문을 취소했습니다</string>
+    <string name="order_recipient">받는 사람</string>
+    <string name="order_payment">결제</string>
+    <string name="order_items">주문 상품</string>
+    <string name="my_orders">주문 내역</string>
+    <string name="my_addresses">배송지 관리</string>
 
     <!-- 찜 -->
     <string name="wishlist_empty">찜한 상품이 없습니다.</string>

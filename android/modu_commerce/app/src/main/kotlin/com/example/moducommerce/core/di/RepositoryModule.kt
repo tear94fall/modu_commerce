@@ -4,6 +4,8 @@ import com.example.moducommerce.data.repository.AuthRepository
 import com.example.moducommerce.data.repository.AuthRepositoryImpl
 import com.example.moducommerce.data.repository.CatalogRepository
 import com.example.moducommerce.data.repository.CatalogRepositoryImpl
+import com.example.moducommerce.data.repository.OrderRepository
+import com.example.moducommerce.data.repository.OrderRepositoryImpl
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -21,4 +23,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindCatalogRepository(impl: CatalogRepositoryImpl): CatalogRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindOrderRepository(impl: OrderRepositoryImpl): OrderRepository
 }
