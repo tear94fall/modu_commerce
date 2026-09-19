@@ -6,6 +6,7 @@ import com.example.commerce.application.seed.ProductSeeder
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Transactional
 import javax.sql.DataSource
 
 /**
@@ -22,6 +23,10 @@ class CatalogTestSupport(
 
     fun reseed() {
         listOf(
+            "order_items",
+            "orders",
+            "cart_items",
+            "addresses",
             "sku_option_values",
             "product_skus",
             "product_option_values",
@@ -39,4 +44,26 @@ class CatalogTestSupport(
     fun productId(name: String): Long = requireNotNull(productRwRepository.findAll().first { it.name == name }.id)
 
     fun categoryId(name: String): Long = requireNotNull(categoryRwRepository.findAll().first { it.name == name }.id)
+
+    /** 상품의 SKU id(옵션 라벨로 고른다. 옵션 없는 상품은 라벨 ""). */
+    @Transactional(transactionManager = "rwTransactionManager")
+    fun skuId(
+        productName: String,
+        optionLabel: String = "",
+    ): Long {
+        val product = productRwRepository.findAll().first { it.name == productName }
+        return requireNotNull(product.skus.first { it.optionLabel() == optionLabel }.id)
+    }
+
+    @Transactional(transactionManager = "rwTransactionManager")
+    fun stockOf(
+        productName: String,
+        optionLabel: String = "",
+    ): Int =
+        productRwRepository
+            .findAll()
+            .first { it.name == productName }
+            .skus
+            .first { it.optionLabel() == optionLabel }
+            .stock
 }

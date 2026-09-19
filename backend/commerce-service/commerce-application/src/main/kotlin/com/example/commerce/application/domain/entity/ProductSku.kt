@@ -42,6 +42,22 @@ class ProductSku(
 
     fun isSoldOut(): Boolean = stock <= 0
 
+    /** 주문 생성. 모자라면 IllegalArgumentException(→ 400). 호출자가 행을 잠근 채 부른다. */
+    fun decreaseStock(quantity: Int) {
+        require(quantity > 0) { "수량은 1 이상이어야 합니다." }
+        require(stock >= quantity) { "재고가 부족합니다: ${displayName()} (남은 수량 $stock)" }
+        stock -= quantity
+    }
+
+    /** 주문 취소. */
+    fun increaseStock(quantity: Int) {
+        require(quantity > 0) { "수량은 1 이상이어야 합니다." }
+        stock += quantity
+    }
+
+    /** "상품명 (블랙 / M)" 또는 옵션이 없으면 "상품명". */
+    fun displayName(): String = optionLabel().let { if (it.isEmpty()) product.name else "${product.name} ($it)" }
+
     /** 그룹명=값명 을 그룹명 순으로 이은 조합 키. 상품 수정 때 같은 조합을 찾는 데 쓴다. */
     fun optionKey(): String = optionKeyOf(optionValues.associate { it.group.name to it.name })
 
