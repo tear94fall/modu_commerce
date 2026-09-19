@@ -24,18 +24,19 @@ class ProductQueryServiceTest
         }
 
         @Test
-        fun `시드 상품 4개를 id 순으로 조회한다`() {
+        fun `시드 상품을 id 순으로 조회한다`() {
             val products = productQueryService.findProducts(null)
 
             assertEquals(ProductSeeder.SAMPLE_COUNT, products.size)
-            assertEquals(listOf("모두 무선 이어폰", "모두 텀블러 500ml", "모두 데일리 백팩", "모두 기계식 키보드"), products.map { it.name })
+            assertEquals("모두 무선 이어폰", products.first().name)
+            assertEquals("모두 스티커 팩", products.last().name)
             assertEquals(89_000L, products.first().price)
         }
 
         @Test
         fun `키워드로 이름과 설명을 검색한다`() {
             assertEquals(listOf("모두 기계식 키보드"), productQueryService.findProducts("키보드").map { it.name })
-            assertEquals(listOf("모두 데일리 백팩"), productQueryService.findProducts("노트북").map { it.name })
+            assertEquals(listOf("모두 고속 충전기 65W", "모두 데일리 백팩"), productQueryService.findProducts("노트북").map { it.name })
             assertEquals(emptyList<String>(), productQueryService.findProducts("없는상품").map { it.name })
         }
 
@@ -49,7 +50,7 @@ class ProductQueryServiceTest
             val clamped = productQueryService.searchAdminProducts(null, -3, 1000)
             assertEquals(0, clamped.number)
             assertEquals(100, clamped.size)
-            assertEquals("모두 기계식 키보드", clamped.content.first().name)
+            assertEquals("모두 스티커 팩", clamped.content.first().name)
 
             assertEquals(1, productQueryService.searchAdminProducts(null, 0, 0).size)
         }

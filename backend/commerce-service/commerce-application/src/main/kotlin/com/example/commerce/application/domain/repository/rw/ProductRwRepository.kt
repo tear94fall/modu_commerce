@@ -8,4 +8,7 @@ interface ProductRwRepository : RwRepository<Product, Long> {
     /** @SQLRestriction 을 우회해 삭제된 행까지 센다. 시더가 "한 번이라도 상품이 있었는지" 볼 때 쓴다. */
     @Query(value = "select count(*) from products", nativeQuery = true)
     fun countIncludingDeleted(): Long
+
+    @Query("select count(p) from Product p where p.category.id = :categoryId")
+    fun countByCategory(categoryId: Long): Long
 }
