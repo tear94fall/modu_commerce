@@ -22,8 +22,6 @@ android {
 
         // 모두의 채팅과 같은 개발 게이트웨이. auth-service 는 게이트웨이 경유로 부른다.
         buildConfigField("String", "API_BASE_URL", "\"http://192.168.0.3:8000/\"")
-        // 커머스 화면(web/). 개발은 Mac 의 Vite dev 서버(LAN, HMR)를 WebView 가 연다. 배포 주소는 다음 단계.
-        buildConfigField("String", "WEB_URL", "\"http://192.168.0.3:5174/\"")
     }
 
     buildFeatures {
@@ -32,9 +30,15 @@ android {
     }
 
     buildTypes {
+        // 커머스 화면(web/) 주소. 디버그는 Mac 의 Vite dev 서버(LAN, HMR)를 열어 저장 즉시 반영되고,
+        // 릴리스는 nginx 로 띄운 정적 빌드(web/docker-compose.yml, :8082)를 연다.
+        debug {
+            buildConfigField("String", "WEB_URL", "\"http://192.168.0.3:5174/\"")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            buildConfigField("String", "WEB_URL", "\"http://192.168.0.3:8082/\"")
         }
     }
 

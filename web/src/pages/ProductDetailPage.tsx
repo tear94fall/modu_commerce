@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { addCartItem } from '../api/cart'
 import { getProduct, setWish, type ProductDetail } from '../api/catalog'
 import { ApiError } from '../api/client'
@@ -15,6 +15,7 @@ import { clampQuantity, isValueAvailable, selectSku, toggleValue, totalPrice, ty
 export default function ProductDetailPage() {
   const { id } = useParams()
   const productId = Number(id)
+  const navigate = useNavigate()
   const [detail, setDetail] = useState<ProductDetail | null>(null)
   const [status, setStatus] = useState<'loading' | 'ok' | 'notFound' | 'error'>('loading')
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -181,6 +182,9 @@ export default function ProductDetailPage() {
         <div className="actions">
           <button type="button" className="btn outline" disabled={!sku || working} onClick={addToCart}>
             장바구니 담기
+          </button>
+          <button type="button" className="btn primary" disabled={!sku || working} onClick={() => sku && navigate(`/checkout?productId=${detail.id}&skuId=${sku.id}&quantity=${quantity}`)}>
+            바로 구매
           </button>
         </div>
       </BottomPanel>

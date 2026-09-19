@@ -56,6 +56,9 @@ fun WebScreen(viewModel: WebViewModel = hiltViewModel()) {
         WebView(context).apply {
             // AndroidView 의 기본은 wrap_content 라 WebView 가 높이를 "정해지지 않음" 으로 재고, 그러면 CSS vh 가 0 이 된다.
             layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            // 웹이 앱처럼 보이도록 오른쪽 스크롤바는 그리지 않는다.
+            isVerticalScrollBarEnabled = false
+            isHorizontalScrollBarEnabled = false
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
             settings.mediaPlaybackRequiresUserGesture = false

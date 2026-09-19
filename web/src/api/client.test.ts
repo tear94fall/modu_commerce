@@ -7,7 +7,7 @@ const json = (status: number, body: unknown) => new Response(JSON.stringify(body
 
 const fakeBridge = (over: Partial<ModuAppBridge> = {}): ModuAppBridge => ({
   getAccessToken: () => 'app-token',
-  refreshAccessToken: () => 'fresh-token',
+  refreshAccessToken: (failed: string) => (failed === 'app-token' ? 'fresh-token' : ''),
   onSessionExpired: vi.fn(),
   logout: vi.fn(),
   getProfile: () => '{}',

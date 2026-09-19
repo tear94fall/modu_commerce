@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getCategories, getProducts, setWish, type Category, type ProductSummary } from '../api/catalog'
 import { ErrorBox } from '../components/Boxes'
+import CartButton from '../components/CartButton'
 import { SearchIcon } from '../components/Icons'
 import { Screen, TopBar } from '../components/Layout'
 import { ProductGrid } from '../components/ProductCard'
@@ -60,9 +61,12 @@ export default function HomePage() {
       <TopBar
         title="모두의 커머스"
         actions={
-          <Link to="/search" className="icon-btn" aria-label="검색">
-            <SearchIcon />
-          </Link>
+          <>
+            <Link to="/search" className="icon-btn" aria-label="검색">
+              <SearchIcon />
+            </Link>
+            <CartButton />
+          </>
         }
       />
       {categories.length > 0 && (

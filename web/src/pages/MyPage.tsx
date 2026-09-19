@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { getProfile, type Profile } from '../api/me'
-import { clearToken } from '../auth/token'
+import { logoutSession } from '../auth/session'
 import { bridge } from '../bridge/app'
 import { Screen, TopBar } from '../components/Layout'
 
@@ -21,8 +21,7 @@ export default function MyPage() {
       b.logout()
       return
     }
-    clearToken()
-    navigate('/login', { replace: true })
+    logoutSession().finally(() => navigate('/login', { replace: true }))
   }
 
   return (
@@ -36,6 +35,12 @@ export default function MyPage() {
         </div>
       </div>
       <div className="menu">
+        <Link to="/orders" className="menu-row">
+          주문 내역
+        </Link>
+        <Link to="/addresses" className="menu-row">
+          배송지 관리
+        </Link>
         <button type="button" className="menu-row danger" onClick={() => setConfirm(true)}>
           로그아웃
         </button>
