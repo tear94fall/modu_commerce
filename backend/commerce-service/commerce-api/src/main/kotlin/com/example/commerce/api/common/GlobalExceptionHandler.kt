@@ -25,6 +25,11 @@ class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ErrorResponse(message))
     }
 
+    /** 도메인 규칙 위반(옵션 조합, 카테고리 깊이, 정가 등). 메시지가 곧 사용자 안내다. */
+    @ExceptionHandler(IllegalArgumentException::class)
+    fun handleIllegalArgument(ex: IllegalArgumentException): ResponseEntity<ErrorResponse> =
+        ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ErrorResponse(ex.message ?: "요청 값이 올바르지 않습니다."))
+
     @ExceptionHandler(HttpMessageNotReadableException::class)
     fun handleUnreadable(ex: HttpMessageNotReadableException): ResponseEntity<ErrorResponse> =
         ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ErrorResponse("요청 본문을 읽을 수 없습니다."))
