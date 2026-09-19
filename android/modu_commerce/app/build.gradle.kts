@@ -22,8 +22,8 @@ android {
 
         // 모두의 채팅과 같은 개발 게이트웨이. auth-service 는 게이트웨이 경유로 부른다.
         buildConfigField("String", "API_BASE_URL", "\"http://192.168.0.3:8000/\"")
-        // 커머스 서비스(backend/commerce-service). 같은 모두 계정 토큰(aud=modu-commerce)으로 부른다.
-        buildConfigField("String", "COMMERCE_API_URL", "\"http://192.168.0.3:8200/\"")
+        // 커머스 화면(web/). 개발은 Mac 의 Vite dev 서버(LAN, HMR)를 WebView 가 연다. 배포 주소는 다음 단계.
+        buildConfigField("String", "WEB_URL", "\"http://192.168.0.3:5174/\"")
     }
 
     buildFeatures {
@@ -84,7 +84,6 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.okhttp.logging)
     implementation(libs.gson)
-    implementation(libs.coil.compose)
     implementation(libs.play.services.auth)
 
     testImplementation(libs.junit)

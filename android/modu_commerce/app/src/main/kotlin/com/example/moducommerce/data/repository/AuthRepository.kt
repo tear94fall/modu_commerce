@@ -38,7 +38,7 @@ class AuthRepositoryImpl @Inject constructor(
         val refresh = sessionStore.refreshToken()
         if (!refresh.isNullOrBlank()) safeCall { plainAuthApi.revoke(refresh, OAuthClient.CLIENT_ID) }
         sessionStore.clearSession()
-        sessionEvents.notifyLoggedOut()
+        sessionEvents.notifyLoggedOut(expired = false)
     }
 
     private suspend fun exchange(form: Map<String, String>): Result<UserProfile> = safeCall {
