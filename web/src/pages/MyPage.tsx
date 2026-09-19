@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { getProfile, type Profile } from '../api/me'
 import { clearToken } from '../auth/token'
 import { bridge } from '../bridge/app'
@@ -36,6 +36,12 @@ export default function MyPage() {
         </div>
       </div>
       <div className="menu">
+        <Link to="/orders" className="menu-row">
+          주문 내역
+        </Link>
+        <Link to="/addresses" className="menu-row">
+          배송지 관리
+        </Link>
         <button type="button" className="menu-row danger" onClick={() => setConfirm(true)}>
           로그아웃
         </button>

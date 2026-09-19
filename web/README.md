@@ -30,4 +30,4 @@ WebView 안에서는 `window.ModuApp` 이 있습니다. `getAccessToken()` 으�
 ## 구조
 
 - `src/api/` 서버 호출(client, catalog, cart, me) · `src/util/` 가격 표기·옵션→SKU 계산 · `src/hooks/useProductPager` 페이징+찜 토글
-- `src/components/` 상단바·탭·상품 카드·바닥 패널·토스트 · `src/pages/` 홈, 카테고리, 상품 목록, 검색, 상품 상세, 찜, 마이, (개발용) 로그인
+- `src/components/` 상단바·탭·상품 카드·바닥 패널·토스트·배송지 폼·주문 상품 줄 · `src/pages/` 홈, 카테고리, 상품 목록, 검색, 상품 상세, 찜, 마이, 장바구니, 주문서, 주문 내역·상세, 배송지 관리, (개발용) 로그인
