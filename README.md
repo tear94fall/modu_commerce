@@ -1,23 +1,26 @@
-# 모두의 커머스 (SSO 샘플)
+# 모두의 커머스
 
-모두의 채팅과 같은 **모두 계정**으로 로그인하는 최소 안드로이드 앱입니다(Kotlin). 아이콘은 채팅 앱과 같은 번개 마크에 붉은 그라데이션을 입혔습니다.
+모두의 채팅과 같은 **모두 계정**으로 로그인하는 커머스입니다. 저장소는 세 부분입니다.
 
-화면은 모두의 채팅과 같은 순서입니다: **초기 화면**(`SplashActivity`, 흰 바탕에 로고만) → **로그인 화면**(`LoginActivity`) → **상품 목록**(`ProductListActivity`). 초기 화면은 저장된 토큰이 있으면 로그인을 건너뛰고 바로 상품 목록으로 갑니다. 상품 목록은 카드 한 장에 사진·이름·가격·설명을 보여 주고, 앱바의 오버플로 메뉴에 로그아웃이 있습니다. 사진은 Glide 로 `imageUrl` 을 받아 그리고, 주소가 없는 상품은 로고 플레이스홀더가 보입니다.
-
-상품 목록 앱바의 돋보기로 이름·설명을 검색하고(검색 버튼을 누를 때만 조회), 카드를 누르면 **상품 상세**(`ProductDetailActivity`)로 가서 서버에서 최신 값을 다시 읽습니다. 액세스 토큰이 만료되면 `TokenRefresher` 가 refresh 토큰으로 한 번 갱신하고, 갱신도 실패하면 로그인 화면으로 돌아갑니다.
-
-- **모두 계정으로 로그인 (채팅 앱)**: 설치된 모두의 채팅 앱에 1회용 코드를 요청하고(PKCE), auth-service `/oauth2/token`(`sso_code` grant)으로 이 앱의 토큰을 받습니다. 채팅 앱이 로그인돼 있으면 확인 대화상자 한 번으로 끝납니다.
-- **Google 로 로그인**: 채팅 앱이 없을 때의 폴백. 구글 ID 토큰을 `google_id_token` grant 로 교환합니다. 구글 콘솔에 이 앱의 패키지 `com.example.moducommerce` 와 서명 SHA-1 이 Android 클라이언트로 등록돼 있어야 동작합니다.
+- `web/` — 커머스 화면 전부(React + Vite). Android 앱의 WebView 가 열고, 브라우저에서도 열립니다. 실험 단계라 화면을 빨리 바꿔 보려고 웹으로 둡니다. 자세한 건 `web/README.md`.
+- `android/modu_commerce` — Android 껍데기(Kotlin/Compose): 초기 화면 → 로그인(모두 계정 SSO 또는 Google) → **WebView**. 토큰은 `window.ModuApp` 브리지로 웹에 넘기고, 만료되면 refresh 토큰으로 갱신하며, 갱신도 실패하면 로그인 화면으로 돌아갑니다.
+- `backend/commerce-service` — 카탈로그·장바구니·주문 API.
 
 ## 실행
 
 ```bash
+# 1) 웹 (Mac, LAN 에 열림)
+cd web && npm install && npm run dev            # http://192.168.0.3:5174
+
+# 2) Android 앱 — 디버그 빌드는 위 dev 서버 주소(app/build.gradle.kts 의 WEB_URL)를 연다
 cd android/modu_commerce
 ANDROID_HOME=$HOME/Library/Android/sdk ./gradlew :app:testDebugUnitTest :app:assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-안드로이드 프로젝트는 `android/modu_commerce` 에 있고(Kotlin 소스는 `app/src/main/kotlin`), 서버 주소는 그 안의 `app/build.gradle` 의 `API_BASE_URL` 입니다. 채팅 앱과 같은 키(개발: 디버그 키)로 서명돼야 채팅 앱의 SSO 액티비티를 부를 수 있습니다.
+- **모두 계정으로 로그인 (채팅 앱)**: 설치된 모두의 채팅 앱에 1회용 코드를 요청하고(PKCE), auth-service `/oauth2/token`(`sso_code` grant)으로 이 앱의 토큰을 받습니다. 채팅 앱과 같은 키(개발: 디버그 키)로 서명돼야 합니다.
+- **Google 로 로그인**: 채팅 앱이 없을 때의 폴백. 구글 콘솔에 패키지 `com.example.moducommerce` 와 서명 SHA-1 이 등록돼 있어야 합니다.
+- 게이트웨이 주소는 `app/build.gradle.kts` 의 `API_BASE_URL` 입니다.
 
 ## 커머스 서비스 (backend/commerce-service)
 
