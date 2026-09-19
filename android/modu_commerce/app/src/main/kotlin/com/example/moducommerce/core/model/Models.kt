@@ -74,3 +74,92 @@ data class Page<T>(
 ) {
     val hasNext: Boolean get() = number + 1 < totalPages
 }
+
+data class CartItem(
+    val id: Long,
+    val productId: Long,
+    val skuId: Long,
+    val productName: String,
+    val optionLabel: String,
+    val imageUrl: String?,
+    val unitPrice: Long,
+    val quantity: Int,
+    val stock: Int,
+    val available: Boolean,
+    val lineAmount: Long,
+) {
+    /** 주문할 수 있는 줄: 판매중이고 재고가 수량 이상. */
+    val orderable: Boolean get() = available && stock >= quantity
+}
+
+data class Cart(
+    val items: List<CartItem>,
+    val totalAmount: Long,
+    val itemCount: Int,
+)
+
+data class Address(
+    val id: Long,
+    val recipient: String,
+    val phone: String,
+    val zipCode: String,
+    val address1: String,
+    val address2: String?,
+    val isDefault: Boolean,
+) {
+    val fullAddress: String get() = listOfNotNull(address1, address2?.takeIf { it.isNotBlank() }).joinToString(" ")
+}
+
+data class AddressInput(
+    val recipient: String,
+    val phone: String,
+    val zipCode: String,
+    val address1: String,
+    val address2: String?,
+    val isDefault: Boolean,
+)
+
+enum class OrderStatus { PAID, SHIPPING, DELIVERED, CANCELLED, UNKNOWN }
+
+data class OrderLine(val skuId: Long, val quantity: Int)
+
+data class OrderItem(
+    val id: Long,
+    val productId: Long,
+    val productName: String,
+    val optionLabel: String,
+    val imageUrl: String?,
+    val unitPrice: Long,
+    val quantity: Int,
+    val lineAmount: Long,
+)
+
+data class OrderSummary(
+    val id: Long,
+    val orderNo: String,
+    val status: OrderStatus,
+    val totalAmount: Long,
+    val itemCount: Int,
+    val firstItemName: String,
+    val firstImageUrl: String?,
+    val createdAt: String?,
+)
+
+data class OrderDetail(
+    val id: Long,
+    val orderNo: String,
+    val status: OrderStatus,
+    val totalAmount: Long,
+    val paymentMethod: String,
+    val recipient: String,
+    val phone: String,
+    val zipCode: String,
+    val address1: String,
+    val address2: String?,
+    val paidAt: String,
+    val cancelledAt: String?,
+    val items: List<OrderItem>,
+) {
+    val fullAddress: String get() = listOfNotNull(address1, address2?.takeIf { it.isNotBlank() }).joinToString(" ")
+    val cancellable: Boolean get() = status == OrderStatus.PAID
+}

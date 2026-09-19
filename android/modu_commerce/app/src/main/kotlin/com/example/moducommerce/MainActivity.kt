@@ -3,6 +3,7 @@ package com.example.moducommerce
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -12,6 +13,7 @@ import androidx.navigation.compose.rememberNavController
 import com.example.moducommerce.core.session.SessionEvents
 import com.example.moducommerce.core.session.SessionStore
 import com.example.moducommerce.core.ui.theme.CommerceTheme
+import com.example.moducommerce.data.repository.OrderRepository
 import com.example.moducommerce.navigation.CommerceNavHost
 import com.example.moducommerce.navigation.Routes
 import dagger.hilt.android.AndroidEntryPoint
@@ -29,11 +31,16 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var sessionEvents: SessionEvents
 
+    @Inject lateinit var orderRepository: OrderRepository
+
     private var sessionDecided by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        // Material3 바텀시트·스캐폴드는 edge-to-edge 를 전제로 인셋을 계산한다. 끄면 3버튼 내비게이션 바 기기에서
+        // 시트 아래쪽 버튼이 바 밑으로 깔려 눌리지 않는다.
+        enableEdgeToEdge()
         splashScreen.setKeepOnScreenCondition { !sessionDecided }
 
         setContent {
@@ -42,6 +49,7 @@ class MainActivity : ComponentActivity() {
 
                 CommerceNavHost(
                     navController = navController,
+                    orderRepository = orderRepository,
                     awaitLoggedIn = {
                         val loggedIn = sessionStore.isLoggedIn.first()
                         sessionDecided = true

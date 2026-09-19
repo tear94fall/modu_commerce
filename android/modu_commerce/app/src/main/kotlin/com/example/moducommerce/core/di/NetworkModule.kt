@@ -8,6 +8,7 @@ import com.example.moducommerce.core.network.AuthInterceptor
 import com.example.moducommerce.core.network.TokenAuthenticator
 import com.example.moducommerce.data.api.AuthApi
 import com.example.moducommerce.data.api.CatalogApi
+import com.example.moducommerce.data.api.OrderApi
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import dagger.Module
@@ -69,6 +70,11 @@ object NetworkModule {
     @Singleton
     fun provideCatalogApi(@Named("api") client: OkHttpClient, gson: Gson): CatalogApi =
         retrofit(ApiConfig.COMMERCE_URL, client, gson).create(CatalogApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideOrderApi(@Named("api") client: OkHttpClient, gson: Gson): OrderApi =
+        retrofit(ApiConfig.COMMERCE_URL, client, gson).create(OrderApi::class.java)
 
     /** 상품 사진은 공개 URL(picsum 등)이라 인증이 필요 없지만, 클라이언트를 하나로 쓰는 편이 단순하다. */
     @Provides

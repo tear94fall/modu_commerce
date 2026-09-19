@@ -9,6 +9,11 @@ import com.example.moducommerce.core.model.Sku
 import com.example.moducommerce.core.network.isNotFound
 import com.example.moducommerce.core.session.WishStore
 import com.example.moducommerce.data.repository.CatalogRepository
+import com.example.moducommerce.data.repository.OrderRepository
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import com.example.moducommerce.navigation.Routes
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,6 +33,8 @@ data class ProductDetailUiState(
     val quantity: Int = 1,
     val sheetOpen: Boolean = false,
     val messageRes: Int? = null,
+    /** 장바구니 담는 중. 버튼을 잠근다. */
+    val working: Boolean = false,
 ) {
     /** 모든 그룹을 골랐을 때의 SKU. 옵션 없는 상품은 유일한 SKU. 아직 덜 골랐으면 null. */
     val selectedSku: Sku? get() = detail?.let { selectSku(it, selected) }
@@ -58,12 +65,19 @@ class ProductDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val catalogRepository: CatalogRepository,
     private val wishStore: WishStore,
+    private val orderRepository: OrderRepository,
 ) : ViewModel() {
 
     private val productId: Long = savedStateHandle.get<Long>(Routes.ARG_ID) ?: 0L
 
     private val _uiState = MutableStateFlow(ProductDetailUiState())
     val uiState: StateFlow<ProductDetailUiState> = _uiState.asStateFlow()
+
+    /** 바로 구매: (skuId, quantity). 화면이 주문서로 간다. */
+    data class BuyNow(val productId: Long, val skuId: Long, val quantity: Int)
+
+    private val _buyNow = MutableSharedFlow<BuyNow>(replay = 0, extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    val buyNow: SharedFlow<BuyNow> = _buyNow.asSharedFlow()
 
     init {
         load()
@@ -114,8 +128,24 @@ class ProductDetailViewModel @Inject constructor(
         }
     }
 
-    /** B 단계(장바구니) 전이라 안내만 한다. */
-    fun addToCart() = _uiState.update { it.copy(messageRes = R.string.option_cart_coming, sheetOpen = false) }
+    fun addToCart() {
+        val state = _uiState.value
+        val sku = state.selectedSku ?: return
+        if (state.working) return
+        _uiState.update { it.copy(working = true) }
+        viewModelScope.launch {
+            orderRepository.addToCart(sku.id, state.quantity)
+                .onSuccess { _uiState.update { it.copy(working = false, sheetOpen = false, messageRes = R.string.option_added) } }
+                .onFailure { _uiState.update { it.copy(working = false, messageRes = R.string.option_add_failed) } }
+        }
+    }
+
+    fun buyNow() {
+        val state = _uiState.value
+        val sku = state.selectedSku ?: return
+        _uiState.update { it.copy(sheetOpen = false) }
+        _buyNow.tryEmit(BuyNow(productId, sku.id, state.quantity))
+    }
 
     fun consumeMessage() = _uiState.update { it.copy(messageRes = null) }
 }
