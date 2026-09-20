@@ -12,8 +12,8 @@
 # 1) 웹 (Mac, LAN 에 열림)
 cd web && npm install && npm run dev            # http://192.168.0.3:5174
 
-# 1') 웹 배포본 (nginx, 릴리스 빌드가 여는 주소)
-cd web && docker compose up -d --build          # http://192.168.0.3:8082
+# 1') 웹 배포본 (nginx, 릴리스 빌드가 여는 주소) — 백엔드 compose 의 서비스라 commerce-service 와 같이 뜬다
+cd backend && docker compose up -d --build modu-commerce-web     # http://192.168.0.3:8082
 
 # 2) Android 앱 — 디버그 빌드는 Vite dev 서버(:5174), 릴리스 빌드는 배포본(:8082)을 연다 (app/build.gradle.kts 의 WEB_URL)
 cd android/modu_commerce
@@ -38,7 +38,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```bash
 cd backend/commerce-service
 ./gradlew test bootJar          # 테스트 37개, commerce-api/build/libs/commerce-api-0.0.1-SNAPSHOT.jar
-cd .. && docker compose up -d --build   # commerce-service(8200). mysql-commerce(3316)는 modu_infra(https://github.com/tear94fall/modu_infra, 이 저장소 옆에 clone)의 data 에서 먼저 띄운다
+cd .. && docker compose up -d --build   # commerce-service(8200) + modu-commerce-web(8082). mysql-commerce(3316)는 modu_infra(https://github.com/tear94fall/modu_infra, 이 저장소 옆에 clone)의 data 에서 먼저 띄운다
 ```
 
 접속 정보는 `DB_MASTER_URL`/`DB_MASTER_USERNAME`/`DB_MASTER_PASSWORD`(선택 `DB_REPLICA_*`), 토큰 검증은 `MODU_OAUTH_ISSUER`/`MODU_OAUTH_JWKS_URI` 환경변수로 바꿉니다. 커머스 앱은 로그인 후 `COMMERCE_API_URL`(`app/build.gradle`) 로 상품 목록을 불러옵니다.

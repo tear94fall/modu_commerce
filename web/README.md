@@ -28,10 +28,10 @@ npm run build        # tsc + vite build → dist/
 ## 배포 (nginx)
 
 ```bash
-cd web && docker compose up -d --build     # modu-commerce-web → http://<Mac IP>:8082
+cd backend && docker compose up -d --build modu-commerce-web     # modu-commerce-web → http://<Mac IP>:8082
 ```
 
-`Dockerfile` 이 정적 빌드를 만들고 `nginx.conf` 가 `/api/` → commerce-service:8200, `/auth-service/` → gateway-service:8000,
+커머스 백엔드 compose(`backend/docker-compose.yml`)의 서비스 하나라 commerce-service 와 같이 뜬다. `Dockerfile` 이 정적 빌드를 만들고 `nginx.conf` 가 `/api/` → commerce-service:8200, `/auth-service/` → gateway-service:8000,
 `/storage-service/` → storage-service:9999 로 프록시합니다(모두 external 네트워크 `modu-infra`). Android **릴리스** 빌드의 `WEB_URL` 이 이 주소이고,
 **디버그** 빌드는 Vite dev 서버(:5174)를 봅니다.
 
