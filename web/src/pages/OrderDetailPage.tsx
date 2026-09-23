@@ -105,9 +105,19 @@ export default function OrderDetailPage() {
         <div className="block-head">
           <h2>결제</h2>
         </div>
+        <div className="kv muted">
+          <span>상품 금액</span>
+          <span>{formatPrice(order.totalAmount)}</span>
+        </div>
+        {order.pointAmount > 0 && (
+          <div className="kv muted">
+            <span>포인트 사용{order.status === 'CANCELLED' ? ' (환불됨)' : ''}</span>
+            <span>-{formatPrice(order.pointAmount)}</span>
+          </div>
+        )}
         <div className="kv">
           <span>{paymentLabel(order.paymentMethod)}</span>
-          <span className="v">{formatPrice(order.totalAmount)}</span>
+          <span className="v">{formatPrice(order.paymentAmount)}</span>
         </div>
       </section>
       {cancellable && (

@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as cart from '../api/cart'
 import * as catalog from '../api/catalog'
 import * as orders from '../api/orders'
+import * as points from '../api/points'
 import CheckoutPage from './CheckoutPage'
 
 const address = (over: Partial<orders.Address> = {}): orders.Address => ({
@@ -31,7 +32,10 @@ const renderAt = (url: string) =>
   )
 
 describe('CheckoutPage', () => {
-  beforeEach(() => vi.restoreAllMocks())
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    vi.spyOn(points, 'getMyPoints').mockResolvedValue(0)
+  })
 
   it('orders the cart lines to the default address and clears them from the cart', async () => {
     vi.spyOn(cart, 'getCart').mockResolvedValue({ items: [cartItem, { ...cartItem, id: 10, productName: '다른 상품' }], totalAmount: 0, itemCount: 2 })
@@ -43,10 +47,10 @@ describe('CheckoutPage', () => {
     expect(screen.getByText('기본')).toBeInTheDocument()
     expect(screen.getByText('모두 스티커 팩')).toBeInTheDocument()
     expect(screen.queryByText('다른 상품')).not.toBeInTheDocument()
-    expect(screen.getAllByText('10,200원').length).toBe(2)
+    expect(screen.getAllByText('10,200원').length).toBeGreaterThanOrEqual(2)
 
     await userEvent.click(screen.getByRole('button', { name: '결제하기' }))
-    expect(create).toHaveBeenCalledWith(1, [{ skuId: 50, quantity: 2 }], [9])
+    expect(create).toHaveBeenCalledWith(1, [{ skuId: 50, quantity: 2 }], [9], 0)
     expect(await screen.findByText('주문 상세 화면')).toBeInTheDocument()
   })
 
@@ -75,5 +79,37 @@ describe('CheckoutPage', () => {
     expect(create).toHaveBeenCalledWith({ recipient: '임준섭', phone: '010-1234-5678', zipCode: '06236', address1: '서울 강남구 테헤란로 1', address2: null, isDefault: false })
     expect(await screen.findByText('임준섭')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '결제하기' })).toBeEnabled()
+  })
+
+  it('uses points up to the smaller of balance and total, and sends them with the order', async () => {
+    vi.spyOn(points, 'getMyPoints').mockResolvedValue(3000)
+    vi.spyOn(cart, 'getCart').mockResolvedValue({ items: [cartItem], totalAmount: 0, itemCount: 1 })
+    vi.spyOn(orders, 'getAddresses').mockResolvedValue([address()])
+    const create = vi.spyOn(orders, 'createOrder').mockResolvedValue(orderDetail)
+    renderAt('/checkout?cartItemIds=9')
+
+    expect(await screen.findByText('보유 3,000P')).toBeInTheDocument()
+    await userEvent.type(screen.getByLabelText('사용 포인트'), '99999')
+    expect(screen.getByText('-3,000원')).toBeInTheDocument()
+    expect(screen.getAllByText('7,200원').length).toBeGreaterThan(0)
+
+    await userEvent.clear(screen.getByLabelText('사용 포인트'))
+    await userEvent.type(screen.getByLabelText('사용 포인트'), '1200')
+    await userEvent.click(screen.getByRole('button', { name: '결제하기' }))
+    expect(create).toHaveBeenCalledWith(1, [{ skuId: 50, quantity: 2 }], [9], 1200)
+  })
+
+  it('전액 사용 caps at the order total when the balance is bigger', async () => {
+    vi.spyOn(points, 'getMyPoints').mockResolvedValue(50000)
+    vi.spyOn(cart, 'getCart').mockResolvedValue({ items: [cartItem], totalAmount: 0, itemCount: 1 })
+    vi.spyOn(orders, 'getAddresses').mockResolvedValue([address()])
+    const create = vi.spyOn(orders, 'createOrder').mockResolvedValue(orderDetail)
+    renderAt('/checkout?cartItemIds=9')
+
+    await userEvent.click(await screen.findByRole('button', { name: '전액 사용' }))
+    expect(screen.getByLabelText('사용 포인트')).toHaveValue(10200)
+    expect(screen.getAllByText('0원').length).toBeGreaterThan(0)
+    await userEvent.click(screen.getByRole('button', { name: '결제하기' }))
+    expect(create).toHaveBeenCalledWith(1, [{ skuId: 50, quantity: 2 }], [9], 10200)
   })
 })

@@ -10,6 +10,8 @@ const order = (over: Partial<orders.OrderDetail> = {}): orders.OrderDetail => ({
   orderNo: '20260919-ABC123',
   status: 'PAID',
   totalAmount: 10200,
+  pointAmount: 0,
+  paymentAmount: 10200,
   paymentMethod: 'MOCK',
   recipient: '임준섭',
   phone: '010-1234-5678',

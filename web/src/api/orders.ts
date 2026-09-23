@@ -48,7 +48,12 @@ export interface OrderSummary {
   id: number
   orderNo: string
   status: OrderStatus
+  /** 상품 금액 합. */
   totalAmount: number
+  /** 결제에 쓴 포인트(1P = 1원). */
+  pointAmount: number
+  /** 실제 결제 금액 = 상품 금액 − 포인트. */
+  paymentAmount: number
   itemCount: number
   firstItemName: string
   firstImageUrl: string | null
@@ -60,6 +65,8 @@ export interface OrderDetail {
   orderNo: string
   status: OrderStatus
   totalAmount: number
+  pointAmount: number
+  paymentAmount: number
   paymentMethod: string
   recipient: string
   phone: string
@@ -84,8 +91,8 @@ export const updateAddress = (id: number, input: AddressInput) => api<Address>(`
 export const setDefaultAddress = (id: number) => api<Address>(`/api/v1/addresses/${id}/default`, { method: 'PUT' })
 export const deleteAddress = (id: number) => api<void>(`/api/v1/addresses/${id}`, { method: 'DELETE' })
 
-export const createOrder = (addressId: number, items: OrderLine[], cartItemIds: number[]) =>
-  api<OrderDetail>('/api/v1/orders', { method: 'POST', body: JSON.stringify({ addressId, items, cartItemIds }) })
+export const createOrder = (addressId: number, items: OrderLine[], cartItemIds: number[], usePoints = 0) =>
+  api<OrderDetail>('/api/v1/orders', { method: 'POST', body: JSON.stringify({ addressId, items, cartItemIds, usePoints }) })
 export const getOrders = (page = 0, size = 20) => api<Page<OrderSummary>>(`/api/v1/orders?page=${page}&size=${size}`)
 export const getOrder = (id: number) => api<OrderDetail>(`/api/v1/orders/${id}`)
 export const cancelOrder = (id: number) => api<OrderDetail>(`/api/v1/orders/${id}/cancel`, { method: 'POST' })

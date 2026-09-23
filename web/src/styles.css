@@ -340,3 +340,11 @@ img { display: block; }
 .review-form .counter { text-align: right; color: var(--muted); font-size: 12px; margin-top: 4px; }
 .review-form .counter.warn { color: var(--brand); }
 .review-form .text-danger { align-self: flex-start; color: var(--brand); font-size: 14px; }
+/* 주문서 포인트 */
+.point-have { color: var(--brand); font-weight: 700; font-size: 14px; }
+.point-use { display: flex; align-items: center; gap: 8px; }
+.point-use input { flex: 1; min-width: 0; height: 44px; padding: 0 12px; border: 1px solid var(--divider); border-radius: 10px; font-size: 16px; text-align: right; font-variant-numeric: tabular-nums; background: #fff; }
+.point-use input:disabled { background: #f5f5f5; color: #aaa; }
+.point-use .unit { color: var(--muted); font-size: 14px; }
+.point-hint { margin-top: 8px; color: var(--muted); font-size: 12px; }
+.kv.muted { color: var(--muted); font-size: 14px; margin-bottom: 6px; }

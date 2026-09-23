@@ -4,6 +4,7 @@ import { getCart } from '../api/cart'
 import { getProduct } from '../api/catalog'
 import { ApiError } from '../api/client'
 import { createAddress, createOrder, getAddresses, type Address, type AddressInput } from '../api/orders'
+import { formatPoints, getMyPoints } from '../api/points'
 import AddressForm, { AddressBlock } from '../components/AddressForm'
 import BottomPanel from '../components/BottomPanel'
 import { ErrorBox, Loading } from '../components/Boxes'
@@ -35,6 +36,9 @@ export default function CheckoutPage() {
   const [saving, setSaving] = useState(false)
   const [paying, setPaying] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  /** 보유 포인트. null = 못 불러옴(포인트 줄을 숨긴다). */
+  const [balance, setBalance] = useState<number | null>(null)
+  const [pointText, setPointText] = useState('')
 
   const load = useCallback(async () => {
     setError(false)
@@ -50,9 +54,15 @@ export default function CheckoutPage() {
   useEffect(() => {
     load()
   }, [load])
+  useEffect(() => {
+    getMyPoints().then(setBalance).catch(() => setBalance(null))
+  }, [])
 
   const selected = addresses.find((a) => a.id === selectedId) ?? null
   const total = (lines ?? []).reduce((s, l) => s + l.lineAmount, 0)
+  const maxPoints = Math.min(balance ?? 0, total)
+  const usePoints = clampPoints(pointText, maxPoints)
+  const payment = total - usePoints
   const canPay = !paying && !!lines && lines.length > 0 && selected !== null
 
   const closePicker = useCallback(() => setPicker(false), [])
@@ -83,6 +93,7 @@ export default function CheckoutPage() {
         selected.id,
         lines.map((l) => ({ skuId: l.skuId, quantity: l.quantity })),
         lines.map((l) => l.cartItemId).filter((id): id is number => id !== null),
+        usePoints,
       )
       navigate(`/orders/${order.id}`, { replace: true, state: { justOrdered: true } })
     } catch (e) {
@@ -126,16 +137,62 @@ export default function CheckoutPage() {
             </div>
             <OrderItems lines={lines} />
           </section>
+          {balance !== null && (
+            <section className="block">
+              <div className="block-head">
+                <h2>포인트</h2>
+                <span className="point-have">보유 {formatPoints(balance)}</span>
+              </div>
+              <div className="point-use">
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  aria-label="사용 포인트"
+                  placeholder="0"
+                  min={0}
+                  max={maxPoints}
+                  value={pointText}
+                  disabled={maxPoints === 0}
+                  onChange={(e) => setPointText(e.target.value)}
+                  onBlur={() => setPointText(usePoints === 0 ? '' : String(usePoints))}
+                />
+                <span className="unit">P</span>
+                <button type="button" className="btn outline small" disabled={maxPoints === 0} onClick={() => setPointText(String(maxPoints))}>
+                  전액 사용
+                </button>
+              </div>
+              <div className="point-hint">{maxPoints === 0 ? '사용할 수 있는 포인트가 없습니다.' : `최대 ${formatPoints(maxPoints)}까지 쓸 수 있어요. 1P = 1원`}</div>
+            </section>
+          )}
           <section className="block">
             <div className="block-head">
               <h2>결제 수단</h2>
             </div>
             <div>모의 결제 (실제 결제 없음)</div>
           </section>
+          <section className="block">
+            <div className="block-head">
+              <h2>결제 금액</h2>
+            </div>
+            <div className="kv muted">
+              <span>상품 금액</span>
+              <span>{formatPrice(total)}</span>
+            </div>
+            {usePoints > 0 && (
+              <div className="kv muted">
+                <span>포인트 사용</span>
+                <span>-{formatPrice(usePoints)}</span>
+              </div>
+            )}
+            <div className="kv">
+              <span>결제 금액</span>
+              <span className="v">{formatPrice(payment)}</span>
+            </div>
+          </section>
           <div className="bottom-bar">
             <div className="summary">
               <div className="label">결제 금액</div>
-              <div className="amount">{formatPrice(total)}</div>
+              <div className="amount">{formatPrice(payment)}</div>
             </div>
             <button type="button" className="btn primary cta" disabled={!canPay} onClick={pay}>
               결제하기
@@ -189,4 +246,11 @@ async function loadLines(params: URLSearchParams): Promise<Line[]> {
     return [{ key: skuId, cartItemId: null, skuId, productId, productName: p.name, optionLabel: sku.optionLabel, imageUrl: p.images[0] ?? null, unitPrice, quantity, lineAmount: unitPrice * quantity }]
   }
   return []
+}
+
+/** 입력한 포인트를 0~최대치의 정수로 맞춘다. 빈 값·글자는 0. */
+export function clampPoints(text: string, max: number): number {
+  const n = Math.floor(Number(text))
+  if (!Number.isFinite(n) || n <= 0) return 0
+  return Math.min(n, max)
 }

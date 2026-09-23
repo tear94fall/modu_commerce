@@ -3,7 +3,7 @@ import { formatDateTime } from '../util/format'
 import { api } from './client'
 
 /** point-service 의 원장 종류. 적립/사용/관리자 조정. */
-export type PointTransactionType = 'EARN' | 'SPEND' | 'ADJUST'
+export type PointTransactionType = 'EARN' | 'SPEND' | 'REFUND' | 'ADJUST'
 
 export interface PointTransaction {
   id: number
@@ -37,7 +37,7 @@ export const RULE_LABELS: Record<string, string> = {
   FIRST_CHAT: '첫 대화',
 }
 
-const TYPE_LABELS: Record<PointTransactionType, string> = { EARN: '적립', SPEND: '사용', ADJUST: '조정' }
+const TYPE_LABELS: Record<PointTransactionType, string> = { EARN: '적립', SPEND: '사용', REFUND: '환불', ADJUST: '조정' }
 
 export function transactionTitle(t: PointTransaction): string {
   if (t.ruleCode && RULE_LABELS[t.ruleCode]) return RULE_LABELS[t.ruleCode]
