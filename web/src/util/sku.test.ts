@@ -13,6 +13,8 @@ const detail = (over: Partial<ProductDetail> = {}): ProductDetail => ({
   discountRate: 0,
   soldOut: false,
   wished: false,
+  reviewCount: 0,
+  ratingAverage: 0,
   wishCount: 0,
   categoryPath: [],
   optionGroups: [

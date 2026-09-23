@@ -14,6 +14,8 @@ const product = (over: Partial<catalog.ProductSummary> = {}): catalog.ProductSum
   discountRate: 33,
   soldOut: false,
   wished: false,
+  reviewCount: 0,
+  ratingAverage: 0,
   ...over,
 })
 const page = (content: catalog.ProductSummary[]): catalog.Page<catalog.ProductSummary> => ({ content, totalElements: content.length, totalPages: 1, number: 0 })

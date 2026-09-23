@@ -23,6 +23,7 @@ class CatalogTestSupport(
 
     fun reseed() {
         listOf(
+            "reviews",
             "order_items",
             "orders",
             "cart_items",

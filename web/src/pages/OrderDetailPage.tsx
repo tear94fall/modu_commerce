@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useLocation, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { ApiError } from '../api/client'
 import { cancelOrder, fullAddress, getOrder, paymentLabel, statusLabel, type OrderDetail } from '../api/orders'
 import { ErrorBox, Loading } from '../components/Boxes'
@@ -71,7 +71,22 @@ export default function OrderDetailPage() {
         <div className="block-head">
           <h2>주문 상품</h2>
         </div>
-        <OrderItems lines={order.items.map((i) => ({ ...i, key: i.id }))} />
+        <OrderItems
+          lines={order.items.map((i) => ({
+            ...i,
+            key: i.id,
+            action:
+              i.reviewId !== null ? (
+                <Link to={`/reviews/${i.reviewId}/edit`} className="btn outline small">
+                  내 리뷰
+                </Link>
+              ) : i.reviewable ? (
+                <Link to={`/reviews/new?orderItemId=${i.id}`} className="btn outline small">
+                  리뷰 쓰기
+                </Link>
+              ) : null,
+          }))}
+        />
       </section>
       <section className="block">
         <div className="block-head">

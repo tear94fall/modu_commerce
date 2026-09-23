@@ -5,6 +5,7 @@ import com.example.commerce.application.domain.entity.CartItem
 import com.example.commerce.application.domain.entity.Order
 import com.example.commerce.application.domain.entity.OrderItem
 import com.example.commerce.application.domain.entity.OrderStatus
+import com.example.commerce.application.domain.entity.Review
 import java.time.LocalDateTime
 
 data class CartItemResult(
@@ -80,20 +81,28 @@ data class OrderItemResult(
     val unitPrice: Long,
     val quantity: Int,
     val lineAmount: Long,
+    /** 이 줄에 쓴 리뷰 id. 없으면 null. */
+    val reviewId: Long?,
+    /** 지금 리뷰를 쓸 수 있는가(취소 주문이 아니고 아직 안 썼음). */
+    val reviewable: Boolean,
 ) {
     companion object {
-        fun from(i: OrderItem) =
-            OrderItemResult(
-                id = requireNotNull(i.id),
-                productId = requireNotNull(i.product.id),
-                skuId = requireNotNull(i.sku.id),
-                productName = i.productName,
-                optionLabel = i.optionLabel,
-                imageUrl = i.imageUrl,
-                unitPrice = i.unitPrice,
-                quantity = i.quantity,
-                lineAmount = i.lineAmount(),
-            )
+        fun from(
+            i: OrderItem,
+            reviewId: Long? = null,
+        ) = OrderItemResult(
+            id = requireNotNull(i.id),
+            productId = requireNotNull(i.product.id),
+            skuId = requireNotNull(i.sku.id),
+            productName = i.productName,
+            optionLabel = i.optionLabel,
+            imageUrl = i.imageUrl,
+            unitPrice = i.unitPrice,
+            quantity = i.quantity,
+            lineAmount = i.lineAmount(),
+            reviewId = reviewId,
+            reviewable = reviewId == null && Review.canReview(i.order),
+        )
     }
 }
 
@@ -144,23 +153,26 @@ data class OrderDetailResult(
     val items: List<OrderItemResult>,
 ) {
     companion object {
-        fun from(o: Order) =
-            OrderDetailResult(
-                id = requireNotNull(o.id),
-                orderNo = o.orderNo,
-                userId = o.userId,
-                status = o.status,
-                totalAmount = o.totalAmount,
-                paymentMethod = o.paymentMethod,
-                recipient = o.recipient,
-                phone = o.phone,
-                zipCode = o.zipCode,
-                address1 = o.address1,
-                address2 = o.address2,
-                paidAt = o.paidAt,
-                cancelledAt = o.cancelledAt,
-                createdAt = o.createdAt,
-                items = o.items.map(OrderItemResult::from),
-            )
+        /** [reviewIds] 는 orderItemId → reviewId. 앱 주문 상세만 넘기고 어드민·생성 응답은 비워 둔다. */
+        fun from(
+            o: Order,
+            reviewIds: Map<Long, Long> = emptyMap(),
+        ) = OrderDetailResult(
+            id = requireNotNull(o.id),
+            orderNo = o.orderNo,
+            userId = o.userId,
+            status = o.status,
+            totalAmount = o.totalAmount,
+            paymentMethod = o.paymentMethod,
+            recipient = o.recipient,
+            phone = o.phone,
+            zipCode = o.zipCode,
+            address1 = o.address1,
+            address2 = o.address2,
+            paidAt = o.paidAt,
+            cancelledAt = o.cancelledAt,
+            createdAt = o.createdAt,
+            items = o.items.map { OrderItemResult.from(it, reviewIds[it.id]) },
+        )
     }
 }

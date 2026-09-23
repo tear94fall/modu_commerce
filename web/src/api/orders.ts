@@ -38,6 +38,10 @@ export interface OrderItem {
   unitPrice: number
   quantity: number
   lineAmount: number
+  /** 이 줄에 쓴 리뷰 id. 없으면 null. */
+  reviewId: number | null
+  /** 지금 리뷰를 쓸 수 있는가(취소 주문이 아니고 아직 안 썼음). */
+  reviewable: boolean
 }
 
 export interface OrderSummary {

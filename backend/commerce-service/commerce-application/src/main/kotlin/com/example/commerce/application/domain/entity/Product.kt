@@ -73,6 +73,15 @@ class Product(
     @Column(name = "wish_count", nullable = false, columnDefinition = "bigint not null default 0")
     var wishCount: Long = 0
 
+    /** 노출 중인 리뷰 수·별점 합 캐시. 목록 카드의 "★4.5 (12)" 를 조인 없이 그린다. 리뷰 작성·수정·삭제·숨김이 맞춘다. */
+    @Column(name = "review_count", nullable = false, columnDefinition = "bigint not null default 0")
+    var reviewCount: Long = 0
+        protected set
+
+    @Column(name = "rating_sum", nullable = false, columnDefinition = "bigint not null default 0")
+    var ratingSum: Long = 0
+        protected set
+
     @OneToMany(mappedBy = "product", cascade = [CascadeType.ALL], orphanRemoval = true)
     @OrderBy("sortOrder ASC, id ASC")
     val images: MutableList<ProductImage> = mutableListOf()
@@ -187,6 +196,31 @@ class Product(
     fun decreaseWishCount() {
         if (wishCount > 0) wishCount -= 1
     }
+
+    fun addRating(rating: Int) {
+        reviewCount += 1
+        ratingSum += rating
+    }
+
+    fun removeRating(rating: Int) {
+        if (reviewCount <= 1) {
+            reviewCount = 0
+            ratingSum = 0
+            return
+        }
+        reviewCount -= 1
+        ratingSum -= rating
+    }
+
+    fun replaceRating(
+        old: Int,
+        new: Int,
+    ) {
+        ratingSum += new - old
+    }
+
+    /** 소수 첫째 자리까지(4.5). 리뷰가 없으면 0.0. */
+    fun ratingAverage(): Double = if (reviewCount == 0L) 0.0 else Math.round(ratingSum * 10.0 / reviewCount) / 10.0
 
     override fun toString(): String = "Product(id=$id, name='$name', price=$price)"
 

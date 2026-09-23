@@ -7,6 +7,7 @@ import com.example.commerce.application.domain.entity.Order
 import com.example.commerce.application.domain.entity.OrderStatus
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import org.springframework.data.jpa.repository.Query
 
 interface CartItemRoRepository : RoRepository<CartItem, Long> {
     fun findAllByUserIdOrderByIdDesc(userId: String): List<CartItem>
@@ -44,4 +45,11 @@ interface OrderRoRepository :
     ): Order?
 
     fun findById(id: Long): Order?
+
+    /** 주문 줄 id 로 내 주문을 찾는다(리뷰 대상 확인). */
+    @Query("select o from Order o join o.items i where i.id = :itemId and o.userId = :userId")
+    fun findByItemIdAndUserId(
+        itemId: Long,
+        userId: String,
+    ): Order?
 }

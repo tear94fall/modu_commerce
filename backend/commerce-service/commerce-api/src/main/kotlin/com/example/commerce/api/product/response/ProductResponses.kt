@@ -16,10 +16,23 @@ data class ProductSummaryResponse(
     val discountRate: Int,
     val soldOut: Boolean,
     val wished: Boolean,
+    val reviewCount: Long,
+    val ratingAverage: Double,
 ) {
     companion object {
         fun from(r: ProductSummaryResult) =
-            ProductSummaryResponse(r.id, r.name, r.imageUrl, r.price, r.listPrice, r.discountRate, r.soldOut, r.wished)
+            ProductSummaryResponse(
+                r.id,
+                r.name,
+                r.imageUrl,
+                r.price,
+                r.listPrice,
+                r.discountRate,
+                r.soldOut,
+                r.wished,
+                r.reviewCount,
+                r.ratingAverage,
+            )
     }
 }
 
@@ -94,6 +107,8 @@ data class ProductDetailResponse(
     val soldOut: Boolean,
     val wished: Boolean,
     val wishCount: Long,
+    val reviewCount: Long,
+    val ratingAverage: Double,
     val categoryId: Long?,
     val categoryPath: List<String>,
     val optionGroups: List<OptionGroupResponse>,
@@ -115,6 +130,8 @@ data class ProductDetailResponse(
                 soldOut = r.soldOut,
                 wished = r.wished,
                 wishCount = r.wishCount,
+                reviewCount = r.reviewCount,
+                ratingAverage = r.ratingAverage,
                 categoryId = r.categoryId,
                 categoryPath = r.categoryPath,
                 optionGroups = r.optionGroups.map(OptionGroupResponse::from),

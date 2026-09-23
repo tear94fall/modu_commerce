@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { formatPrice } from '../util/format'
 
@@ -10,6 +11,8 @@ export interface LineView {
   unitPrice: number
   quantity: number
   lineAmount: number
+  /** 줄 아래 오른쪽에 붙는 것(주문 상세의 '리뷰 쓰기'). */
+  action?: ReactNode
 }
 
 /** 주문서·주문 상세의 상품 줄. 사진, 이름, 옵션, 단가 × 수량, 줄 금액. */
@@ -29,6 +32,7 @@ export default function OrderItems({ lines }: { lines: LineView[] }) {
             </div>
           </div>
           <div className="line-amount">{formatPrice(l.lineAmount)}</div>
+          {l.action && <div className="line-action">{l.action}</div>}
         </div>
       ))}
     </div>
