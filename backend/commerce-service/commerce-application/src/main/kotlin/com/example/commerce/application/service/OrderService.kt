@@ -7,6 +7,7 @@ import com.example.commerce.application.domain.entity.ProductStatus
 import com.example.commerce.application.domain.repository.ro.OrderRoRepository
 import com.example.commerce.application.domain.repository.rw.OrderRwRepository
 import com.example.commerce.application.domain.repository.rw.ProductSkuRwRepository
+import com.example.commerce.application.point.PointGateway
 import com.example.commerce.application.usecase.command.CreateOrderCommand
 import jakarta.persistence.EntityNotFoundException
 import org.springframework.data.domain.Page
@@ -52,6 +53,9 @@ class OrderQueryService(
 /**
  * 주문 생성은 SKU 행을 잠근 채 재고를 깎고 스냅샷을 만든다. 결제는 모의라 생성과 동시에 PAID.
  * 취소(사용자·관리자)는 잠근 채 재고를 되돌린다.
+ *
+ * 포인트는 DB 작업을 다 마친 뒤(커밋 직전) point-service 에 차감을 요청한다. 차감이 실패하면 예외로 트랜잭션이 통째로
+ * 풀리고(주문·재고·장바구니 그대로), 차감 뒤 커밋이 실패하는 드문 경우만 포인트가 먼저 빠진다(멱등 키 order:번호로 추적 가능).
  */
 @Service
 @Transactional(transactionManager = "rwTransactionManager")
@@ -60,6 +64,7 @@ class OrderCommandService(
     private val productSkuRwRepository: ProductSkuRwRepository,
     private val addressCommandService: AddressCommandService,
     private val cartCommandService: CartCommandService,
+    private val pointGateway: PointGateway,
 ) {
     fun create(
         userId: String,
@@ -80,9 +85,13 @@ class OrderCommandService(
             sku.decreaseStock(quantity)
             order.addItem(sku, quantity)
         }
+        order.usePoints(command.usePoints)
         val saved = orderRwRepository.saveAndFlush(order)
         cartCommandService.removeAll(userId, command.cartItemIds)
-        logger.info { "order ${saved.orderNo} created by $userId: ${saved.totalAmount}원" }
+        if (saved.pointAmount > 0) {
+            pointGateway.spend(userId, saved.pointAmount, saved.pointSpendRefId(), "주문 결제 ${saved.orderNo}")
+        }
+        logger.info { "order ${saved.orderNo} created by $userId: ${saved.totalAmount}원 (포인트 ${saved.pointAmount})" }
         return saved
     }
 
@@ -93,6 +102,7 @@ class OrderCommandService(
         val order = orderRwRepository.findByIdAndUserId(orderId, userId) ?: throw OrderQueryService.notFound(orderId)
         order.cancel()
         restock(order)
+        refundPoints(order)
         return order
     }
 
@@ -102,8 +112,17 @@ class OrderCommandService(
     ): Order {
         val order = orderRwRepository.findById(orderId).orElse(null) ?: throw OrderQueryService.notFound(orderId)
         order.transition(next)
-        if (next == OrderStatus.CANCELLED) restock(order)
+        if (next == OrderStatus.CANCELLED) {
+            restock(order)
+            refundPoints(order)
+        }
         return order
+    }
+
+    /** 결제에 쓴 포인트를 돌려준다. 환불 키가 멱등이라 두 번 불려도 한 번만 돌아간다. */
+    private fun refundPoints(order: Order) {
+        if (order.pointAmount <= 0) return
+        pointGateway.refund(order.userId, order.pointAmount, order.pointRefundRefId(), "주문 취소 ${order.orderNo}")
     }
 
     private fun restock(order: Order) {

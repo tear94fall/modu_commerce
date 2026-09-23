@@ -43,12 +43,16 @@ data class CreateOrderRequest(
     @field:NotEmpty(message = "주문할 상품이 없습니다.")
     val items: List<OrderLineRequest>? = null,
     val cartItemIds: List<Long>? = null,
+    /** 결제에 쓸 포인트(1P = 1원). 상품 금액까지만. */
+    @field:Min(value = 0, message = "사용 포인트는 0 이상이어야 합니다.")
+    val usePoints: Long? = null,
 ) {
     fun toCommand() =
         CreateOrderCommand(
             addressId = requireNotNull(addressId),
             items = requireNotNull(items).map { OrderLineCommand(requireNotNull(it.skuId), requireNotNull(it.quantity)) },
             cartItemIds = cartItemIds.orEmpty(),
+            usePoints = usePoints ?: 0,
         )
 }
 

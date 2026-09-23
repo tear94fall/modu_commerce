@@ -1,8 +1,11 @@
 package com.example.commerce.api.point
 
 import com.example.commerce.api.config.ModuPointProperties
+import com.example.commerce.application.point.InsufficientPointException
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
+import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientException
 import org.springframework.web.client.body
@@ -40,6 +43,43 @@ class PointClient(
                 .uri("/api-internal/point/{userId}/history?page={page}&size={size}", userId, page, size)
                 .retrieve()
                 .body<PointHistoryPage>()
+        }
+
+    /** 차감. 잔액 부족(409)은 [InsufficientPointException]. 같은 refId 는 point-service 가 한 번만 차감한다. */
+    fun spend(
+        userId: String,
+        amount: Long,
+        refId: String,
+        memo: String?,
+    ): PointChangeResult =
+        call {
+            try {
+                client
+                    .post()
+                    .uri("/api-internal/point/spend")
+                    .body(PointChangeRequest(userId, amount, refId, memo))
+                    .retrieve()
+                    .body<PointChangeResult>()
+            } catch (e: HttpClientErrorException) {
+                if (e.statusCode == HttpStatus.CONFLICT) throw InsufficientPointException()
+                throw e
+            }
+        }
+
+    /** 환불(차감 되돌리기). 같은 refId 는 한 번만. */
+    fun refund(
+        userId: String,
+        amount: Long,
+        refId: String,
+        memo: String?,
+    ): PointChangeResult =
+        call {
+            client
+                .post()
+                .uri("/api-internal/point/refund")
+                .body(PointChangeRequest(userId, amount, refId, memo))
+                .retrieve()
+                .body<PointChangeResult>()
         }
 
     private fun <T> call(block: () -> T?): T =
@@ -82,4 +122,19 @@ data class PointHistoryPage(
     val totalPages: Int,
     val number: Int,
     val size: Int,
+)
+
+/** point-service 의 SpendRequestDto. */
+data class PointChangeRequest(
+    val userId: String,
+    val amount: Long,
+    val refId: String,
+    val memo: String?,
+)
+
+/** point-service 의 SpendResultDto. 같은 refId 가 두 번 오면 applied=false. */
+data class PointChangeResult(
+    val applied: Boolean,
+    val amount: Long,
+    val balance: Long,
 )

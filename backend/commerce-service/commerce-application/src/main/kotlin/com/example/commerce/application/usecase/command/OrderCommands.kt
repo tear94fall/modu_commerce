@@ -19,4 +19,6 @@ data class CreateOrderCommand(
     val addressId: Long,
     val items: List<OrderLineCommand>,
     val cartItemIds: List<Long>,
+    /** 결제에 쓸 포인트(1P = 1원). 0 이면 안 쓴다. */
+    val usePoints: Long = 0,
 )

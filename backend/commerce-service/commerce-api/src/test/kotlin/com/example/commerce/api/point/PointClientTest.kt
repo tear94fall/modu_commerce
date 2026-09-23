@@ -1,13 +1,17 @@
 package com.example.commerce.api.point
 
 import com.example.commerce.api.config.ModuPointProperties
+import com.example.commerce.application.point.InsufficientPointException
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
+import org.springframework.http.HttpMethod
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.test.web.client.MockRestServiceServer
+import org.springframework.test.web.client.match.MockRestRequestMatchers.content
 import org.springframework.test.web.client.match.MockRestRequestMatchers.header
+import org.springframework.test.web.client.match.MockRestRequestMatchers.method
 import org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo
 import org.springframework.test.web.client.response.MockRestResponseCreators.withStatus
 import org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess
@@ -54,5 +58,31 @@ class PointClientTest {
         server.expect(requestTo("http://point.test/api-internal/point/u-1/balance")).andRespond(withStatus(HttpStatus.FORBIDDEN))
 
         assertThrows(PointUnavailableException::class.java) { client.balance("u-1") }
+    }
+
+    @Test
+    fun `차감은 주문번호를 멱등 키로 보내고 409 는 잔액 부족이다`() {
+        server
+            .expect(requestTo("http://point.test/api-internal/point/spend"))
+            .andExpect(method(HttpMethod.POST))
+            .andExpect(content().json("""{"userId":"u-1","amount":3000,"refId":"order:20260924-ABC123","memo":"주문 결제 20260924-ABC123"}"""))
+            .andRespond(withSuccess("""{"applied":true,"amount":3000,"balance":500}""", MediaType.APPLICATION_JSON))
+        server
+            .expect(requestTo("http://point.test/api-internal/point/spend"))
+            .andRespond(withStatus(HttpStatus.CONFLICT).contentType(MediaType.APPLICATION_JSON).body("""{"code":"INSUFFICIENT_POINT"}"""))
+
+        assertEquals(PointChangeResult(true, 3000, 500), client.spend("u-1", 3000, "order:20260924-ABC123", "주문 결제 20260924-ABC123"))
+        assertThrows(InsufficientPointException::class.java) { client.spend("u-1", 3000, "order:20260924-ABC123", null) }
+        server.verify()
+    }
+
+    @Test
+    fun `환불은 refund 로 보낸다`() {
+        server
+            .expect(requestTo("http://point.test/api-internal/point/refund"))
+            .andExpect(method(HttpMethod.POST))
+            .andRespond(withSuccess("""{"applied":false,"amount":0,"balance":3500}""", MediaType.APPLICATION_JSON))
+
+        assertEquals(PointChangeResult(false, 0, 3500), client.refund("u-1", 3000, "refund:order:1", "주문 취소"))
     }
 }

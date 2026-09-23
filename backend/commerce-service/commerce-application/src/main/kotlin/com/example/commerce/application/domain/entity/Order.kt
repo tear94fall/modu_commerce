@@ -82,8 +82,14 @@ class Order(
     var status: OrderStatus = OrderStatus.PAID
         protected set
 
+    /** 상품 금액 합(원). 포인트를 빼기 전 금액. */
     @Column(name = "total_amount", nullable = false)
     var totalAmount: Long = 0
+        protected set
+
+    /** 결제에 쓴 포인트(1P = 1원). 취소하면 그대로 돌려준다. */
+    @Column(name = "point_amount", nullable = false, columnDefinition = "bigint not null default 0")
+    var pointAmount: Long = 0
         protected set
 
     @Column(name = "payment_method", nullable = false, length = 20)
@@ -122,6 +128,21 @@ class Order(
         totalAmount += item.lineAmount()
         return item
     }
+
+    /** 실제 결제 금액 = 상품 금액 − 포인트. */
+    fun paymentAmount(): Long = totalAmount - pointAmount
+
+    /** 포인트 사용. 상품을 다 담은 뒤에 부른다. 상품 금액을 넘길 수 없다. */
+    fun usePoints(amount: Long) {
+        require(amount >= 0) { "사용 포인트는 0 이상이어야 합니다." }
+        require(amount <= totalAmount) { "포인트는 상품 금액(${totalAmount}원)까지만 쓸 수 있습니다." }
+        pointAmount = amount
+    }
+
+    /** 포인트 원장의 멱등 키. 차감은 order:번호, 환불은 refund:order:번호. */
+    fun pointSpendRefId(): String = "order:$orderNo"
+
+    fun pointRefundRefId(): String = "refund:order:$orderNo"
 
     /** 사용자 취소. 결제 완료 상태에서만. 재고 복구는 호출자가 한다. */
     fun cancel(now: LocalDateTime = LocalDateTime.now()) {
