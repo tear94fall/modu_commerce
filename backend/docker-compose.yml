@@ -16,6 +16,9 @@ services:
     environment:
       # 접속 정보·OAuth 검증 주소는 modu_platform 의 config-service(commerce/commerce-service.yml + 공통)가 내려준다.
       - CONFIG_SERVER_URI=http://config-service:8888
+      # 마이 탭 포인트 조회가 point-service(/api-internal) 를 부를 때 쓰는 서비스 간 토큰.
+      # 이 디렉터리의 .env(커밋 안 함)에 modu_chat backend/.env 와 같은 INTERNAL_API_TOKEN 을 둔다.
+      - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-modu-internal-dev-token}
     networks:
       - modu-infra
     restart: always

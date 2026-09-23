@@ -9,6 +9,7 @@ import LoginPage from './pages/LoginPage'
 import MyPage from './pages/MyPage'
 import OrderDetailPage from './pages/OrderDetailPage'
 import OrdersPage from './pages/OrdersPage'
+import PointsPage from './pages/PointsPage'
 import ProductDetailPage from './pages/ProductDetailPage'
 import ProductListPage from './pages/ProductListPage'
 import SearchPage from './pages/SearchPage'
@@ -27,6 +28,7 @@ export default function App() {
           <Route path="/search" element={<SearchPage />} />
           <Route path="/wishlist" element={<WishlistPage />} />
           <Route path="/my" element={<MyPage />} />
+          <Route path="/points" element={<PointsPage />} />
           <Route path="/cart" element={<CartPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/orders" element={<OrdersPage />} />

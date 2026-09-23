@@ -57,6 +57,12 @@ modu:
     audience: modu-commerce
     # 백오피스(/api-admin/**) 토큰의 aud. 게이트웨이 AuthorizationHeaderFilter=ROLE_ADMIN,modu-admin 과 같은 값.
     admin-audience: modu-admin
+  # 서비스 간 호출 토큰. 실제 값은 config-service 공통 설정(application.yml)이 내려주고, 챗 스택의 INTERNAL_API_TOKEN 과 같아야 한다.
+  internal-api:
+    token: ${INTERNAL_API_TOKEN:modu-internal-dev-token}
+  # 마이 탭 포인트 조회가 부르는 point-service(모두 챗 백엔드). 같은 modu-infra 네트워크의 컨테이너 이름.
+  point:
+    url: ${MODU_POINT_URL:http://point-service:9600}
 
 logging:
   level:

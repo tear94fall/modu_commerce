@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { getProfile, type Profile } from '../api/me'
+import { formatPoints, getMyPoints } from '../api/points'
 import { logoutSession } from '../auth/session'
 import { bridge } from '../bridge/app'
 import { Screen, TopBar } from '../components/Layout'
 
 export default function MyPage() {
   const [profile, setProfile] = useState<Profile | null>(null)
+  /** null = 아직/못 불러옴(줄은 그대로, 값만 비운다). 포인트 서비스가 죽어도 마이 탭은 떠야 한다. */
+  const [points, setPoints] = useState<number | null>(null)
   const [confirm, setConfirm] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
     getProfile().then(setProfile).catch(() => setProfile({ name: '', email: '', picture: '' }))
+    getMyPoints().then(setPoints).catch(() => setPoints(null))
   }, [])
 
   /** 앱이면 토큰 폐기와 화면 전환을 앱이 맡고, 브라우저면 토큰만 지우고 로그인으로. */
@@ -35,6 +39,10 @@ export default function MyPage() {
         </div>
       </div>
       <div className="menu">
+        <Link to="/points" className="menu-row">
+          포인트
+          <span className="value point-value">{points === null ? '' : formatPoints(points)}</span>
+        </Link>
         <Link to="/orders" className="menu-row">
           주문 내역
         </Link>

@@ -30,3 +30,7 @@ modu:
     issuer: http://auth.test/auth-service
     jwks-uri: http://auth.test/auth-service/oauth2/jwks
     audience: modu-commerce
+  internal-api:
+    token: test-internal-token
+  point:
+    url: http://point.test
