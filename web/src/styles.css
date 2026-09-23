@@ -182,6 +182,22 @@ img { display: block; }
 .menu-row { display: flex; align-items: center; width: 100%; height: 52px; padding: 0 16px; border-bottom: 1px solid var(--divider); font-size: 16px; text-align: left; }
 .menu-row .value { margin-left: auto; color: var(--muted); font-size: 14px; }
 .menu-row.danger { color: var(--brand); }
+.menu-row .point-value { color: var(--brand); font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
+
+/* 포인트 */
+.point-head { padding: 24px 20px; background: var(--surface); margin-bottom: 8px; }
+.point-head .label { color: var(--muted); font-size: 13px; }
+.point-head .balance { margin-top: 4px; font-size: 30px; font-weight: 700; color: var(--brand); font-variant-numeric: tabular-nums; }
+.point-list { list-style: none; margin: 0; padding: 0; background: var(--surface); }
+.point-row { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--divider); }
+.point-row .body { flex: 1; min-width: 0; }
+.point-row .title { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.point-row .sub { color: var(--muted); font-size: 12px; margin-top: 3px; }
+.point-row .side { text-align: right; font-variant-numeric: tabular-nums; }
+.point-row .delta { font-size: 15px; font-weight: 700; }
+.point-row .delta.plus { color: var(--brand); }
+.point-row .delta.minus { color: #1a56db; }
+.point-row .after { color: var(--muted); font-size: 12px; margin-top: 3px; }
 
 /* 개발용 로그인(브라우저) */
 .login { padding: 32px 20px; display: flex; flex-direction: column; gap: 12px; }
