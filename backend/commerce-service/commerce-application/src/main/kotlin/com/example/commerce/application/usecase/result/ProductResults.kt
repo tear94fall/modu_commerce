@@ -13,6 +13,8 @@ data class ProductSummaryResult(
     val discountRate: Int,
     val soldOut: Boolean,
     val wished: Boolean,
+    val reviewCount: Long,
+    val ratingAverage: Double,
 ) {
     companion object {
         fun from(
@@ -27,6 +29,8 @@ data class ProductSummaryResult(
             discountRate = product.discountRate(),
             soldOut = product.isSoldOut(),
             wished = wished,
+            reviewCount = product.reviewCount,
+            ratingAverage = product.ratingAverage(),
         )
     }
 }
@@ -95,6 +99,8 @@ data class ProductDetailResult(
     val soldOut: Boolean,
     val wished: Boolean,
     val wishCount: Long,
+    val reviewCount: Long,
+    val ratingAverage: Double,
     val categoryId: Long?,
     val categoryPath: List<String>,
     val optionGroups: List<OptionGroupResult>,
@@ -118,6 +124,8 @@ data class ProductDetailResult(
             soldOut = product.isSoldOut(),
             wished = wished,
             wishCount = product.wishCount,
+            reviewCount = product.reviewCount,
+            ratingAverage = product.ratingAverage(),
             categoryId = product.category?.id,
             categoryPath =
                 product.category

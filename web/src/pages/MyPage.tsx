@@ -46,6 +46,9 @@ export default function MyPage() {
         <Link to="/orders" className="menu-row">
           주문 내역
         </Link>
+        <Link to="/my/reviews" className="menu-row">
+          내 리뷰
+        </Link>
         <Link to="/addresses" className="menu-row">
           배송지 관리
         </Link>

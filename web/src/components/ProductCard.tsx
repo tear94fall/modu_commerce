@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom'
 import type { ProductSummary } from '../api/catalog'
 import { HeartIcon, HeartOutlineIcon } from './Icons'
 import Price from './Price'
+import { formatRating } from '../api/reviews'
+import { StarIcon } from './Icons'
 
 interface ProductCardProps {
   product: ProductSummary
@@ -18,6 +20,11 @@ export default function ProductCard({ product, onToggleWish }: ProductCardProps)
         </div>
         <div className="name">{product.name}</div>
         <Price price={product.price} listPrice={product.listPrice} discountRate={product.discountRate} />
+        {product.reviewCount > 0 && (
+          <div className="rating-line">
+            <StarIcon className="on" /> {formatRating(product.ratingAverage)} <span className="cnt">({product.reviewCount.toLocaleString('ko-KR')})</span>
+          </div>
+        )}
       </Link>
       <button
         type="button"

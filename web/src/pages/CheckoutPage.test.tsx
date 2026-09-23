@@ -52,7 +52,7 @@ describe('CheckoutPage', () => {
 
   it('builds a single line for buy-now and requires an address', async () => {
     vi.spyOn(catalog, 'getProduct').mockResolvedValue({
-      id: 5, name: '모두 스티커 팩', description: '', detail: null, images: [], price: 5000, listPrice: null, discountRate: 0, soldOut: false, wished: false, wishCount: 0, categoryPath: [],
+      id: 5, name: '모두 스티커 팩', description: '', detail: null, images: [], price: 5000, listPrice: null, discountRate: 0, soldOut: false, wished: false, wishCount: 0, reviewCount: 0, ratingAverage: 0, categoryPath: [],
       optionGroups: [], skus: [{ id: 51, optionValueIds: [], optionLabel: '그린 / 20', extraPrice: 100, stock: 3 }],
     })
     vi.spyOn(orders, 'getAddresses').mockResolvedValue([])

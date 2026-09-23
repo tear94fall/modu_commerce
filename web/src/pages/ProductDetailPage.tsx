@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { addCartItem } from '../api/cart'
 import { getProduct, setWish, type ProductDetail } from '../api/catalog'
 import { ApiError } from '../api/client'
+import { formatRating, getProductReviews, type Review } from '../api/reviews'
 import BottomPanel from '../components/BottomPanel'
 import { ErrorBox, Loading } from '../components/Boxes'
-import { HeartIcon, HeartOutlineIcon } from '../components/Icons'
+import { HeartIcon, HeartOutlineIcon, StarIcon } from '../components/Icons'
 import { Screen, TopBar } from '../components/Layout'
 import Price from '../components/Price'
+import ReviewList from '../components/ReviewList'
 import Toast from '../components/Toast'
 import { formatPrice } from '../util/format'
 import { clampQuantity, isValueAvailable, selectSku, toggleValue, totalPrice, type Selection } from '../util/sku'
@@ -24,6 +26,8 @@ export default function ProductDetailPage() {
   const [working, setWorking] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [slide, setSlide] = useState(0)
+  /** 최신 리뷰 세 개 미리보기. 못 불러오면 빈 목록(상세는 그대로 뜬다). */
+  const [reviews, setReviews] = useState<Review[]>([])
 
   const load = useCallback(() => {
     setStatus('loading')
@@ -35,6 +39,9 @@ export default function ProductDetailPage() {
         setStatus('ok')
       })
       .catch((e: unknown) => setStatus(e instanceof ApiError && e.status === 404 ? 'notFound' : 'error'))
+    getProductReviews(productId, 0, 'latest', 3)
+      .then((p) => setReviews(p.content))
+      .catch(() => setReviews([]))
   }, [productId])
   useEffect(load, [load])
 
@@ -111,6 +118,11 @@ export default function ProductDetailPage() {
         {detail.categoryPath.length > 0 && <div className="crumb">{detail.categoryPath.join(' › ')}</div>}
         <h1>{detail.name}</h1>
         <Price price={detail.price} listPrice={detail.listPrice} discountRate={detail.discountRate} />
+        {detail.reviewCount > 0 && (
+          <Link to={`/products/${detail.id}/reviews`} className="rating-line">
+            <StarIcon className="on" /> {formatRating(detail.ratingAverage)} <span className="cnt">리뷰 {detail.reviewCount.toLocaleString('ko-KR')}개 ›</span>
+          </Link>
+        )}
         {detail.description && <p className="desc">{detail.description}</p>}
       </div>
       {detail.detail && (
@@ -119,6 +131,13 @@ export default function ProductDetailPage() {
           {detail.detail}
         </div>
       )}
+      <section className="reviews-preview">
+        <div className="block-head">
+          <h2>리뷰 {detail.reviewCount > 0 ? detail.reviewCount.toLocaleString('ko-KR') : ''}</h2>
+          {detail.reviewCount > 0 && <Link to={`/products/${detail.id}/reviews`}>전체 보기</Link>}
+        </div>
+        {reviews.length === 0 ? <div className="empty">아직 리뷰가 없습니다. 구매 후 첫 리뷰를 남겨 주세요.</div> : <ReviewList reviews={reviews} />}
+      </section>
       <div className="bottom-bar">
         <button type="button" className={`wish-big ${detail.wished ? 'on' : ''}`} aria-label={detail.wished ? '찜 해제' : '찜'} aria-pressed={detail.wished} onClick={toggleWish}>
           {detail.wished ? <HeartIcon /> : <HeartOutlineIcon />}

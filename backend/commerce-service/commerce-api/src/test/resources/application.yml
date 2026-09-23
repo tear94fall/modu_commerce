@@ -34,3 +34,5 @@ modu:
     token: test-internal-token
   point:
     url: http://point.test
+  member:
+    url: http://member.test

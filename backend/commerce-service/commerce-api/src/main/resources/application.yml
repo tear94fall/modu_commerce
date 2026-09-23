@@ -63,6 +63,9 @@ modu:
   # 마이 탭 포인트 조회가 부르는 point-service(모두 챗 백엔드). 같은 modu-infra 네트워크의 컨테이너 이름.
   point:
     url: ${MODU_POINT_URL:http://point-service:9600}
+  # 리뷰 작성자 이름·이메일을 받는 member-service(모두 챗 백엔드).
+  member:
+    url: ${MODU_MEMBER_URL:http://member-service:8080}
 
 logging:
   level:

@@ -18,7 +18,7 @@ const order = (over: Partial<orders.OrderDetail> = {}): orders.OrderDetail => ({
   address2: '101동 101호',
   paidAt: '2026-09-19T14:22:00',
   cancelledAt: null,
-  items: [{ id: 1, productId: 5, productName: '모두 스티커 팩', optionLabel: '블랙 / 10', imageUrl: null, unitPrice: 5100, quantity: 2, lineAmount: 10200 }],
+  items: [{ id: 1, productId: 5, productName: '모두 스티커 팩', optionLabel: '블랙 / 10', imageUrl: null, unitPrice: 5100, quantity: 2, lineAmount: 10200, reviewId: null, reviewable: true }],
   ...over,
 })
 

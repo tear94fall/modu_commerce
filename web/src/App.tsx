@@ -6,12 +6,15 @@ import CategoryPage from './pages/CategoryPage'
 import CheckoutPage from './pages/CheckoutPage'
 import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
+import MyReviewsPage from './pages/MyReviewsPage'
 import MyPage from './pages/MyPage'
 import OrderDetailPage from './pages/OrderDetailPage'
 import OrdersPage from './pages/OrdersPage'
 import PointsPage from './pages/PointsPage'
 import ProductDetailPage from './pages/ProductDetailPage'
 import ProductListPage from './pages/ProductListPage'
+import ProductReviewsPage from './pages/ProductReviewsPage'
+import ReviewFormPage from './pages/ReviewFormPage'
 import SearchPage from './pages/SearchPage'
 import WishlistPage from './pages/WishlistPage'
 
@@ -25,10 +28,14 @@ export default function App() {
           <Route path="/categories" element={<CategoryPage />} />
           <Route path="/products" element={<ProductListPage />} />
           <Route path="/products/:id" element={<ProductDetailPage />} />
+          <Route path="/products/:id/reviews" element={<ProductReviewsPage />} />
+          <Route path="/reviews/new" element={<ReviewFormPage />} />
+          <Route path="/reviews/:id/edit" element={<ReviewFormPage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/wishlist" element={<WishlistPage />} />
           <Route path="/my" element={<MyPage />} />
           <Route path="/points" element={<PointsPage />} />
+          <Route path="/my/reviews" element={<MyReviewsPage />} />
           <Route path="/cart" element={<CartPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/orders" element={<OrdersPage />} />

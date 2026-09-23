@@ -15,6 +15,9 @@ export interface ProductSummary {
   discountRate: number
   soldOut: boolean
   wished: boolean
+  reviewCount: number
+  /** 소수 첫째 자리(4.5). 리뷰가 없으면 0. */
+  ratingAverage: number
 }
 
 export interface OptionValue {
@@ -48,6 +51,8 @@ export interface ProductDetail {
   soldOut: boolean
   wished: boolean
   wishCount: number
+  reviewCount: number
+  ratingAverage: number
   categoryPath: string[]
   optionGroups: OptionGroup[]
   skus: Sku[]

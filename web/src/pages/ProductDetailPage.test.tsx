@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as cart from '../api/cart'
 import * as catalog from '../api/catalog'
+import * as reviews from '../api/reviews'
 import { ApiError } from '../api/client'
 import ProductDetailPage from './ProductDetailPage'
 
@@ -19,6 +20,8 @@ const detail = (over: Partial<catalog.ProductDetail> = {}): catalog.ProductDetai
   soldOut: false,
   wished: false,
   wishCount: 2,
+  reviewCount: 0,
+  ratingAverage: 0,
   categoryPath: ['문구', '노트·데스크'],
   optionGroups: [
     { id: 1, name: '색상', values: [{ id: 11, name: '블랙' }, { id: 12, name: '그린' }] },
@@ -41,7 +44,10 @@ const renderPage = () =>
   )
 
 describe('ProductDetailPage', () => {
-  beforeEach(() => vi.restoreAllMocks())
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    vi.spyOn(reviews, 'getProductReviews').mockResolvedValue({ content: [], totalElements: 0, totalPages: 0, number: 0 })
+  })
 
   it('shows the product and adds the chosen SKU to the cart', async () => {
     vi.spyOn(catalog, 'getProduct').mockResolvedValue(detail())
