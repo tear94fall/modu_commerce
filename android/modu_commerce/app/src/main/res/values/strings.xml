@@ -21,5 +21,7 @@
 
     <!-- 웹 화면 -->
     <string name="web_failed">화면을 불러오지 못했습니다. 네트워크를 확인해 주세요.</string>
+    <string name="web_offline">인터넷에 연결되어 있지 않습니다.\n연결되면 자동으로 다시 불러옵니다.</string>
+    <string name="web_retrying">다시 불러오는 중입니다</string>
     <string name="action_retry">다시 시도</string>
 </resources>
