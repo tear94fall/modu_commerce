@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 웹을 못 열었을 때 인터넷 연결 여부를 보고, 연결이 돌아오면 자동으로 다시 불러온다 -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- 모두의 채팅이 signature 보호로 여는 SSO 액티비티를 부르기 위한 권한. 같은 키로 서명돼야 얻는다. -->
     <uses-permission android:name="com.example.modumessenger.permission.SSO" />
 
