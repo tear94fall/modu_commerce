@@ -39,6 +39,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // 상태바 아이콘은 밝게(웹 화면이 상태바 뒤를 브랜드 레드로 칠한다). 로그인 화면은 흰 바탕이라 아이콘이 안 보이지만 잠깐이다.
         enableEdgeToEdge(statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT))
+        // 다시 만들어진 액티비티(다크 모드·언어·글자 크기 변경, 프로세스 복원 등)는 NavHost 가 보던 화면을 복원하고, 세션을 판정하는
+        // SPLASH 는 이미 백스택에서 빠져 다시 돌지 않는다. 여기서 붙잡으면 창이 영영 그려지지 않는다(검은 화면, 터치 불가).
+        // 그래서 시스템 스플래시는 처음 켤 때만 판정까지 잡아 둔다. (회전·접기는 manifest configChanges 로 재생성 자체를 막는다.)
+        if (savedInstanceState != null) sessionDecided = true
         splashScreen.setKeepOnScreenCondition { !sessionDecided }
 
         setContent {
