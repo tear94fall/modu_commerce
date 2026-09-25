@@ -72,7 +72,7 @@ class ProductSeeder(
             )
 
         /**
-         * 사진은 picsum.photos 의 seed 주소를 쓴다. seed 가 같으면 같은 사진이 오므로 앱 목록이 매번 바뀌지 않는다.
+         * 사진은 상품에 맞는 퍼블릭 도메인(CC0·PDM) 사진이다([SAMPLE_IMAGES], 출처는 README). 목록에 없는 상품은 picsum.photos seed 주소.
          * [categories] 에 없는 이름은 카테고리 없이 만든다(테스트가 카테고리 없이 저장할 때).
          */
         fun sampleProducts(categories: Map<String, Category> = emptyMap()): List<Product> {
@@ -230,10 +230,138 @@ class ProductSeeder(
                     detail = detail,
                     status = com.example.commerce.application.domain.entity.ProductStatus.SELLING,
                 )
-                replaceImages((1..IMAGES_PER_PRODUCT).map { "https://picsum.photos/seed/modu-$slug-$it/600/600" })
+                replaceImages(SAMPLE_IMAGES[slug] ?: (1..IMAGES_PER_PRODUCT).map { "https://picsum.photos/seed/modu-$slug-$it/600/600" })
                 replaceOptions(groups, skus)
             }
 
         private const val IMAGES_PER_PRODUCT = 2
+
+        /**
+         * 샘플 상품 사진(slug → 첫 장이 대표). Openverse 에서 고른 CC0·퍼블릭 도메인 사진이라 출처 표시 의무는 없지만
+         * README 의 "상품 사진 출처"에 남겨 둔다. 원본 CDN(stocksnap·rawpixel·flickr·wikimedia·wordpress)을 그대로 가리킨다.
+         */
+        private val SAMPLE_IMAGES: Map<String, List<String>> =
+            mapOf(
+                "backpack" to
+                    listOf(
+                        "https://cdn.stocksnap.io/img-thumbs/960w/0JXUC43X55.jpg",
+                        "https://cdn.stocksnap.io/img-thumbs/960w/LE23HHZVIF.jpg",
+                    ),
+                "buckethat" to
+                    listOf(
+                        "https://cdn.stocksnap.io/img-thumbs/960w/R27ZN6PJ4S.jpg",
+                        "https://live.staticflickr.com/65535/51694681673_0570f81a8d_b.jpg",
+                    ),
+                "cap" to
+                    listOf(
+                        "https://cdn.stocksnap.io/img-thumbs/960w/RI84WJYDVA.jpg",
+                        "https://cdn.stocksnap.io/img-thumbs/960w/QIJ4BAZL2D.jpg",
+                    ),
+                "charger" to
+                    listOf(
+                        "https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvcHgxNTk1MTcwLWltYWdlLWt3dnhxcmFnLmpwZw.jpg",
+                        "https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvcHgxNTk1MTcxLWltYWdlLWt3dnZxeDI0LmpwZw.jpg",
+                    ),
+                "crossbag" to
+                    listOf(
+                        "https://live.staticflickr.com/7711/17281999865_41697a3bef_b.jpg",
+                        "https://live.staticflickr.com/65535/49062061267_5ca3d06806.jpg",
+                    ),
+                "deskmat" to
+                    listOf(
+                        "https://cdn.stocksnap.io/img-thumbs/960w/51CE04FEF9.jpg",
+                        "https://cdn.stocksnap.io/img-thumbs/960w/UCEBZORVVB.jpg",
+                    ),
+                "diary" to
+                    listOf(
+                        "https://cdn.stocksnap.io/img-thumbs/960w/2FRRD2PUVA.jpg",
+                        "https://cdn.stocksnap.io/img-thumbs/960w/JTHDMAOGLD.jpg",
+                    ),
+                "diffuser" to
+                    listOf(
+                        "https://upload.wikimedia.org/wikipedia/commons/9/93/Reed_diffuser.jpg",
+                        "https://live.staticflickr.com/258/17864691244_20f67da634.jpg",
+                    ),
+                "earbuds" to
+                    listOf(
+                        "https://live.staticflickr.com/65535/52063601444_87d8b1d840.jpg",
+                        "https://live.staticflickr.com/65535/50168607566_39011b8ec9_b.jpg",
+                    ),
+                "gelpen" to
+                    listOf(
+                        "https://cdn.stocksnap.io/img-thumbs/960w/7UES4TX4ZN.jpg",
+                        "https://cdn.stocksnap.io/img-thumbs/960w/0V4MVUGT47.jpg",
+                    ),
+                "hoodie" to
+                    listOf(
+                        "https://upload.wikimedia.org/wikipedia/commons/6/6e/WPWP_Campaign_hoodie_01.jpg",
+                        "https://live.staticflickr.com/7299/12358351054_e6e397fee0_b.jpg",
+                    ),
+                "keyboard" to
+                    listOf(
+                        "https://cdn.stocksnap.io/img-thumbs/960w/R7GVMRJWW9.jpg",
+                        "https://cdn.stocksnap.io/img-thumbs/960w/FFPJ3S8U5Y.jpg",
+                    ),
+                "monitorstand" to
+                    listOf(
+                        "https://cdn.stocksnap.io/img-thumbs/960w/959IURDRGJ.jpg",
+                        "https://cdn.stocksnap.io/img-thumbs/960w/0061559E5D.jpg",
+                    ),
+                "moodlamp" to
+                    listOf(
+                        "https://cdn.stocksnap.io/img-thumbs/960w/8ZYCJ5MGJI.jpg",
+                        "https://cdn.stocksnap.io/img-thumbs/960w/WDUTVSMPXQ.jpg",
+                    ),
+                "mouse" to
+                    listOf(
+                        "https://pd.w.org/2023/10/8756533cf94221718.64818500-2048x1536.jpg",
+                        "https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9zdGF0aWMvaW1hZ2Uvd2Vic2l0ZS8yMDIyLTA0L2xyL2ZycGNfbW91c2VfbW91c2VfcGNfMC1pbWFnZS1reWJhejB6MS5qcGc.jpg",
+                    ),
+                "mug" to
+                    listOf(
+                        "https://cdn.stocksnap.io/img-thumbs/960w/J6PXDIMIUU.jpg",
+                        "https://live.staticflickr.com/707/32903357261_7c3d83b8dd_b.jpg",
+                    ),
+                "notebook" to
+                    listOf(
+                        "https://cdn.stocksnap.io/img-thumbs/960w/MFRLKOXJVH.jpg",
+                        "https://cdn.stocksnap.io/img-thumbs/960w/CH9EXU7YTW.jpg",
+                    ),
+                "powerbank" to
+                    listOf(
+                        "https://cdn.stocksnap.io/img-thumbs/960w/1KQALMC305.jpg",
+                        "https://live.staticflickr.com/4916/31300186927_72cbb90e2b_b.jpg",
+                    ),
+                "showertowel" to
+                    listOf(
+                        "https://live.staticflickr.com/65535/52676443903_e5b4f964cd.jpg",
+                        "https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9zdGF0aWMvaW1hZ2Uvd2Vic2l0ZS8yMDIyLTA0L2xyL2ZydG93ZWxzX2xpbmVuc19zdG9yZV9iYXRoLWltYWdlLWt5YmFoa2VkLmpwZw.jpg",
+                    ),
+                "speaker" to
+                    listOf(
+                        "https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvYnM0NzQtaW1hZ2Uta3d5dDZhMGouanBn.jpg",
+                        "https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9zdGF0aWMvaW1hZ2Uvd2Vic2l0ZS8yMDIyLTA0L2xyL25zOTY5OS1pbWFnZS1rd3Z3ajQ2MC5qcGc.jpg",
+                    ),
+                "sticker" to
+                    listOf(
+                        "https://upload.wikimedia.org/wikipedia/commons/1/10/Stickers_and_japanese_goods_in_As_Seen_On_TV_store.jpg",
+                        "https://cdn.stocksnap.io/img-thumbs/960w/UD4G1NRANC.jpg",
+                    ),
+                "towel" to
+                    listOf(
+                        "https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvcHg2NTQ2ODUtaW1hZ2Uta3d2eGw4bzAuanBn.jpg",
+                        "https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvcHg2NDE3MDQtaW1hZ2Uta3d2eGtleDkuanBn.jpg",
+                    ),
+                "tshirt" to
+                    listOf(
+                        "https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9sci9pbWFnZXMvd2Vic2l0ZS8yMDIzLTAzL2pvYjk3MS1lbGVtZW50LTEwMi14LmpwZw.jpg",
+                        "https://live.staticflickr.com/65535/54573341777_13cfc3449c_b.jpg",
+                    ),
+                "tumbler" to
+                    listOf(
+                        "https://cdn.stocksnap.io/img-thumbs/960w/Q9JPW18WWZ.jpg",
+                        "https://cdn.stocksnap.io/img-thumbs/960w/IB5PS7EDFG.jpg",
+                    ),
+            )
     }
 }
