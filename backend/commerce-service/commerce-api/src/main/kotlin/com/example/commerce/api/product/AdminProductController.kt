@@ -1,13 +1,15 @@
 package com.example.commerce.api.product
 
+import com.example.commerce.api.common.PageResponse
 import com.example.commerce.api.product.request.ProductRequest
-import com.example.commerce.api.product.response.GetProductResponse
-import com.example.commerce.api.product.response.ProductPageResponse
-import com.example.commerce.application.usecase.CreateProductUseCase
-import com.example.commerce.application.usecase.DeleteProductUseCase
-import com.example.commerce.application.usecase.GetProductUseCase
-import com.example.commerce.application.usecase.SearchAdminProductsUseCase
-import com.example.commerce.application.usecase.UpdateProductUseCase
+import com.example.commerce.api.product.response.AdminProductSummaryResponse
+import com.example.commerce.api.product.response.ProductDetailResponse
+import com.example.commerce.application.domain.entity.ProductStatus
+import com.example.commerce.application.usecase.product.CreateProductUseCase
+import com.example.commerce.application.usecase.product.DeleteProductUseCase
+import com.example.commerce.application.usecase.product.GetAdminProductUseCase
+import com.example.commerce.application.usecase.product.SearchAdminProductsUseCase
+import com.example.commerce.application.usecase.product.UpdateProductUseCase
 import jakarta.validation.Valid
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -26,7 +28,7 @@ import java.net.URI
 @RequestMapping("/api-admin/v1/products")
 class AdminProductController(
     private val searchAdminProductsUseCase: SearchAdminProductsUseCase,
-    private val getProductUseCase: GetProductUseCase,
+    private val getAdminProductUseCase: GetAdminProductUseCase,
     private val createProductUseCase: CreateProductUseCase,
     private val updateProductUseCase: UpdateProductUseCase,
     private val deleteProductUseCase: DeleteProductUseCase,
@@ -34,29 +36,34 @@ class AdminProductController(
     @GetMapping
     fun products(
         @RequestParam(required = false) q: String?,
+        @RequestParam(required = false) categoryId: Long?,
+        @RequestParam(required = false) status: ProductStatus?,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "15") size: Int,
-    ): ResponseEntity<ProductPageResponse> = ResponseEntity.ok(ProductPageResponse.from(searchAdminProductsUseCase.execute(q, page, size)))
+    ): ResponseEntity<PageResponse<AdminProductSummaryResponse>> =
+        ResponseEntity.ok(
+            PageResponse.from(searchAdminProductsUseCase.execute(q, categoryId, status, page, size), AdminProductSummaryResponse::from),
+        )
 
     @GetMapping("/{id}")
     fun product(
         @PathVariable id: Long,
-    ): ResponseEntity<GetProductResponse> = ResponseEntity.ok(GetProductResponse.from(getProductUseCase.execute(id)))
+    ): ResponseEntity<ProductDetailResponse> = ResponseEntity.ok(ProductDetailResponse.from(getAdminProductUseCase.execute(id)))
 
     @PostMapping
     fun create(
         @Valid @RequestBody request: ProductRequest,
-    ): ResponseEntity<GetProductResponse> {
+    ): ResponseEntity<ProductDetailResponse> {
         val created = createProductUseCase.execute(request.toCommand())
-        return ResponseEntity.created(URI.create("/api-admin/v1/products/${created.id}")).body(GetProductResponse.from(created))
+        return ResponseEntity.created(URI.create("/api-admin/v1/products/${created.id}")).body(ProductDetailResponse.from(created))
     }
 
     @PutMapping("/{id}")
     fun update(
         @PathVariable id: Long,
         @Valid @RequestBody request: ProductRequest,
-    ): ResponseEntity<GetProductResponse> =
-        ResponseEntity.ok(GetProductResponse.from(updateProductUseCase.execute(id, request.toCommand())))
+    ): ResponseEntity<ProductDetailResponse> =
+        ResponseEntity.ok(ProductDetailResponse.from(updateProductUseCase.execute(id, request.toCommand())))
 
     @DeleteMapping("/{id}")
     fun delete(

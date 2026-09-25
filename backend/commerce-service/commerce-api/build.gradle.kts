@@ -13,6 +13,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
 
     testImplementation("org.springframework.security:spring-security-test")
+    // 코틀린 non-null 파라미터에 Mockito 매처(eq/any)를 쓰기 위해
+    testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")
 }
 
 springBoot {

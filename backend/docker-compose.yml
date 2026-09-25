@@ -2,7 +2,8 @@ name: modu-commerce
 
 # mysql-commerce 등 인프라는 ~/workspace/modu_infra/data 에서 먼저 띄운다.
 # commerce-service 는 external 네트워크 modu-infra 에서 컨테이너 이름으로 인프라·플랫폼(config-service)·auth-service 에 접근한다.
-# 기동 순서: modu_infra → modu_platform → 이 스택. 설정을 못 받으면 기동에 실패하고 restart 가 다시 띄운다.
+# 기동 순서: modu_infra → modu_platform → modu_chat backend(gateway) → 이 스택. 설정을 못 받으면 기동에 실패하고 restart 가 다시 띄운다.
+# 커머스 웹(../web)도 여기서 같이 뜬다: nginx 가 정적 빌드를 서빙하고 /api → commerce-service, /auth-service → gateway-service 로 프록시한다.
 
 services:
   commerce-service:
@@ -15,6 +16,22 @@ services:
     environment:
       # 접속 정보·OAuth 검증 주소는 modu_platform 의 config-service(commerce/commerce-service.yml + 공통)가 내려준다.
       - CONFIG_SERVER_URI=http://config-service:8888
+      # 마이 탭 포인트 조회가 point-service(/api-internal) 를 부를 때 쓰는 서비스 간 토큰.
+      # 이 디렉터리의 .env(커밋 안 함)에 modu_chat backend/.env 와 같은 INTERNAL_API_TOKEN 을 둔다.
+      - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-modu-internal-dev-token}
+    networks:
+      - modu-infra
+    restart: always
+
+  modu-commerce-web:
+    build:
+      context: ../web
+      dockerfile: ./Dockerfile
+    container_name: modu-commerce-web
+    ports:
+      - "${COMMERCE_WEB_PORT:-8082}:80"
+    depends_on:
+      - commerce-service
     networks:
       - modu-infra
     restart: always
