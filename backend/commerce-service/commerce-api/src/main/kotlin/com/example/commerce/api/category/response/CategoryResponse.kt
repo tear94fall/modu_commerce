@@ -9,6 +9,8 @@ data class CategoryResponse(
     val sortOrder: Int,
     val productCount: Long?,
     val children: List<CategoryResponse>,
+    val icon: String?,
+    val color: String?,
 ) {
     companion object {
         fun from(result: CategoryResult): CategoryResponse =
@@ -18,6 +20,8 @@ data class CategoryResponse(
                 sortOrder = result.sortOrder,
                 productCount = result.productCount,
                 children = result.children.map(::from),
+                icon = result.icon,
+                color = result.color,
             )
     }
 }
@@ -27,9 +31,18 @@ data class CategoryNodeResponse(
     val name: String,
     val parentId: Long?,
     val sortOrder: Int,
+    val icon: String?,
+    val color: String?,
 ) {
     companion object {
         fun from(result: CategoryNodeResult) =
-            CategoryNodeResponse(id = result.id, name = result.name, parentId = result.parentId, sortOrder = result.sortOrder)
+            CategoryNodeResponse(
+                id = result.id,
+                name = result.name,
+                parentId = result.parentId,
+                sortOrder = result.sortOrder,
+                icon = result.icon,
+                color = result.color,
+            )
     }
 }

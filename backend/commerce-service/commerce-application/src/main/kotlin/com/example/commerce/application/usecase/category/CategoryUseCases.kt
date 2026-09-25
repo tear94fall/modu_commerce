@@ -34,6 +34,8 @@ data class CategoryNodeResult(
     val name: String,
     val parentId: Long?,
     val sortOrder: Int,
+    val icon: String? = null,
+    val color: String? = null,
 ) {
     companion object {
         fun from(category: Category) =
@@ -42,6 +44,8 @@ data class CategoryNodeResult(
                 name = category.name,
                 parentId = category.parent?.id,
                 sortOrder = category.sortOrder,
+                icon = category.icon,
+                color = category.color,
             )
     }
 }

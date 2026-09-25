@@ -4,6 +4,12 @@ export interface Category {
   id: number
   name: string
   children: Category[]
+  sortOrder?: number
+  productCount?: number | null
+  /** 이모지 하나("🍳"). 없으면 이름 첫 글자를 쓴다. */
+  icon?: string | null
+  /** 타일 바탕 파스텔 색("#FFEDD5"). 없으면 중립 회색. */
+  color?: string | null
 }
 
 export interface ProductSummary {
@@ -78,6 +84,23 @@ export interface ProductQuery {
   sort?: ProductSort
   page?: number
   size?: number
+}
+
+/** 카테고리 상품 목록 주소. title 은 카테고리를 못 불러왔을 때의 제목. sort 를 주면 정렬도 잇는다. */
+export function categoryLink(category: Pick<Category, 'id' | 'name'>, sort?: ProductSort | null) {
+  const params = new URLSearchParams({ categoryId: String(category.id), title: category.name })
+  if (sort) params.set('sort', sort)
+  return `/products?${params}`
+}
+
+/** 트리에서 id 까지의 경로(대분류부터). 없으면 빈 배열. */
+export function categoryPath(roots: Category[], id: number): Category[] {
+  for (const c of roots) {
+    if (c.id === id) return [c]
+    const sub = categoryPath(c.children ?? [], id)
+    if (sub.length > 0) return [c, ...sub]
+  }
+  return []
 }
 
 export const getCategories = () => api<Category[]>('/api/v1/categories')

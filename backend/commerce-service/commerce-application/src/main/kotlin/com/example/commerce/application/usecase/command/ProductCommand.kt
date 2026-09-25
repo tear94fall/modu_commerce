@@ -22,4 +22,8 @@ data class CategoryCommand(
     val name: String,
     val parentId: Long?,
     val sortOrder: Int,
+    /** 이모지 한 개. 없으면 null. */
+    val icon: String? = null,
+    /** #RRGGBB. 없으면 null. */
+    val color: String? = null,
 )

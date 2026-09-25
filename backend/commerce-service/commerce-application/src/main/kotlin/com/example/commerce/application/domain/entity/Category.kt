@@ -26,6 +26,27 @@ class Category(
     var deletedAt: LocalDateTime? = null
         protected set
 
+    /** 앱 카테고리 화면의 아이콘(이모지 한 개). 없으면 앱이 이름 첫 글자를 보여 준다. */
+    @Column(name = "icon", length = 16)
+    var icon: String? = null
+        protected set
+
+    /** 아이콘 타일 배경색 #RRGGBB. 없으면 앱 기본색. */
+    @Column(name = "color", length = 7)
+    var color: String? = null
+        protected set
+
+    fun decorate(
+        icon: String?,
+        color: String?,
+    ): Category {
+        require(icon == null || icon.length <= 16) { "아이콘은 이모지 한 개로 넣어 주세요." }
+        require(color == null || COLOR.matches(color)) { "아이콘 색은 #RRGGBB 형식으로 입력하세요." }
+        this.icon = icon
+        this.color = color?.uppercase()
+        return this
+    }
+
     fun update(
         name: String,
         parent: Category?,
@@ -50,6 +71,8 @@ class Category(
     override fun toString(): String = "Category(id=$id, name='$name')"
 
     companion object {
+        private val COLOR = Regex("^#[0-9A-Fa-f]{6}$")
+
         fun create(
             name: String,
             parent: Category? = null,

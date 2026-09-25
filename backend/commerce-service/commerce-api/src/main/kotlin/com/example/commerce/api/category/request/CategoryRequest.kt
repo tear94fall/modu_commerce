@@ -10,6 +10,17 @@ data class CategoryRequest(
     val name: String? = null,
     val parentId: Long? = null,
     val sortOrder: Int? = null,
+    /** 이모지 한 개(빈 값이면 없음). */
+    val icon: String? = null,
+    /** #RRGGBB(빈 값이면 없음). */
+    val color: String? = null,
 ) {
-    fun toCommand() = CategoryCommand(name = requireNotNull(name).trim(), parentId = parentId, sortOrder = sortOrder ?: 0)
+    fun toCommand() =
+        CategoryCommand(
+            name = requireNotNull(name).trim(),
+            parentId = parentId,
+            sortOrder = sortOrder ?: 0,
+            icon = icon?.trim()?.takeIf { it.isNotEmpty() },
+            color = color?.trim()?.takeIf { it.isNotEmpty() },
+        )
 }

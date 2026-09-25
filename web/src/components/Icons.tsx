@@ -20,3 +20,33 @@ export const StarIcon = ({ className }: { className?: string }) => (
     <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
   </svg>
 )
+
+/**
+ * 선 아이콘(Lucide 모양, ISC). 채우기 없이 currentColor 선으로 그린다.
+ * `.icon-btn svg { fill }` 같은 규칙에 덮이지 않게 fill 은 인라인 스타일로 끈다.
+ */
+const line = (...paths: string[]) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" className="line-icon" style={{ fill: 'none' }} stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    {paths.map((d) => (
+      <path key={d} d={d} />
+    ))}
+  </svg>
+)
+
+export const PointLineIcon = () => line('M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z', 'M10 16.5v-9h3a2.75 2.75 0 0 1 0 5.5h-3')
+export const TicketLineIcon = () =>
+  line('M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z', 'M13 5v2', 'M13 11v2', 'M13 17v2')
+export const HeartLineIcon = () => line('M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7z')
+export const ReviewLineIcon = () => line('M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z', 'M8 9h8', 'M8 13h5')
+export const PackageLineIcon = () =>
+  line(
+    'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z',
+    'M3.27 6.96 12 12.01l8.73-5.05',
+    'M12 22.08V12',
+    'M7.5 4.21l9 5.15',
+  )
+export const GiftLineIcon = () =>
+  line('M20 12v9H4v-9', 'M2 7h20v5H2z', 'M12 21V7', 'M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z', 'M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z')
+export const HistoryLineIcon = () => line('M3 12a9 9 0 1 0 3-6.7L3 8', 'M3 3v5h5', 'M12 7v5l4 2')
+export const PinLineIcon = () => line('M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z', 'M15 10a3 3 0 1 1-6 0 3 3 0 0 1 6 0z')
+export const ChevronRightIcon = () => line('M9 18l6-6-6-6')
