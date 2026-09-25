@@ -85,7 +85,11 @@ class ProductControllerTest
                 .andExpect {
                     status { isOk() }
                     jsonPath("$.images.length()") { value(2) }
-                    jsonPath("$.imageUrl") { value("https://picsum.photos/seed/modu-tshirt-1/600/600") }
+                    jsonPath("$.imageUrl") {
+                        value(
+                            "https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9sci9pbWFnZXMvd2Vic2l0ZS8yMDIzLTAzL2pvYjk3MS1lbGVtZW50LTEwMi14LmpwZw.jpg",
+                        )
+                    }
                     jsonPath("$.categoryPath[0]") { value("패션") }
                     jsonPath("$.categoryPath[1]") { value("의류") }
                     jsonPath("$.optionGroups.length()") { value(2) }
