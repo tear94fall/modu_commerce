@@ -1,6 +1,7 @@
 package com.example.commerce.api.point
 
 import com.example.commerce.application.common.logger
+import com.example.commerce.application.point.PointEarnResult
 import com.example.commerce.application.point.PointGateway
 import com.example.commerce.application.point.PointGatewayException
 import org.springframework.stereotype.Component
@@ -28,6 +29,17 @@ class RestClientPointGateway(
     ) {
         val result = wrap { pointClient.refund(userId, amount, refId, memo) }
         logger.info { "point refund $refId: applied=${result.applied} balance=${result.balance}" }
+    }
+
+    override fun earn(
+        userId: String,
+        ruleCode: String,
+        refId: String,
+        memo: String?,
+    ): PointEarnResult {
+        val result = wrap { pointClient.earn(userId, ruleCode, refId, memo) }
+        logger.info { "point earn $refId ($ruleCode): applied=${result.applied} amount=${result.amount} reason=${result.reason}" }
+        return PointEarnResult(result.applied, result.amount, result.reason)
     }
 
     private fun <T> wrap(block: () -> T): T =

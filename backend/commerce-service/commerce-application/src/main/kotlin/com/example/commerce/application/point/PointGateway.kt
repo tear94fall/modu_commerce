@@ -13,6 +13,18 @@ interface PointGateway {
         memo: String?,
     )
 
+    /**
+     * 규칙([ruleCode])대로 적립한다. 금액·하루 한도는 point-service 규칙이 정한다. [refId] 는 멱등 키.
+     * 한도·중복·규칙 없음 같은 "적립 안 됨"은 예외가 아니라 [PointEarnResult.applied] = false 로 온다.
+     * 서버를 못 부르면 [PointGatewayException].
+     */
+    fun earn(
+        userId: String,
+        ruleCode: String,
+        refId: String,
+        memo: String?,
+    ): PointEarnResult
+
     /** 차감을 되돌린다(주문 취소). [refId] 는 멱등 키. */
     fun refund(
         userId: String,
@@ -29,3 +41,10 @@ class InsufficientPointException : IllegalArgumentException("포인트가 부족
 class PointGatewayException(
     cause: Throwable? = null,
 ) : RuntimeException("포인트 서비스에 연결할 수 없습니다.", cause)
+
+/** 적립 결과. [reason] 은 적립되지 않은 이유(point-service 의 RULE_DISABLED, DAILY_LIMIT, TOTAL_LIMIT, DUPLICATE, 또는 RULE_NOT_FOUND). */
+data class PointEarnResult(
+    val applied: Boolean,
+    val amount: Long,
+    val reason: String? = null,
+)
