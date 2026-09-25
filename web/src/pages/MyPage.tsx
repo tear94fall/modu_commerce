@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { getMyCouponCount } from '../api/coupons'
 import { getProfile, type Profile } from '../api/me'
 import { formatPoints, getMyPoints } from '../api/points'
 import { logoutSession } from '../auth/session'
@@ -10,12 +11,15 @@ export default function MyPage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   /** null = 아직/못 불러옴(줄은 그대로, 값만 비운다). 포인트 서비스가 죽어도 마이 탭은 떠야 한다. */
   const [points, setPoints] = useState<number | null>(null)
+  /** 사용 가능 쿠폰 장수. null = 아직/못 불러옴. */
+  const [coupons, setCoupons] = useState<number | null>(null)
   const [confirm, setConfirm] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
     getProfile().then(setProfile).catch(() => setProfile({ name: '', email: '', picture: '' }))
     getMyPoints().then(setPoints).catch(() => setPoints(null))
+    getMyCouponCount().then(setCoupons).catch(() => setCoupons(null))
   }, [])
 
   /** 앱이면 토큰 폐기와 화면 전환을 앱이 맡고, 브라우저면 토큰만 지우고 로그인으로. */
@@ -42,6 +46,10 @@ export default function MyPage() {
         <Link to="/points" className="menu-row">
           포인트
           <span className="value point-value">{points === null ? '' : formatPoints(points)}</span>
+        </Link>
+        <Link to="/my/coupons" className="menu-row">
+          쿠폰
+          <span className="value point-value coupon-value">{coupons === null ? '' : `${coupons.toLocaleString('ko-KR')}장`}</span>
         </Link>
         <Link to="/orders" className="menu-row">
           주문 내역

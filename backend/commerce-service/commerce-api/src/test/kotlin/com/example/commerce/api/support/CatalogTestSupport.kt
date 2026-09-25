@@ -23,9 +23,13 @@ class CatalogTestSupport(
 
     fun reseed() {
         listOf(
+            "promotion_coupons",
             "attendance_checks",
             "promotion_products",
             "promotions",
+            "user_coupons",
+            "coupon_scope_targets",
+            "coupons",
             "reviews",
             "order_items",
             "orders",

@@ -3,11 +3,13 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getCart } from '../api/cart'
 import { getProduct } from '../api/catalog'
 import { ApiError } from '../api/client'
+import { expiresOnLabel, getApplicableCoupons, type ApplicableCoupon } from '../api/coupons'
 import { createAddress, createOrder, getAddresses, type Address, type AddressInput } from '../api/orders'
 import { formatPoints, getMyPoints } from '../api/points'
 import AddressForm, { AddressBlock } from '../components/AddressForm'
 import BottomPanel from '../components/BottomPanel'
 import { ErrorBox, Loading } from '../components/Boxes'
+import CouponCard from '../components/CouponCard'
 import { Screen, TopBar } from '../components/Layout'
 import OrderItems, { type LineView } from '../components/OrderItems'
 import Toast from '../components/Toast'
@@ -39,6 +41,10 @@ export default function CheckoutPage() {
   /** 보유 포인트. null = 못 불러옴(포인트 줄을 숨긴다). */
   const [balance, setBalance] = useState<number | null>(null)
   const [pointText, setPointText] = useState('')
+  /** 내 사용 가능 쿠폰(이 주문 기준 적용 여부 포함). null = 아직/못 불러옴(쿠폰 줄을 숨긴다). */
+  const [coupons, setCoupons] = useState<ApplicableCoupon[] | null>(null)
+  const [couponId, setCouponId] = useState<number | null>(null)
+  const [couponPanel, setCouponPanel] = useState(false)
 
   const load = useCallback(async () => {
     setError(false)
@@ -58,15 +64,45 @@ export default function CheckoutPage() {
     getMyPoints().then(setBalance).catch(() => setBalance(null))
   }, [])
 
+  const loadCoupons = useCallback((current: Line[]) => {
+    if (current.length === 0) {
+      setCoupons([])
+      return
+    }
+    getApplicableCoupons(current.map((l) => ({ skuId: l.skuId, quantity: l.quantity })))
+      .then(setCoupons)
+      .catch(() => setCoupons(null))
+  }, [])
+  useEffect(() => {
+    if (lines) loadCoupons(lines)
+  }, [lines, loadCoupons])
+
   const selected = addresses.find((a) => a.id === selectedId) ?? null
   const total = (lines ?? []).reduce((s, l) => s + l.lineAmount, 0)
-  const maxPoints = Math.min(balance ?? 0, total)
+  const coupon = coupons?.find((c) => c.id === couponId && c.applicable) ?? null
+  const couponDiscount = coupon ? Math.min(coupon.discount, total) : 0
+  const usableCoupons = (coupons ?? []).filter((c) => c.applicable).length
+  /** 포인트는 쿠폰 할인 뒤 남은 금액까지만. */
+  const maxPoints = Math.max(0, Math.min(balance ?? 0, total - couponDiscount))
   const usePoints = clampPoints(pointText, maxPoints)
-  const payment = total - usePoints
+  const payment = total - couponDiscount - usePoints
   const canPay = !paying && !!lines && lines.length > 0 && selected !== null
 
   const closePicker = useCallback(() => setPicker(false), [])
   const closeForm = useCallback(() => setForm(false), [])
+  const closeCouponPanel = useCallback(() => setCouponPanel(false), [])
+
+  /** 쿠폰을 바꾸면 포인트 한도가 달라지므로 입력한 포인트를 새 한도로 다시 맞춘다. */
+  const selectCoupon = (id: number | null) => {
+    const next = coupons?.find((c) => c.id === id && c.applicable) ?? null
+    const nextMax = Math.max(0, Math.min(balance ?? 0, total - (next ? Math.min(next.discount, total) : 0)))
+    setCouponId(next?.id ?? null)
+    setPointText((t) => {
+      const v = clampPoints(t, nextMax)
+      return v === 0 ? '' : String(v)
+    })
+    setCouponPanel(false)
+  }
   const clearMessage = useCallback(() => setMessage(null), [])
 
   const saveAddress = async (input: AddressInput) => {
@@ -94,10 +130,17 @@ export default function CheckoutPage() {
         lines.map((l) => ({ skuId: l.skuId, quantity: l.quantity })),
         lines.map((l) => l.cartItemId).filter((id): id is number => id !== null),
         usePoints,
+        coupon?.id ?? null,
       )
       navigate(`/orders/${order.id}`, { replace: true, state: { justOrdered: true } })
     } catch (e) {
-      setMessage(e instanceof ApiError && e.status === 400 ? e.message : '주문하지 못했습니다')
+      const badRequest = e instanceof ApiError && e.status === 400
+      setMessage(badRequest ? e.message : '주문하지 못했습니다')
+      // 쿠폰이 그사이 만료 · 사용됐으면 선택을 풀고 목록을 다시 받는다.
+      if (badRequest && coupon && e.message.includes('쿠폰')) {
+        setCouponId(null)
+        loadCoupons(lines)
+      }
       setPaying(false)
     }
   }
@@ -137,6 +180,29 @@ export default function CheckoutPage() {
             </div>
             <OrderItems lines={lines} />
           </section>
+          {coupons !== null && (
+            <section className="block">
+              <div className="block-head">
+                <h2>쿠폰</h2>
+                {usableCoupons > 0 && <span className="point-have">사용 가능 {usableCoupons}장</span>}
+              </div>
+              <div className="coupon-pick">
+                <div className="picked">
+                  {coupon ? (
+                    <>
+                      <div className="nm">{coupon.name}</div>
+                      <div className="coupon-amount">-{formatPrice(couponDiscount)}</div>
+                    </>
+                  ) : (
+                    <div className="hint">{usableCoupons > 0 ? '쿠폰을 선택해 주세요' : '사용할 수 있는 쿠폰이 없습니다'}</div>
+                  )}
+                </div>
+                <button type="button" className="btn outline small" disabled={coupons.length === 0} onClick={() => setCouponPanel(true)}>
+                  쿠폰 선택
+                </button>
+              </div>
+            </section>
+          )}
           {balance !== null && (
             <section className="block">
               <div className="block-head">
@@ -178,6 +244,12 @@ export default function CheckoutPage() {
               <span>상품 금액</span>
               <span>{formatPrice(total)}</span>
             </div>
+            {couponDiscount > 0 && (
+              <div className="kv muted">
+                <span>쿠폰 할인</span>
+                <span>-{formatPrice(couponDiscount)}</span>
+              </div>
+            )}
             {usePoints > 0 && (
               <div className="kv muted">
                 <span>포인트 사용</span>
@@ -220,6 +292,34 @@ export default function CheckoutPage() {
         <button type="button" className="btn outline small" style={{ marginTop: 12 }} onClick={() => setForm(true)}>
           배송지 추가
         </button>
+      </BottomPanel>
+      <BottomPanel open={couponPanel} onClose={closeCouponPanel}>
+        <h3>쿠폰 선택</h3>
+        <button type="button" className={`coupon-none ${coupon ? '' : 'on'}`} aria-pressed={!coupon} onClick={() => selectCoupon(null)}>
+          <span className="radio" />
+          선택 안 함
+        </button>
+        <div className="coupon-list">
+          {(coupons ?? []).map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              className={`coupon-choice ${coupon?.id === c.id ? 'on' : ''}`}
+              aria-pressed={coupon?.id === c.id}
+              aria-label={c.name}
+              disabled={!c.applicable}
+              onClick={() => selectCoupon(c.id)}
+            >
+              <CouponCard
+                coupon={c}
+                expiry={expiresOnLabel(c.expiresOn)}
+                dim={!c.applicable}
+                note={c.applicable ? undefined : c.reason}
+                action={c.applicable ? <span className="coupon-amount">-{formatPrice(c.discount)}</span> : undefined}
+              />
+            </button>
+          ))}
+        </div>
       </BottomPanel>
       <AddressForm open={form} saving={saving} onSubmit={saveAddress} onClose={closeForm} />
       <Toast message={message} onDone={clearMessage} />

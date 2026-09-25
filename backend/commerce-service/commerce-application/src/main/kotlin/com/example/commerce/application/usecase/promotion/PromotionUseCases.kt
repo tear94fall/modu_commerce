@@ -1,12 +1,15 @@
 package com.example.commerce.application.usecase.promotion
 
-import com.example.commerce.application.domain.entity.Promotion
+import com.example.commerce.application.domain.entity.EventKind
 import com.example.commerce.application.domain.entity.PromotionType
 import com.example.commerce.application.service.AttendanceService
+import com.example.commerce.application.service.CouponQueryService
 import com.example.commerce.application.service.PromotionCommandService
 import com.example.commerce.application.service.PromotionQueryService
 import com.example.commerce.application.service.WishlistQueryService
 import com.example.commerce.application.usecase.command.PromotionCommand
+import com.example.commerce.application.usecase.coupon.adminSummaries
+import com.example.commerce.application.usecase.coupon.offers
 import com.example.commerce.application.usecase.result.AdminAttendanceResult
 import com.example.commerce.application.usecase.result.AdminPromotionDetailResult
 import com.example.commerce.application.usecase.result.AdminPromotionSummaryResult
@@ -31,6 +34,7 @@ class GetPromotionBannersUseCase(
 class GetPromotionUseCase(
     private val promotionQueryService: PromotionQueryService,
     private val wishlistQueryService: WishlistQueryService,
+    private val couponQueryService: CouponQueryService,
 ) {
     @Transactional(transactionManager = "roTransactionManager", readOnly = true)
     fun execute(
@@ -48,7 +52,7 @@ class GetPromotionUseCase(
                 emptyList()
             }
         val attendance =
-            if (p.type == PromotionType.EVENT) {
+            if (p.kind() == EventKind.ATTENDANCE) {
                 val dates = promotionQueryService.myCheckDates(id, userId)
                 AttendanceInfoResult(p.rewardPoints, today, today in dates, dates, p.totalDays())
             } else {
@@ -67,6 +71,8 @@ class GetPromotionUseCase(
             p.statusOn(today),
             products,
             attendance,
+            p.kind(),
+            couponQueryService.offers(userId, couponQueryService.live(p.couponIds)),
         )
     }
 }
@@ -105,9 +111,20 @@ class SearchAdminPromotionsUseCase(
 @Component
 class GetAdminPromotionUseCase(
     private val promotionQueryService: PromotionQueryService,
+    private val couponQueryService: CouponQueryService,
 ) {
     @Transactional(transactionManager = "roTransactionManager", readOnly = true)
-    fun execute(id: Long): AdminPromotionDetailResult = detail(promotionQueryService, promotionQueryService.find(id))
+    fun execute(id: Long): AdminPromotionDetailResult {
+        val p = promotionQueryService.find(id)
+        val coupons = couponQueryService.adminSummaries(couponQueryService.live(p.couponIds))
+        return AdminPromotionDetailResult.from(
+            p,
+            promotionQueryService.today(),
+            promotionQueryService.attendanceCounts(listOf(id))[id] ?: 0,
+            promotionQueryService.products(p),
+            coupons,
+        )
+    }
 }
 
 @Component
@@ -144,12 +161,4 @@ class GetPromotionAttendancesUseCase(
         promotionQueryService.find(id)
         return PageResult.from(promotionQueryService.attendances(id, page, size), AdminAttendanceResult::from)
     }
-}
-
-private fun detail(
-    q: PromotionQueryService,
-    p: Promotion,
-): AdminPromotionDetailResult {
-    val id = requireNotNull(p.id)
-    return AdminPromotionDetailResult.from(p, q.today(), q.attendanceCounts(listOf(id))[id] ?: 0, q.products(p))
 }

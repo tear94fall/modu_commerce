@@ -22,6 +22,11 @@ export function serverMessage(body: string): string | undefined {
   }
 }
 
+/** 서버가 준 문구가 있으면 그것, 없으면(네트워크 · 401 · 본문 없음) fallback. */
+export function errorMessage(e: unknown, fallback: string): string {
+  return e instanceof ApiError && e.status !== 401 && e.message && !e.message.startsWith('HTTP ') ? e.message : fallback
+}
+
 /**
  * commerce-service / auth-service 호출. 같은 출처(프록시)라 경로만 준다.
  * 401 이면 토큰을 한 번 갱신해 재시도하고, 그래도 401 이면 세션 만료 처리.

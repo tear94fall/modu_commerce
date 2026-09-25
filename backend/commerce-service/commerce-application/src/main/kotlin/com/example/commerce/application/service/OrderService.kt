@@ -65,6 +65,7 @@ class OrderCommandService(
     private val addressCommandService: AddressCommandService,
     private val cartCommandService: CartCommandService,
     private val pointGateway: PointGateway,
+    private val couponUseService: CouponUseService,
 ) {
     fun create(
         userId: String,
@@ -85,13 +86,17 @@ class OrderCommandService(
             sku.decreaseStock(quantity)
             order.addItem(sku, quantity)
         }
+        val coupon = command.userCouponId?.let { couponUseService.applyTo(order, it) }
         order.usePoints(command.usePoints)
         val saved = orderRwRepository.saveAndFlush(order)
+        coupon?.let { couponUseService.markUsed(it, saved) }
         cartCommandService.removeAll(userId, command.cartItemIds)
         if (saved.pointAmount > 0) {
             pointGateway.spend(userId, saved.pointAmount, saved.pointSpendRefId(), "주문 결제 ${saved.orderNo}")
         }
-        logger.info { "order ${saved.orderNo} created by $userId: ${saved.totalAmount}원 (포인트 ${saved.pointAmount})" }
+        logger.info {
+            "order ${saved.orderNo} created by $userId: ${saved.totalAmount}원 (쿠폰 ${saved.couponDiscount}, 포인트 ${saved.pointAmount})"
+        }
         return saved
     }
 
@@ -102,6 +107,7 @@ class OrderCommandService(
         val order = orderRwRepository.findByIdAndUserId(orderId, userId) ?: throw OrderQueryService.notFound(orderId)
         order.cancel()
         restock(order)
+        couponUseService.restore(order)
         refundPoints(order)
         return order
     }
@@ -114,6 +120,7 @@ class OrderCommandService(
         order.transition(next)
         if (next == OrderStatus.CANCELLED) {
             restock(order)
+            couponUseService.restore(order)
             refundPoints(order)
         }
         return order

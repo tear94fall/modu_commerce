@@ -3,6 +3,8 @@ package com.example.commerce.api.common
 import com.example.commerce.api.point.PointUnavailableException
 import com.example.commerce.application.point.PointGatewayException
 import com.example.commerce.application.service.AlreadyCheckedInException
+import com.example.commerce.application.service.CouponAlreadyIssuedException
+import com.example.commerce.application.service.CouponCodeNotFoundException
 import jakarta.persistence.EntityNotFoundException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -38,6 +40,14 @@ class GlobalExceptionHandler {
         ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ErrorResponse("요청 본문을 읽을 수 없습니다."))
 
     /** point-service 가 죽었거나 내부 토큰이 다를 때. 마이 탭은 포인트 줄만 비우고 나머지는 그대로 보여 준다. */
+    @ExceptionHandler(CouponAlreadyIssuedException::class)
+    fun handleCouponIssued(ex: CouponAlreadyIssuedException): ResponseEntity<ErrorResponse> =
+        ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse(ex.message ?: "이미 받은 쿠폰입니다."))
+
+    @ExceptionHandler(CouponCodeNotFoundException::class)
+    fun handleCouponCode(ex: CouponCodeNotFoundException): ResponseEntity<ErrorResponse> =
+        ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorResponse(ex.message ?: "쿠폰 코드를 확인해 주세요."))
+
     @ExceptionHandler(AlreadyCheckedInException::class)
     fun handleAlreadyChecked(ex: AlreadyCheckedInException): ResponseEntity<ErrorResponse> =
         ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse(ex.message ?: "오늘은 이미 출석했습니다."))

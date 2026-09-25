@@ -3,6 +3,7 @@ package com.example.commerce.api.promotion
 import com.example.commerce.api.common.PageResponse
 import com.example.commerce.api.common.userId
 import com.example.commerce.api.product.response.ProductSummaryResponse
+import com.example.commerce.application.domain.entity.EventKind
 import com.example.commerce.application.domain.entity.PromotionStatus
 import com.example.commerce.application.domain.entity.PromotionType
 import com.example.commerce.application.usecase.command.PromotionCommand
@@ -18,6 +19,7 @@ import com.example.commerce.application.usecase.result.AdminPromotionDetailResul
 import com.example.commerce.application.usecase.result.AdminPromotionSummaryResult
 import com.example.commerce.application.usecase.result.AttendanceInfoResult
 import com.example.commerce.application.usecase.result.AttendanceResult
+import com.example.commerce.application.usecase.result.CouponOfferResult
 import com.example.commerce.application.usecase.result.PromotionBannerResult
 import com.example.commerce.application.usecase.result.PromotionDetailResult
 import org.springframework.http.HttpStatus
@@ -127,6 +129,8 @@ data class PromotionRequest(
     val productIds: List<Long>? = null,
     val pointRuleCode: String? = null,
     val rewardPoints: Long? = null,
+    val eventKind: EventKind? = null,
+    val couponIds: List<Long>? = null,
 ) {
     fun toCommand(): PromotionCommand {
         val type = requireNotNull(type) { "기획전·이벤트 종류를 고르세요." }
@@ -144,6 +148,8 @@ data class PromotionRequest(
             productIds = if (type == PromotionType.EXHIBITION) productIds.orEmpty() else emptyList(),
             pointRuleCode = if (type == PromotionType.EVENT) PromotionCommand.blankToNull(pointRuleCode) else null,
             rewardPoints = if (type == PromotionType.EVENT) rewardPoints else null,
+            eventKind = if (type == PromotionType.EVENT) eventKind else null,
+            couponIds = couponIds.orEmpty(),
         )
     }
 }
@@ -162,6 +168,8 @@ data class PromotionDetailResponse(
     val status: PromotionStatus,
     val products: List<ProductSummaryResponse>,
     val attendance: AttendanceInfoResult?,
+    val eventKind: EventKind?,
+    val coupons: List<CouponOfferResult>,
 ) {
     companion object {
         fun from(r: PromotionDetailResult) =
@@ -178,6 +186,8 @@ data class PromotionDetailResponse(
                 r.status,
                 r.products.map(ProductSummaryResponse::from),
                 r.attendance,
+                r.eventKind,
+                r.coupons,
             )
     }
 }

@@ -1,5 +1,6 @@
 package com.example.commerce.application.usecase.command
 
+import com.example.commerce.application.domain.entity.EventKind
 import com.example.commerce.application.domain.entity.PromotionType
 import java.time.LocalDate
 
@@ -18,6 +19,10 @@ data class PromotionCommand(
     val productIds: List<Long>,
     val pointRuleCode: String?,
     val rewardPoints: Long?,
+    /** 이벤트 종류. 이벤트가 아니면 무시. 없으면 출석 체크. */
+    val eventKind: EventKind? = null,
+    /** 기획전 쿠폰(0~10) 또는 쿠폰 이벤트의 쿠폰(1~10). */
+    val couponIds: List<Long> = emptyList(),
 ) {
     fun validate() {
         require(title.isNotBlank() && title.length <= 60) { "제목은 1~60자로 입력하세요." }
@@ -31,6 +36,11 @@ data class PromotionCommand(
             require(productIds.toSet().size == productIds.size) { "같은 상품을 두 번 넣을 수 없습니다." }
         }
         require(rewardPoints == null || rewardPoints >= 0) { "보상 포인트는 0 이상이어야 합니다." }
+        require(couponIds.size <= 10) { "쿠폰은 10개까지 넣을 수 있습니다." }
+        require(couponIds.toSet().size == couponIds.size) { "같은 쿠폰을 두 번 넣을 수 없습니다." }
+        if (type == PromotionType.EVENT && (eventKind ?: EventKind.ATTENDANCE) == EventKind.COUPON) {
+            require(couponIds.isNotEmpty()) { "쿠폰 이벤트에 줄 쿠폰을 1~10개 고르세요." }
+        }
     }
 
     companion object {

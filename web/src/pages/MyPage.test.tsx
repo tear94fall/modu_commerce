@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import * as coupons from '../api/coupons'
 import * as me from '../api/me'
 import * as points from '../api/points'
 import MyPage from './MyPage'
@@ -18,6 +19,7 @@ describe('MyPage', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     vi.spyOn(me, 'getProfile').mockResolvedValue({ name: '임준섭', email: 'me@modu.local', picture: '' })
+    vi.spyOn(coupons, 'getMyCouponCount').mockResolvedValue(0)
   })
 
   it('shows my points next to the 포인트 row', async () => {
@@ -36,5 +38,14 @@ describe('MyPage', () => {
     expect(await screen.findByText('임준섭')).toBeInTheDocument()
     const row = screen.getByRole('link', { name: /포인트/ })
     expect(row.querySelector('.point-value')).toHaveTextContent('')
+  })
+
+  it('shows the available coupon count on the 쿠폰 row', async () => {
+    vi.spyOn(points, 'getMyPoints').mockResolvedValue(0)
+    vi.spyOn(coupons, 'getMyCouponCount').mockResolvedValue(3)
+    renderMy()
+
+    expect(await screen.findByText('3장')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /쿠폰/ })).toHaveAttribute('href', '/my/coupons')
   })
 })

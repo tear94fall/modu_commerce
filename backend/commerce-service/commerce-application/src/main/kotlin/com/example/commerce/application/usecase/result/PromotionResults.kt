@@ -1,6 +1,7 @@
 package com.example.commerce.application.usecase.result
 
 import com.example.commerce.application.domain.entity.AttendanceCheck
+import com.example.commerce.application.domain.entity.EventKind
 import com.example.commerce.application.domain.entity.Product
 import com.example.commerce.application.domain.entity.ProductStatus
 import com.example.commerce.application.domain.entity.Promotion
@@ -49,6 +50,10 @@ data class PromotionDetailResult(
     val status: PromotionStatus,
     val products: List<ProductSummaryResult>,
     val attendance: AttendanceInfoResult?,
+    /** 이벤트 종류(기획전은 null). */
+    val eventKind: EventKind? = null,
+    /** 기획전 쿠폰 또는 쿠폰 이벤트의 쿠폰. */
+    val coupons: List<CouponOfferResult> = emptyList(),
 )
 
 data class AttendanceInfoResult(
@@ -82,6 +87,8 @@ data class AdminPromotionSummaryResult(
     val bannerColor: String?,
     val createdAt: LocalDateTime?,
     val updatedAt: LocalDateTime?,
+    val eventKind: EventKind?,
+    val couponCount: Int,
 ) {
     companion object {
         fun from(
@@ -103,6 +110,8 @@ data class AdminPromotionSummaryResult(
             p.bannerColor,
             p.createdAt,
             p.updatedAt,
+            p.kind(),
+            p.couponIds.size,
         )
     }
 }
@@ -140,6 +149,8 @@ data class AdminPromotionDetailResult(
     val products: List<AdminPromotionProductResult>,
     val createdAt: LocalDateTime?,
     val updatedAt: LocalDateTime?,
+    val eventKind: EventKind?,
+    val coupons: List<AdminCouponSummaryResult>,
 ) {
     companion object {
         fun from(
@@ -147,6 +158,7 @@ data class AdminPromotionDetailResult(
             today: LocalDate,
             attendanceCount: Long,
             products: List<Product>,
+            coupons: List<AdminCouponSummaryResult>,
         ) = AdminPromotionDetailResult(
             requireNotNull(p.id),
             p.type,
@@ -167,6 +179,8 @@ data class AdminPromotionDetailResult(
             products.map(AdminPromotionProductResult::from),
             p.createdAt,
             p.updatedAt,
+            p.kind(),
+            coupons,
         )
     }
 }
