@@ -13,6 +13,7 @@ import OrdersPage from './pages/OrdersPage'
 import PointsPage from './pages/PointsPage'
 import ProductDetailPage from './pages/ProductDetailPage'
 import ProductListPage from './pages/ProductListPage'
+import PromotionPage from './pages/PromotionPage'
 import ProductReviewsPage from './pages/ProductReviewsPage'
 import ReviewFormPage from './pages/ReviewFormPage'
 import SearchPage from './pages/SearchPage'
@@ -31,6 +32,7 @@ export default function App() {
           <Route path="/products/:id/reviews" element={<ProductReviewsPage />} />
           <Route path="/reviews/new" element={<ReviewFormPage />} />
           <Route path="/reviews/:id/edit" element={<ReviewFormPage />} />
+          <Route path="/promotions/:id" element={<PromotionPage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/wishlist" element={<WishlistPage />} />
           <Route path="/my" element={<MyPage />} />

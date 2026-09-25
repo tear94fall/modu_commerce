@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as catalog from '../api/catalog'
+import * as promotions from '../api/promotions'
 import HomePage from './HomePage'
 
 const product = (over: Partial<catalog.ProductSummary> = {}): catalog.ProductSummary => ({
@@ -27,6 +28,7 @@ const renderHome = () =>
         <Route path="/" element={<HomePage />} />
         <Route path="/products" element={<p>목록 화면</p>} />
         <Route path="/products/:id" element={<p>상세 화면</p>} />
+        <Route path="/promotions/:id" element={<p>기획전 화면</p>} />
       </Routes>
     </MemoryRouter>,
   )
@@ -35,6 +37,27 @@ describe('HomePage', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     vi.spyOn(catalog, 'getCategories').mockResolvedValue([{ id: 1, name: '패션', children: [] }])
+    vi.spyOn(promotions, 'getPromotionBanners').mockResolvedValue([])
+  })
+
+  it('shows promotion banners on top and opens one on tap', async () => {
+    vi.spyOn(catalog, 'getProducts').mockResolvedValue(page([product()]))
+    vi.spyOn(promotions, 'getPromotionBanners').mockResolvedValue([
+      { id: 7, type: 'EVENT', title: '매일 출석 체크', subtitle: '하루 10P', bannerImageUrl: null, bannerColor: null, startDate: '2026-09-01', endDate: '2026-09-30' },
+    ])
+    renderHome()
+
+    await userEvent.click(await screen.findByRole('link', { name: '매일 출석 체크' }))
+    expect(screen.getByText('기획전 화면')).toBeInTheDocument()
+  })
+
+  it('hides the banner area when banners fail to load but still shows the home', async () => {
+    vi.spyOn(catalog, 'getProducts').mockResolvedValue(page([product({ name: '격자 상품' })]))
+    vi.spyOn(promotions, 'getPromotionBanners').mockRejectedValue(new Error('down'))
+    renderHome()
+
+    expect((await screen.findAllByText('격자 상품')).length).toBeGreaterThan(0)
+    expect(document.querySelector('.promo-carousel')).toBeNull()
   })
 
   it('shows category chips, rows and the grid with discounted prices', async () => {

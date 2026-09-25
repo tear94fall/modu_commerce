@@ -66,6 +66,29 @@ class PointClient(
             }
         }
 
+    /**
+     * 규칙대로 적립. 한도·중복·꺼진 규칙은 point-service 가 applied=false 와 reason 으로 답한다.
+     * 규칙이 없으면(404) 장애가 아니라 적립 안 됨(RULE_NOT_FOUND)으로 돌려준다.
+     */
+    fun earn(
+        userId: String,
+        ruleCode: String,
+        refId: String,
+        memo: String?,
+    ): PointEarnResponse =
+        call {
+            try {
+                client
+                    .post()
+                    .uri("/api-internal/point/earn")
+                    .body(PointEarnRequest(userId, ruleCode, refId, memo))
+                    .retrieve()
+                    .body<PointEarnResponse>()
+            } catch (e: HttpClientErrorException.NotFound) {
+                PointEarnResponse(applied = false, amount = 0, balance = null, reason = "RULE_NOT_FOUND")
+            }
+        }
+
     /** 환불(차감 되돌리기). 같은 refId 는 한 번만. */
     fun refund(
         userId: String,
@@ -137,4 +160,20 @@ data class PointChangeResult(
     val applied: Boolean,
     val amount: Long,
     val balance: Long,
+)
+
+/** point-service 의 EarnRequestDto. */
+data class PointEarnRequest(
+    val userId: String,
+    val ruleCode: String,
+    val refId: String,
+    val memo: String?,
+)
+
+/** point-service 의 EarnResultDto. reason: RULE_DISABLED, DUPLICATE, TOTAL_LIMIT, DAILY_LIMIT (+ 커머스가 붙이는 RULE_NOT_FOUND). */
+data class PointEarnResponse(
+    val applied: Boolean,
+    val amount: Long,
+    val balance: Long?,
+    val reason: String? = null,
 )

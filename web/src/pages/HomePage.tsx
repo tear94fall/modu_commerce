@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getCategories, getProducts, setWish, type Category, type ProductSummary } from '../api/catalog'
+import { getPromotionBanners, type PromotionBanner } from '../api/promotions'
 import { ErrorBox } from '../components/Boxes'
 import CartButton from '../components/CartButton'
 import { SearchIcon } from '../components/Icons'
 import { Screen, TopBar } from '../components/Layout'
 import { ProductGrid } from '../components/ProductCard'
+import PromotionCarousel from '../components/PromotionBanner'
 import Toast from '../components/Toast'
 import { useProductPager } from '../hooks/useProductPager'
 
@@ -13,8 +15,9 @@ const ROW_SIZE = 10
 
 const loadLatest = (page: number) => getProducts({ sort: 'latest', page })
 
-/** 홈: 카테고리 칩, 새 상품·인기 상품 가로줄, 그 아래 전체 상품 격자(최신순 페이징). */
+/** 홈: 기획전·이벤트 배너, 카테고리 칩, 새 상품·인기 상품 가로줄, 그 아래 전체 상품 격자(최신순 페이징). */
 export default function HomePage() {
+  const [banners, setBanners] = useState<PromotionBanner[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [newest, setNewest] = useState<ProductSummary[]>([])
   const [popular, setPopular] = useState<ProductSummary[]>([])
@@ -22,6 +25,8 @@ export default function HomePage() {
   const [message, setMessage] = useState<string | null>(null)
 
   const loadSections = useCallback(() => {
+    // 배너를 못 불러와도 홈은 그대로 뜬다(배너 자리만 비운다).
+    getPromotionBanners().then(setBanners).catch(() => setBanners([]))
     getCategories().then(setCategories).catch(() => {})
     getProducts({ sort: 'latest', size: ROW_SIZE }).then((p) => setNewest(p.content)).catch(() => {})
     getProducts({ sort: 'popular', size: ROW_SIZE }).then((p) => setPopular(p.content)).catch(() => {})
@@ -69,6 +74,7 @@ export default function HomePage() {
           </>
         }
       />
+      <PromotionCarousel banners={banners} />
       {categories.length > 0 && (
         <div className="chips">
           {categories.map((c) => (
