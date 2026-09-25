@@ -572,3 +572,7 @@ a.coupon-get { background: var(--surface); color: var(--brand); border: 1px soli
 .promo-coupons .coupon-list { background: var(--bg); }
 .coupon-event-btn { margin: 4px 0 0; }
 .coupon-event .coupon-list { padding: 12px 0; }
+
+/* 기획전·이벤트 상세 배너: 상단 바와 같은 색이어도 섞이지 않게 여백을 둔 둥근 카드로(홈 배너와 같은 모양). */
+.promo-hero { padding: 12px 16px 4px; background: var(--surface); }
+.promo-hero .promo-art { border-radius: 16px; box-shadow: 0 4px 14px rgba(17, 24, 39, 0.12); }

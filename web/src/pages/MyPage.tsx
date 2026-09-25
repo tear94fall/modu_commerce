@@ -75,7 +75,7 @@ export default function MyPage() {
 
   return (
     <Screen tabs className="my">
-      <TopBar title="마이" />
+      <TopBar title="마이 페이지" />
       <div className="my-hero">
         {profile?.picture ? <img className="avatar" src={profile.picture} alt="" /> : <div className="avatar" aria-hidden="true" />}
         <div className="who">
