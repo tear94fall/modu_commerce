@@ -9,6 +9,8 @@ data class CategoryResult(
     val sortOrder: Int,
     val productCount: Long?,
     val children: List<CategoryResult>,
+    val icon: String? = null,
+    val color: String? = null,
 ) {
     companion object {
         /** 정렬된 평면 목록을 상위 → 하위 트리로 만든다. */
@@ -25,6 +27,8 @@ data class CategoryResult(
                     sortOrder = category.sortOrder,
                     productCount = productCount(category),
                     children = childrenByParent[category.id].orEmpty().map(::node),
+                    icon = category.icon,
+                    color = category.color,
                 )
             return categories.filter { it.parent == null }.map(::node)
         }

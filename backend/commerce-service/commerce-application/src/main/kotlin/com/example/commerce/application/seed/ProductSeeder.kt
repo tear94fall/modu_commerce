@@ -49,8 +49,27 @@ class ProductSeeder(
                     Category.create("모자", fashion, 2),
                     Category.create("노트·데스크", stationery, 0),
                 )
-            return roots + children
+            return (roots + children).onEach { c -> SAMPLE_ICONS[c.name]?.let { (icon, color) -> c.decorate(icon, color) } }
         }
+
+        /** 샘플 카테고리 아이콘(이모지)과 타일 색(파스텔). */
+        private val SAMPLE_ICONS =
+            mapOf(
+                "전자기기" to ("💻" to "#DBEAFE"),
+                "생활" to ("🏠" to "#DCFCE7"),
+                "패션" to ("👕" to "#FCE7F3"),
+                "문구" to ("✏️" to "#FEF3C7"),
+                "이어폰·스피커" to ("🎧" to "#E0E7FF"),
+                "키보드·마우스" to ("⌨️" to "#E0F2FE"),
+                "충전" to ("🔋" to "#DCFCE7"),
+                "주방" to ("🍳" to "#FFEDD5"),
+                "욕실" to ("🛁" to "#CFFAFE"),
+                "홈데코" to ("🪴" to "#D1FAE5"),
+                "가방" to ("👜" to "#FCE7F3"),
+                "의류" to ("👚" to "#FAE8FF"),
+                "모자" to ("🧢" to "#EDE9FE"),
+                "노트·데스크" to ("📓" to "#FEF9C3"),
+            )
 
         /**
          * 사진은 picsum.photos 의 seed 주소를 쓴다. seed 가 같으면 같은 사진이 오므로 앱 목록이 매번 바뀌지 않는다.

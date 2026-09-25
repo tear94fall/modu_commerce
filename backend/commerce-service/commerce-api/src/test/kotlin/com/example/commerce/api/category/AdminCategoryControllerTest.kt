@@ -32,6 +32,45 @@ class AdminCategoryControllerTest
         fun reseed() = support.reseed()
 
         @Test
+        fun `icon and colour are saved, shown to the app and validated`() {
+            val body =
+                mockMvc
+                    .post("/api-admin/v1/categories") {
+                        with(admin)
+                        contentType = MediaType.APPLICATION_JSON
+                        content = """{"name":"캠핑","icon":"⛺","color":"#d1fae5"}"""
+                    }.andExpect {
+                        status { isCreated() }
+                        jsonPath("$.icon") { value("⛺") }
+                        jsonPath("$.color") { value("#D1FAE5") }
+                    }.andReturn()
+                    .response.contentAsString
+            val id = JsonPath.read<Int>(body, "$.id")
+            mockMvc.get("/api/v1/categories") { with(jwt().jwt { it.subject("11") }) }.andExpect {
+                jsonPath("$[?(@.id == $id)].icon") { value("⛺") }
+                jsonPath("$[?(@.name == '문구')].icon") { value("✏️") }
+            }
+            mockMvc
+                .put("/api-admin/v1/categories/$id") {
+                    with(admin)
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"name":"캠핑","icon":"","color":"green"}"""
+                }.andExpect {
+                    status { isBadRequest() }
+                    jsonPath("$.message") { value("아이콘 색은 #RRGGBB 형식으로 입력하세요.") }
+                }
+            mockMvc
+                .put("/api-admin/v1/categories/$id") {
+                    with(admin)
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"name":"캠핑","icon":"","color":""}"""
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.icon") { doesNotExist() }
+                }
+        }
+
+        @Test
         fun `앱 토큰으로는 어드민 카테고리를 못 본다`() {
             mockMvc.get("/api-admin/v1/categories") { with(jwt()) }.andExpect { status { isForbidden() } }
         }

@@ -18,7 +18,7 @@ class CategoryCommandService(
 ) {
     fun create(command: CategoryCommand): Category {
         val parent = command.parentId?.let { resolveParent(it) }
-        return categoryRwRepository.save(Category.create(command.name, parent, command.sortOrder))
+        return categoryRwRepository.save(Category.create(command.name, parent, command.sortOrder).decorate(command.icon, command.color))
     }
 
     fun update(
@@ -32,6 +32,7 @@ class CategoryCommandService(
             require(categoryRwRepository.countChildren(id) == 0L) { "하위 카테고리가 있는 카테고리는 다른 카테고리 아래로 옮길 수 없습니다." }
         }
         category.update(command.name, parent, command.sortOrder)
+        category.decorate(command.icon, command.color)
         return category
     }
 
