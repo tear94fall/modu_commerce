@@ -19,6 +19,8 @@ data class CreateOrderCommand(
     val addressId: Long,
     val items: List<OrderLineCommand>,
     val cartItemIds: List<Long>,
-    /** 결제에 쓸 포인트(1P = 1원). 0 이면 안 쓴다. */
+    /** 결제에 쓸 포인트(1P = 1원). 0 이면 안 쓴다. 쿠폰 할인을 뺀 금액까지. */
     val usePoints: Long = 0,
+    /** 쓸 쿠폰(user_coupons.id). 없으면 null. */
+    val userCouponId: Long? = null,
 )

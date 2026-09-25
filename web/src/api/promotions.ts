@@ -1,8 +1,12 @@
 import type { ProductSummary } from './catalog'
+import type { CouponOffer } from './coupons'
 import { api } from './client'
 
-/** 기획전(상품 묶음) · 이벤트(지금은 출석 체크 한 가지). */
+/** 기획전(상품 묶음) · 이벤트(출석 체크 또는 쿠폰). */
 export type PromotionType = 'EXHIBITION' | 'EVENT'
+
+/** 이벤트 종류. 기획전은 null. 예전 이벤트는 null 이어도 attendance 가 있으면 출석 이벤트. */
+export type EventKind = 'ATTENDANCE' | 'COUPON'
 
 /** 서버가 한국 날짜 기준으로 정한다. 예정 · 진행 중 · 종료. */
 export type PromotionStatus = 'UPCOMING' | 'ONGOING' | 'ENDED'
@@ -36,7 +40,10 @@ export interface PromotionDetail extends PromotionBanner {
   status: PromotionStatus
   /** 기획전 상품(판매 중인 것만, 관리자 순서). 이벤트는 빈 목록. */
   products: ProductSummary[]
-  /** 이벤트만. */
+  eventKind: EventKind | null
+  /** 기획전: 함께 붙은 쿠폰(없을 수 있음). 쿠폰 이벤트: 이벤트 쿠폰. */
+  coupons: CouponOffer[]
+  /** 출석 이벤트만. */
   attendance: AttendanceInfo | null
 }
 

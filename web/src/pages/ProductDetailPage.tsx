@@ -3,9 +3,11 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { addCartItem } from '../api/cart'
 import { getProduct, setWish, type ProductDetail } from '../api/catalog'
 import { ApiError } from '../api/client'
+import { getDownloadableCoupons, offerDiscountFor, type CouponOffer } from '../api/coupons'
 import { formatRating, getProductReviews, type Review } from '../api/reviews'
 import BottomPanel from '../components/BottomPanel'
 import { ErrorBox, Loading } from '../components/Boxes'
+import CouponOfferList from '../components/CouponOfferList'
 import { HeartIcon, HeartOutlineIcon, StarIcon } from '../components/Icons'
 import { Screen, TopBar } from '../components/Layout'
 import Price from '../components/Price'
@@ -28,6 +30,9 @@ export default function ProductDetailPage() {
   const [slide, setSlide] = useState(0)
   /** 최신 리뷰 세 개 미리보기. 못 불러오면 빈 목록(상세는 그대로 뜬다). */
   const [reviews, setReviews] = useState<Review[]>([])
+  /** 이 상품에 쓸 수 있는 받을 쿠폰. 없거나 못 불러오면 빈 목록(줄을 숨긴다). */
+  const [offers, setOffers] = useState<CouponOffer[]>([])
+  const [couponOpen, setCouponOpen] = useState(false)
 
   const load = useCallback(() => {
     setStatus('loading')
@@ -42,10 +47,14 @@ export default function ProductDetailPage() {
     getProductReviews(productId, 0, 'latest', 3)
       .then((p) => setReviews(p.content))
       .catch(() => setReviews([]))
+    getDownloadableCoupons(productId)
+      .then(setOffers)
+      .catch(() => setOffers([]))
   }, [productId])
   useEffect(load, [load])
 
   const closeSheet = useCallback(() => setSheetOpen(false), [])
+  const closeCoupons = useCallback(() => setCouponOpen(false), [])
   const clearMessage = useCallback(() => setMessage(null), [])
 
   if (status === 'loading' || !detail) {
@@ -59,6 +68,7 @@ export default function ProductDetailPage() {
 
   const sku = selectSku(detail, selected)
   const total = totalPrice(detail, sku, quantity)
+  const bestCoupon = offers.reduce((best, o) => Math.max(best, offerDiscountFor(o, detail.price)), 0)
 
   const toggleWish = () => {
     const next = !detail.wished
@@ -122,6 +132,12 @@ export default function ProductDetailPage() {
           <Link to={`/products/${detail.id}/reviews`} className="rating-line">
             <StarIcon className="on" /> {formatRating(detail.ratingAverage)} <span className="cnt">리뷰 {detail.reviewCount.toLocaleString('ko-KR')}개 ›</span>
           </Link>
+        )}
+        {offers.length > 0 && (
+          <button type="button" className="coupon-row" onClick={() => setCouponOpen(true)}>
+            <span>{bestCoupon > 0 ? `최대 ${formatPrice(bestCoupon)} 할인 쿠폰` : '할인 쿠폰'}</span>
+            <span className="go">{offers.every((o) => o.downloaded) ? '모두 받음 ›' : '쿠폰 받기 ›'}</span>
+          </button>
         )}
         {detail.description && <p className="desc">{detail.description}</p>}
       </div>
@@ -206,6 +222,10 @@ export default function ProductDetailPage() {
             바로 구매
           </button>
         </div>
+      </BottomPanel>
+      <BottomPanel open={couponOpen} onClose={closeCoupons}>
+        <h3>쿠폰 받기</h3>
+        <CouponOfferList offers={offers} onChange={setOffers} onMessage={setMessage} />
       </BottomPanel>
       <Toast message={message} onDone={clearMessage} />
     </Screen>

@@ -1,7 +1,9 @@
 package com.example.commerce.application.domain.entity
 
 import jakarta.persistence.CascadeType
+import jakarta.persistence.CollectionTable
 import jakarta.persistence.Column
+import jakarta.persistence.ElementCollection
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
@@ -11,6 +13,7 @@ import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.OneToMany
 import jakarta.persistence.OrderBy
+import jakarta.persistence.OrderColumn
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 import org.hibernate.annotations.SQLRestriction
@@ -19,6 +22,9 @@ import java.time.LocalDateTime
 
 /** 기획전(연관 상품 모음)과 이벤트(지금은 출석 체크 하나). */
 enum class PromotionType { EXHIBITION, EVENT }
+
+/** 이벤트 종류. 기획전은 null. */
+enum class EventKind { ATTENDANCE, COUPON }
 
 /** 오늘(KST)과 기간으로 정해진다. 저장하지 않는다. */
 enum class PromotionStatus { UPCOMING, ONGOING, ENDED }
@@ -76,6 +82,20 @@ class Promotion(
     var sortOrder: Int = 0
         protected set
 
+    /** 이벤트 종류(출석 체크 / 쿠폰 받기). 기획전은 null. 만든 뒤 바꾸지 않는다. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "event_kind", length = 16)
+    var eventKind: EventKind? = null
+        protected set
+
+    /** 기획전 쿠폰(선택) 또는 쿠폰 이벤트의 쿠폰. 순서대로. */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "promotion_coupons", joinColumns = [JoinColumn(name = "promotion_id")])
+    @OrderColumn(name = "position")
+    @Column(name = "coupon_id", nullable = false)
+    var couponIds: MutableList<Long> = mutableListOf()
+        protected set
+
     @Column(name = "point_rule_code", length = 64)
     var pointRuleCode: String? = null
         protected set
@@ -129,6 +149,18 @@ class Promotion(
     }
 
     fun productIds(): List<Long> = products.sortedBy { it.position }.map { it.productId }
+
+    /** 이벤트 종류. 칼럼이 생기기 전에 만든 이벤트(null)는 출석 체크다. 기획전은 null. */
+    fun kind(): EventKind? = if (type == PromotionType.EVENT) eventKind ?: EventKind.ATTENDANCE else null
+
+    fun initEventKind(kind: EventKind?) {
+        eventKind = if (type == PromotionType.EVENT) (kind ?: EventKind.ATTENDANCE) else null
+    }
+
+    fun replaceCoupons(ids: List<Long>) {
+        couponIds.clear()
+        couponIds.addAll(ids)
+    }
 
     fun setReward(
         pointRuleCode: String?,

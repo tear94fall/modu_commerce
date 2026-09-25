@@ -92,6 +92,21 @@ class Order(
     var pointAmount: Long = 0
         protected set
 
+    /** 쿠폰 할인(원). 포인트보다 먼저 뺀다. */
+    @Column(name = "coupon_discount", nullable = false, columnDefinition = "bigint not null default 0")
+    var couponDiscount: Long = 0
+        protected set
+
+    /** 쓴 쿠폰(user_coupons.id). 취소하면 이것으로 돌려준다. */
+    @Column(name = "user_coupon_id")
+    var userCouponId: Long? = null
+        protected set
+
+    /** 주문 화면에 보일 쿠폰 이름(스냅숏). */
+    @Column(name = "coupon_name", length = 40)
+    var couponName: String? = null
+        protected set
+
     @Column(name = "payment_method", nullable = false, length = 20)
     val paymentMethod: String = PAYMENT_MOCK
 
@@ -129,13 +144,26 @@ class Order(
         return item
     }
 
-    /** 실제 결제 금액 = 상품 금액 − 포인트. */
-    fun paymentAmount(): Long = totalAmount - pointAmount
+    /** 실제 결제 금액 = 상품 금액 − 쿠폰 할인 − 포인트. */
+    fun paymentAmount(): Long = totalAmount - couponDiscount - pointAmount
 
-    /** 포인트 사용. 상품을 다 담은 뒤에 부른다. 상품 금액을 넘길 수 없다. */
+    /** 쿠폰 적용. 상품을 다 담은 뒤, 포인트보다 먼저 부른다. */
+    fun applyCoupon(
+        userCouponId: Long,
+        name: String,
+        discount: Long,
+    ) {
+        require(discount in 1..totalAmount) { "쿠폰 할인액이 올바르지 않습니다." }
+        this.userCouponId = userCouponId
+        this.couponName = name
+        this.couponDiscount = discount
+    }
+
+    /** 포인트 사용. 쿠폰을 적용한 뒤에 부른다. 남은 금액을 넘길 수 없다. */
     fun usePoints(amount: Long) {
+        val payable = totalAmount - couponDiscount
         require(amount >= 0) { "사용 포인트는 0 이상이어야 합니다." }
-        require(amount <= totalAmount) { "포인트는 상품 금액(${totalAmount}원)까지만 쓸 수 있습니다." }
+        require(amount <= payable) { "포인트는 결제할 금액(${payable}원)까지만 쓸 수 있습니다." }
         pointAmount = amount
     }
 

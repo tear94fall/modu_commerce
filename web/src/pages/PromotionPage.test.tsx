@@ -4,7 +4,9 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ProductSummary } from '../api/catalog'
 import { ApiError } from '../api/client'
+import * as coupons from '../api/coupons'
 import * as promotions from '../api/promotions'
+import { myCoupon, offer } from '../test-fixtures/coupons'
 import PromotionPage from './PromotionPage'
 
 const product = (over: Partial<ProductSummary> = {}): ProductSummary => ({
@@ -33,6 +35,8 @@ const exhibition = (over: Partial<promotions.PromotionDetail> = {}): promotions.
   endDate: '2026-09-30',
   status: 'ONGOING',
   products: [product(), product({ id: 6, name: '드립 주전자' })],
+  eventKind: null,
+  coupons: [],
   attendance: null,
   ...over,
 })
@@ -47,6 +51,7 @@ const attendanceEvent = (over: Partial<promotions.AttendanceInfo> = {}, detail: 
     startDate: '2026-09-20',
     endDate: '2026-09-30',
     products: [],
+    eventKind: 'ATTENDANCE',
     attendance: { rewardPoints: 10, today: '2026-09-25', checkedToday: false, checkedDates: ['2026-09-21', '2026-09-22'], totalDays: 11, ...over },
     ...detail,
   })
@@ -173,5 +178,79 @@ describe('PromotionPage', () => {
     await userEvent.click(screen.getByRole('button', { name: '다음 달' }))
     expect(screen.getByText('2026년 10월')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '다음 달' })).toBeDisabled()
+  })
+
+  it('shows exhibition coupons with 받기 buttons', async () => {
+    vi.spyOn(promotions, 'getPromotion').mockResolvedValue(exhibition({ coupons: [offer({ couponId: 4, name: '홈카페 10%', discountType: 'PERCENT', discountValue: 10, maxDiscount: 3000 })] }))
+    const download = vi.spyOn(coupons, 'downloadCoupon').mockResolvedValue(myCoupon({ couponId: 4 }))
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: '기획전 쿠폰' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '홈카페 10% 받기' }))
+    expect(download).toHaveBeenCalledWith(4)
+    expect(await screen.findByRole('button', { name: '홈카페 10% 받음' })).toBeDisabled()
+    expect(screen.getByText('드립 주전자')).toBeInTheDocument()
+  })
+
+  it('has no coupon section for an exhibition without coupons', async () => {
+    vi.spyOn(promotions, 'getPromotion').mockResolvedValue(exhibition())
+    renderPage()
+    expect(await screen.findByText('드립 주전자')).toBeInTheDocument()
+    expect(screen.queryByText('기획전 쿠폰')).not.toBeInTheDocument()
+  })
+
+  const couponEvent = (over: Partial<promotions.PromotionDetail> = {}) =>
+    exhibition({
+      id: 12,
+      type: 'EVENT',
+      eventKind: 'COUPON',
+      title: '가을 쿠폰 팩',
+      products: [],
+      attendance: null,
+      coupons: [offer({ couponId: 1, name: '쿠폰 A' }), offer({ couponId: 2, name: '쿠폰 B' }), offer({ couponId: 3, name: '쿠폰 C', downloaded: true })],
+      ...over,
+    })
+
+  it('claims every event coupon at once', async () => {
+    vi.spyOn(promotions, 'getPromotion').mockResolvedValue(couponEvent())
+    const claim = vi.spyOn(coupons, 'claimEventCoupons').mockResolvedValue({ issued: [myCoupon({ couponId: 1 }), myCoupon({ id: 32, couponId: 2 })], alreadyHad: 1 })
+    renderPage(12)
+
+    expect(await screen.findByText('쿠폰 A')).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: '출석 달력' })).not.toBeInTheDocument()
+    expect(screen.getAllByText('받음')).toHaveLength(1)
+
+    await userEvent.click(screen.getByRole('button', { name: '쿠폰 한 번에 받기' }))
+    expect(claim).toHaveBeenCalledWith(12)
+    expect(await screen.findByText('쿠폰 2장을 받았습니다')).toBeInTheDocument()
+    expect(screen.getAllByText('받음')).toHaveLength(3)
+    expect(screen.getByRole('button', { name: '모두 받았어요' })).toBeDisabled()
+  })
+
+  it('marks everything received on 409', async () => {
+    vi.spyOn(promotions, 'getPromotion').mockResolvedValue(couponEvent())
+    vi.spyOn(coupons, 'claimEventCoupons').mockRejectedValue(new ApiError(409, JSON.stringify({ message: '이미 받은 쿠폰입니다' })))
+    renderPage(12)
+
+    await userEvent.click(await screen.findByRole('button', { name: '쿠폰 한 번에 받기' }))
+    expect(await screen.findByText('이미 받은 쿠폰입니다')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '모두 받았어요' })).toBeDisabled()
+  })
+
+  it('disables the claim button when all are received or the event is over', async () => {
+    vi.spyOn(promotions, 'getPromotion').mockResolvedValueOnce(couponEvent({ status: 'ENDED' }))
+    const { unmount } = renderPage(12)
+    expect(await screen.findByRole('button', { name: '진행 기간이 아닙니다' })).toBeDisabled()
+    unmount()
+
+    vi.spyOn(promotions, 'getPromotion').mockResolvedValue(couponEvent({ coupons: [offer({ downloaded: true })] }))
+    renderPage(12)
+    expect(await screen.findByRole('button', { name: '모두 받았어요' })).toBeDisabled()
+  })
+
+  it('treats an old event without eventKind as attendance', async () => {
+    vi.spyOn(promotions, 'getPromotion').mockResolvedValue(attendanceEvent({}, { eventKind: null }))
+    renderPage(9)
+    expect(await screen.findByRole('button', { name: '출석 체크하기' })).toBeEnabled()
   })
 })

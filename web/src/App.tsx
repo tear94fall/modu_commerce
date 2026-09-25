@@ -4,6 +4,8 @@ import AddressesPage from './pages/AddressesPage'
 import CartPage from './pages/CartPage'
 import CategoryPage from './pages/CategoryPage'
 import CheckoutPage from './pages/CheckoutPage'
+import CouponsPage from './pages/CouponsPage'
+import CouponZonePage from './pages/CouponZonePage'
 import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import MyReviewsPage from './pages/MyReviewsPage'
@@ -38,6 +40,8 @@ export default function App() {
           <Route path="/my" element={<MyPage />} />
           <Route path="/points" element={<PointsPage />} />
           <Route path="/my/reviews" element={<MyReviewsPage />} />
+          <Route path="/my/coupons" element={<CouponsPage />} />
+          <Route path="/coupons" element={<CouponZonePage />} />
           <Route path="/cart" element={<CartPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/orders" element={<OrdersPage />} />

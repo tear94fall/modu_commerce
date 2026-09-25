@@ -1,6 +1,7 @@
 package com.example.commerce.application.service
 
 import com.example.commerce.application.domain.entity.AttendanceCheck
+import com.example.commerce.application.domain.entity.EventKind
 import com.example.commerce.application.domain.entity.Product
 import com.example.commerce.application.domain.entity.ProductStatus
 import com.example.commerce.application.domain.entity.Promotion
@@ -10,6 +11,7 @@ import com.example.commerce.application.domain.repository.ro.AttendanceCheckRoRe
 import com.example.commerce.application.domain.repository.ro.ProductRoRepository
 import com.example.commerce.application.domain.repository.ro.PromotionRoRepository
 import com.example.commerce.application.domain.repository.rw.AttendanceCheckRwRepository
+import com.example.commerce.application.domain.repository.rw.CouponRwRepository
 import com.example.commerce.application.domain.repository.rw.ProductRwRepository
 import com.example.commerce.application.domain.repository.rw.PromotionRwRepository
 import com.example.commerce.application.point.PointGateway
@@ -93,11 +95,13 @@ class PromotionQueryService(
 class PromotionCommandService(
     private val promotionRwRepository: PromotionRwRepository,
     private val productRwRepository: ProductRwRepository,
+    private val couponRwRepository: CouponRwRepository,
     private val clock: Clock,
 ) {
     fun create(command: PromotionCommand): Promotion {
         command.validate()
         val promotion = Promotion(command.type, command.title, command.startDate, command.endDate)
+        promotion.initEventKind(command.eventKind)
         apply(promotion, command)
         return promotionRwRepository.saveAndFlush(promotion)
     }
@@ -109,6 +113,10 @@ class PromotionCommandService(
         command.validate()
         val promotion = promotionRwRepository.findByIdOrNull(id) ?: throw PromotionQueryService.notFound(id)
         require(promotion.type == command.type) { "기획전·이벤트 종류는 바꿀 수 없습니다." }
+        require(command.type != PromotionType.EVENT || command.eventKind == null || command.eventKind == promotion.kind()) {
+            "이벤트 종류는 바꿀 수 없습니다."
+        }
+        promotion.initEventKind(promotion.kind())
         apply(promotion, command)
         return promotionRwRepository.saveAndFlush(promotion)
     }
@@ -133,6 +141,10 @@ class PromotionCommandService(
             c.visible,
             c.sortOrder,
         )
+        val couponIds = if (promotion.kind() == EventKind.ATTENDANCE) emptyList() else c.couponIds
+        val missingCoupons = couponIds.filter { couponRwRepository.findLive(it) == null }
+        require(missingCoupons.isEmpty()) { "없는 쿠폰이 있습니다: ${missingCoupons.joinToString()}" }
+        promotion.replaceCoupons(couponIds)
         when (promotion.type) {
             PromotionType.EXHIBITION -> {
                 val found = productRwRepository.findAllById(c.productIds).mapNotNull { it.id }.toSet()
@@ -140,7 +152,8 @@ class PromotionCommandService(
                 require(missing.isEmpty()) { "없는 상품이 있습니다: ${missing.joinToString()}" }
                 promotion.replaceProducts(c.productIds)
             }
-            PromotionType.EVENT -> promotion.setReward(c.pointRuleCode, c.rewardPoints)
+            PromotionType.EVENT ->
+                promotion.setReward(if (promotion.kind() == EventKind.ATTENDANCE) c.pointRuleCode else null, c.rewardPoints)
         }
     }
 }
@@ -164,7 +177,7 @@ class AttendanceService(
     ): AttendanceOutcome {
         val promotion =
             promotionRwRepository.findByIdOrNull(promotionId)?.takeIf { it.visible } ?: throw PromotionQueryService.notFound(promotionId)
-        require(promotion.type == PromotionType.EVENT) { "출석 체크 이벤트가 아닙니다." }
+        require(promotion.kind() == EventKind.ATTENDANCE) { "출석 체크 이벤트가 아닙니다." }
         val today = LocalDate.now(clock)
         require(promotion.statusOn(today) == PromotionStatus.ONGOING) {
             "진행 중인 이벤트가 아닙니다."

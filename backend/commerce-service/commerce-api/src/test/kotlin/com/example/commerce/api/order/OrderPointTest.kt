@@ -119,7 +119,7 @@ class OrderPointTest
             val stockBefore = support.stockOf("모두 머그컵 세트")
             order(18_001).andExpect {
                 status { isBadRequest() }
-                jsonPath("$.message") { value("포인트는 상품 금액(18000원)까지만 쓸 수 있습니다.") }
+                jsonPath("$.message") { value("포인트는 결제할 금액(18000원)까지만 쓸 수 있습니다.") }
             }
             whenever(pointGateway.spend(any(), any(), any(), anyOrNull())).thenThrow(InsufficientPointException())
             order(1_000).andExpect {

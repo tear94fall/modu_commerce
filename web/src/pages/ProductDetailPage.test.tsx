@@ -1,11 +1,13 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as cart from '../api/cart'
 import * as catalog from '../api/catalog'
+import * as coupons from '../api/coupons'
 import * as reviews from '../api/reviews'
 import { ApiError } from '../api/client'
+import { myCoupon, offer } from '../test-fixtures/coupons'
 import ProductDetailPage from './ProductDetailPage'
 
 const detail = (over: Partial<catalog.ProductDetail> = {}): catalog.ProductDetail => ({
@@ -47,6 +49,7 @@ describe('ProductDetailPage', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     vi.spyOn(reviews, 'getProductReviews').mockResolvedValue({ content: [], totalElements: 0, totalPages: 0, number: 0 })
+    vi.spyOn(coupons, 'getDownloadableCoupons').mockResolvedValue([])
   })
 
   it('shows the product and adds the chosen SKU to the cart', async () => {
@@ -104,5 +107,32 @@ describe('ProductDetailPage', () => {
     vi.spyOn(catalog, 'getProduct').mockRejectedValue(new ApiError(404, ''))
     renderPage()
     expect(await screen.findByText('상품이 없거나 판매가 끝났습니다.')).toBeInTheDocument()
+  })
+
+  it('offers coupons for the product in a panel', async () => {
+    vi.spyOn(catalog, 'getProduct').mockResolvedValue(detail({ price: 20000 }))
+    const list = vi.spyOn(coupons, 'getDownloadableCoupons').mockResolvedValue([
+      offer({ couponId: 1, name: '스티커 3천원', discountValue: 3000 }),
+      offer({ couponId: 2, name: '문구 30%', discountType: 'PERCENT', discountValue: 30, maxDiscount: 5000, scopeLabel: "'문구' 카테고리" }),
+    ])
+    const download = vi.spyOn(coupons, 'downloadCoupon').mockResolvedValue(myCoupon({ couponId: 2 }))
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: /최대 5,000원 할인 쿠폰/ }))
+    expect(list).toHaveBeenCalledWith(5)
+    const panel = screen.getByRole('dialog')
+    expect(within(panel).getByText('30% 할인 (최대 5,000원)')).toBeInTheDocument()
+    await userEvent.click(within(panel).getByRole('button', { name: '문구 30% 받기' }))
+    expect(download).toHaveBeenCalledWith(2)
+    expect(await screen.findByText('쿠폰을 받았습니다')).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: '문구 30% 받음' })).toBeDisabled()
+  })
+
+  it('hides the coupon row when there is nothing to get', async () => {
+    vi.spyOn(catalog, 'getProduct').mockResolvedValue(detail())
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: '모두 스티커 팩' })).toBeInTheDocument()
+    expect(screen.queryByText(/할인 쿠폰/)).not.toBeInTheDocument()
   })
 })

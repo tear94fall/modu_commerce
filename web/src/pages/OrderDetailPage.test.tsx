@@ -10,6 +10,8 @@ const order = (over: Partial<orders.OrderDetail> = {}): orders.OrderDetail => ({
   orderNo: '20260919-ABC123',
   status: 'PAID',
   totalAmount: 10200,
+  couponDiscount: 0,
+  couponName: null,
   pointAmount: 0,
   paymentAmount: 10200,
   paymentMethod: 'MOCK',
@@ -48,5 +50,21 @@ describe('OrderDetailPage', () => {
     expect(cancel).toHaveBeenCalledWith(77)
     expect(await screen.findByText(/^취소 2026\.09\.19 /)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '주문 취소' })).not.toBeInTheDocument()
+  })
+
+  it('shows the coupon discount in the breakdown', async () => {
+    vi.spyOn(orders, 'getOrder').mockResolvedValue(order({ couponDiscount: 3000, couponName: '가을 맞이 3천원', pointAmount: 200, paymentAmount: 7000 }))
+    render(
+      <MemoryRouter initialEntries={['/orders/77']}>
+        <Routes>
+          <Route path="/orders/:id" element={<OrderDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText('쿠폰 할인 (가을 맞이 3천원)')).toBeInTheDocument()
+    expect(screen.getByText('-3,000원')).toBeInTheDocument()
+    expect(screen.getByText('-200원')).toBeInTheDocument()
+    expect(screen.getByText('7,000원')).toBeInTheDocument()
   })
 })

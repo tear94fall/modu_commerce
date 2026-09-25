@@ -109,6 +109,15 @@ export default function OrderDetailPage() {
           <span>상품 금액</span>
           <span>{formatPrice(order.totalAmount)}</span>
         </div>
+        {order.couponDiscount > 0 && (
+          <div className="kv muted">
+            <span>
+              쿠폰 할인{order.couponName ? ` (${order.couponName})` : ''}
+              {order.status === 'CANCELLED' ? ' · 쿠폰 반환됨' : ''}
+            </span>
+            <span>-{formatPrice(order.couponDiscount)}</span>
+          </div>
+        )}
         {order.pointAmount > 0 && (
           <div className="kv muted">
             <span>포인트 사용{order.status === 'CANCELLED' ? ' (환불됨)' : ''}</span>
