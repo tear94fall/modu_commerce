@@ -29,7 +29,7 @@ const TABS = [
   { to: '/', label: '홈', icon: <HomeIcon /> },
   { to: '/categories', label: '카테고리', icon: <CategoryIcon /> },
   { to: '/wishlist', label: '찜', icon: <HeartOutlineIcon /> },
-  { to: '/my', label: '마이', icon: <PersonIcon /> },
+  { to: '/my', label: '마이 페이지', icon: <PersonIcon /> },
 ]
 
 export function TabBar() {
