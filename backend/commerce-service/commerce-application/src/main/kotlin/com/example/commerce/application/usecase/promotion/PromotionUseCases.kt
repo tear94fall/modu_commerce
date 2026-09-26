@@ -4,6 +4,8 @@ import com.example.commerce.application.domain.entity.EventKind
 import com.example.commerce.application.domain.entity.PromotionType
 import com.example.commerce.application.service.AttendanceService
 import com.example.commerce.application.service.CouponQueryService
+import com.example.commerce.application.service.PromotionCacheService
+import com.example.commerce.application.service.PromotionCaches
 import com.example.commerce.application.service.PromotionCommandService
 import com.example.commerce.application.service.PromotionQueryService
 import com.example.commerce.application.service.WishlistQueryService
@@ -19,20 +21,24 @@ import com.example.commerce.application.usecase.result.PageResult
 import com.example.commerce.application.usecase.result.ProductSummaryResult
 import com.example.commerce.application.usecase.result.PromotionBannerResult
 import com.example.commerce.application.usecase.result.PromotionDetailResult
+import org.springframework.cache.annotation.CacheEvict
+import org.springframework.cache.annotation.Caching
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 @Component
 class GetPromotionBannersUseCase(
     private val promotionQueryService: PromotionQueryService,
+    private val promotionCacheService: PromotionCacheService,
 ) {
-    @Transactional(transactionManager = "roTransactionManager", readOnly = true)
-    fun execute(): List<PromotionBannerResult> = promotionQueryService.banners().map(PromotionBannerResult::from)
+    /** 캐시(오늘 날짜 키)에서 읽는다. 앱을 열 때마다 불리는 가장 뜨거운 조회다. */
+    fun execute(): List<PromotionBannerResult> = promotionCacheService.banners(promotionQueryService.today())
 }
 
 @Component
 class GetPromotionUseCase(
     private val promotionQueryService: PromotionQueryService,
+    private val promotionCacheService: PromotionCacheService,
     private val wishlistQueryService: WishlistQueryService,
     private val couponQueryService: CouponQueryService,
 ) {
@@ -41,25 +47,26 @@ class GetPromotionUseCase(
         userId: String,
         id: Long,
     ): PromotionDetailResult {
-        val p = promotionQueryService.visible(id)
+        // 공통 정보는 캐시에서, 상품 가격·품절·쿠폰 수량·찜·출석은 매번 새로 읽는다.
+        val p = promotionCacheService.snapshot(id)?.takeIf { it.visible } ?: throw PromotionQueryService.notFound(id)
         val today = promotionQueryService.today()
         val products =
             if (p.type == PromotionType.EXHIBITION) {
-                val list = promotionQueryService.sellingProducts(p)
+                val list = promotionQueryService.sellingProducts(p.productIds)
                 val wished = wishlistQueryService.wishedIds(userId, list.mapNotNull { it.id })
                 list.map { ProductSummaryResult.from(it, wished = it.id in wished) }
             } else {
                 emptyList()
             }
         val attendance =
-            if (p.kind() == EventKind.ATTENDANCE) {
+            if (p.eventKind == EventKind.ATTENDANCE) {
                 val dates = promotionQueryService.myCheckDates(id, userId)
                 AttendanceInfoResult(p.rewardPoints, today, today in dates, dates, p.totalDays())
             } else {
                 null
             }
         return PromotionDetailResult(
-            requireNotNull(p.id),
+            p.id,
             p.type,
             p.title,
             p.subtitle,
@@ -71,7 +78,7 @@ class GetPromotionUseCase(
             p.statusOn(today),
             products,
             attendance,
-            p.kind(),
+            p.eventKind,
             couponQueryService.offers(userId, couponQueryService.live(p.couponIds)),
         )
     }
@@ -127,16 +134,27 @@ class GetAdminPromotionUseCase(
     }
 }
 
+/**
+ * 만들기·고치기·지우기. 캐시는 여기(트랜잭션 밖)서 비운다: 서비스 트랜잭션이 커밋된 뒤라 옛 값이 다시 들어가지 않고,
+ * Redis 가 죽어 비우기가 실패해도 이미 커밋된 변경이 오류로 보이지 않는다(캐시 오류 처리기가 로그만 남긴다, 최대 TTL 만큼 늦게 반영).
+ */
 @Component
 class SavePromotionUseCase(
     private val promotionCommandService: PromotionCommandService,
     private val getAdminPromotionUseCase: GetAdminPromotionUseCase,
 ) {
+    @CacheEvict(cacheNames = [PromotionCaches.BANNERS], allEntries = true)
     fun create(command: PromotionCommand): AdminPromotionDetailResult {
         val id = requireNotNull(promotionCommandService.create(command).id)
         return getAdminPromotionUseCase.execute(id)
     }
 
+    @Caching(
+        evict = [
+            CacheEvict(cacheNames = [PromotionCaches.BANNERS], allEntries = true),
+            CacheEvict(cacheNames = [PromotionCaches.PROMOTION], key = "#p0"),
+        ],
+    )
     fun update(
         id: Long,
         command: PromotionCommand,
@@ -145,6 +163,12 @@ class SavePromotionUseCase(
         return getAdminPromotionUseCase.execute(id)
     }
 
+    @Caching(
+        evict = [
+            CacheEvict(cacheNames = [PromotionCaches.BANNERS], allEntries = true),
+            CacheEvict(cacheNames = [PromotionCaches.PROMOTION], key = "#p0"),
+        ],
+    )
     fun delete(id: Long) = promotionCommandService.delete(id)
 }
 

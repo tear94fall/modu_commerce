@@ -49,6 +49,12 @@ spring:
         default_batch_fetch_size: 1000
     open-in-view: false
 
+  # Redis 는 캐시로만 쓴다(Spring Data Redis 저장소를 찾지 않는다). 접속 정보(클러스터 노드)는 config-service 가 내려준다.
+  data:
+    redis:
+      repositories:
+        enabled: false
+
 modu:
   oauth:
     # 모두의 채팅 auth-service. 커머스 앱이 SSO 로 받은 modu-commerce 토큰을 여기 JWKS 로 검증한다.
@@ -66,6 +72,12 @@ modu:
   # 리뷰 작성자 이름·이메일을 받는 member-service(모두 챗 백엔드).
   member:
     url: ${MODU_MEMBER_URL:http://member-service:8080}
+
+  # 기획전·이벤트 캐시. 개발·운영은 config-service 가 redis-enabled=true 와 클러스터 노드를 내려준다. 기본(IDE·테스트)은 메모리 캐시.
+  cache:
+    redis-enabled: ${MODU_CACHE_REDIS_ENABLED:false}
+    banners-ttl: 5m
+    promotion-ttl: 10m
 
 logging:
   level:

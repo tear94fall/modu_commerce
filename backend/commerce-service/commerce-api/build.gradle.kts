@@ -11,6 +11,9 @@ dependencies {
     // 모두 계정(auth-service) 토큰을 JWKS 로 검증하는 리소스 서버
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
+    // 기획전·이벤트 캐시. 개발·운영은 공용 Redis 클러스터(modu_infra), 테스트·로컬은 메모리 캐시
+    implementation("org.springframework.boot:spring-boot-starter-cache")
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
 
     testImplementation("org.springframework.security:spring-security-test")
     // 코틀린 non-null 파라미터에 Mockito 매처(eq/any)를 쓰기 위해

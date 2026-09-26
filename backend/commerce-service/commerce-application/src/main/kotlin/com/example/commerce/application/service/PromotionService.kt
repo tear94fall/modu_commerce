@@ -53,6 +53,13 @@ class PromotionQueryService(
         return ids.mapNotNull { byId[it] }
     }
 
+    /** 앱 기획전 상품: 관리자 순서대로 판매 중인 것만(가격·품절은 늘 새로 읽는다). */
+    fun sellingProducts(productIds: List<Long>): List<Product> {
+        if (productIds.isEmpty()) return emptyList()
+        val byId = productRoRepository.findAllByIdIn(productIds).associateBy { it.id }
+        return productIds.mapNotNull { byId[it] }.filter { it.status == ProductStatus.SELLING }
+    }
+
     /** 앱 기획전 상품: 판매 중인 것만. */
     fun sellingProducts(promotion: Promotion): List<Product> = products(promotion).filter { it.status == ProductStatus.SELLING }
 

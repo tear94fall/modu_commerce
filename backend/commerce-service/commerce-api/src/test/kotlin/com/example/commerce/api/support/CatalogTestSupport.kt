@@ -4,6 +4,7 @@ import com.example.commerce.application.domain.repository.rw.CategoryRwRepositor
 import com.example.commerce.application.domain.repository.rw.ProductRwRepository
 import com.example.commerce.application.seed.ProductSeeder
 import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.cache.CacheManager
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -18,10 +19,13 @@ class CatalogTestSupport(
     private val productRwRepository: ProductRwRepository,
     private val categoryRwRepository: CategoryRwRepository,
     @Qualifier("rwDataSource") rwDataSource: DataSource,
+    private val cacheManager: CacheManager,
 ) {
     private val jdbc = JdbcTemplate(rwDataSource)
 
     fun reseed() {
+        // 테스트끼리 같은 컨텍스트(같은 캐시)를 쓴다. 지운 행이 캐시에 남지 않게 먼저 비운다.
+        cacheManager.cacheNames.forEach { cacheManager.getCache(it)?.clear() }
         listOf(
             "promotion_coupons",
             "attendance_checks",
