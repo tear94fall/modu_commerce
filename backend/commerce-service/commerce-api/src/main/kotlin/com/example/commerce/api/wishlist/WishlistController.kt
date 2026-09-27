@@ -1,5 +1,6 @@
 package com.example.commerce.api.wishlist
 
+import com.example.commerce.api.common.CustomerRequired
 import com.example.commerce.api.common.PageResponse
 import com.example.commerce.api.common.userId
 import com.example.commerce.api.product.response.ProductSummaryResponse
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 
 /** 찜. 추가·해제는 멱등이라 둘 다 204. */
+@CustomerRequired
 @RestController
 @RequestMapping("/api/v1/wishlist")
 class WishlistController(

@@ -229,7 +229,14 @@ class CouponIssueService(
             require(coupon.inIssuePeriod(today)) { "쿠폰을 받을 수 있는 기간이 아닙니다." }
         }
         if (source == CouponSource.DOWNLOAD) require(coupon.downloadable) { "지금은 받을 수 없는 쿠폰입니다." }
-        if (userCouponRwRepository.existsByCouponIdAndUserId(couponId, userId)) throw CouponAlreadyIssuedException()
+        if (userCouponRwRepository.existsByCouponIdAndUserIdAndIssueKey(
+                couponId,
+                userId,
+                UserCoupon.ONCE,
+            )
+        ) {
+            throw CouponAlreadyIssuedException()
+        }
         require(!coupon.soldOut()) { "쿠폰이 모두 소진되었습니다." }
         coupon.issued()
         return try {
@@ -238,7 +245,40 @@ class CouponIssueService(
             throw CouponAlreadyIssuedException()
         }
     }
+
+    /**
+     * 매월 등급 쿠폰. 쿠폰 행을 잠그고 [issueKey](`tier:2026-10`)로 아직 안 받은 사람에게 준다.
+     * 활성·수량은 지키고 받기 노출·발급 기간은 무시한다.
+     */
+    fun issueTier(
+        couponId: Long,
+        userIds: Collection<String>,
+        issueKey: String,
+    ): TierIssueResult {
+        val coupon = couponRwRepository.findByIdForUpdate(couponId)
+        val already = userCouponRwRepository.findUserIdsByCouponAndKey(couponId, issueKey).toSet()
+        val targets = userIds.distinct().filter { it !in already }
+        if (targets.isEmpty()) return TierIssueResult(0, 0)
+        if (coupon == null || !coupon.active) return TierIssueResult(0, targets.size)
+        val today = LocalDate.now(clock)
+        var issued = 0
+        val rows =
+            targets.mapNotNull { userId ->
+                if (coupon.soldOut()) return@mapNotNull null
+                coupon.issued()
+                issued++
+                UserCoupon(coupon, userId, CouponSource.TIER, coupon.expiresOn(today), issueKey)
+            }
+        userCouponRwRepository.saveAllAndFlush(rows)
+        return TierIssueResult(issued, targets.size - issued)
+    }
 }
+
+/** 등급 쿠폰 한 종류 발급 결과. [skipped] 는 쿠폰이 꺼졌거나 지워졌거나 소진돼 못 준 수(이미 받은 사람은 세지 않는다). */
+data class TierIssueResult(
+    val issued: Int,
+    val skipped: Int,
+)
 
 /** 결제에 쓸 수 있는지, 얼마인지. 주문에 적용하고 취소하면 돌려준다. */
 @Service

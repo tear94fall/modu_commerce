@@ -1,5 +1,6 @@
 package com.example.commerce.api.address
 
+import com.example.commerce.api.common.CustomerRequired
 import com.example.commerce.api.common.userId
 import com.example.commerce.application.usecase.address.CreateAddressUseCase
 import com.example.commerce.application.usecase.address.DeleteAddressUseCase
@@ -53,6 +54,7 @@ data class AddressRequest(
         )
 }
 
+@CustomerRequired
 @RestController
 @RequestMapping("/api/v1/addresses")
 class AddressController(

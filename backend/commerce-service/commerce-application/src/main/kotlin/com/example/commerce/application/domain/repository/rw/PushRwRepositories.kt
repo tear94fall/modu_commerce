@@ -23,6 +23,13 @@ interface PushDeviceRwRepository : RwRepository<PushDevice, Long> {
         @Param("token") token: String,
     ): Int
 
+    /** 회원 탈퇴. */
+    @Modifying
+    @Query("delete from PushDevice d where d.userId = :userId")
+    fun deleteAllOfUser(
+        @Param("userId") userId: String,
+    ): Int
+
     @Modifying
     @Query("delete from PushDevice d where d.token in :tokens")
     fun deleteTokens(
@@ -39,7 +46,14 @@ interface PushDeviceRwRepository : RwRepository<PushDevice, Long> {
     ): List<PushDevice>
 }
 
-interface PushConsentRwRepository : RwRepository<PushConsent, String>
+interface PushConsentRwRepository : RwRepository<PushConsent, String> {
+    /** 회원 탈퇴. */
+    @Modifying
+    @Query("delete from PushConsent c where c.userId = :userId")
+    fun deleteOfUser(
+        @Param("userId") userId: String,
+    ): Int
+}
 
 interface PushCampaignRwRepository : RwRepository<PushCampaign, Long> {
     /** 보낼 때가 된 예약 캠페인. */

@@ -6,6 +6,7 @@ import com.example.commerce.application.domain.entity.Order
 import com.example.commerce.application.domain.entity.OrderItem
 import com.example.commerce.application.domain.entity.OrderStatus
 import com.example.commerce.application.domain.entity.Review
+import com.example.commerce.application.domain.entity.Tier
 import java.time.LocalDateTime
 
 data class CartItemResult(
@@ -120,9 +121,17 @@ data class OrderSummaryResult(
     val firstItemName: String,
     val firstImageUrl: String?,
     val createdAt: LocalDateTime?,
+    val earn: OrderEarnResult?,
+    val expectedEarn: ExpectedEarnResult?,
 ) {
     companion object {
-        fun from(o: Order): OrderSummaryResult {
+        fun from(o: Order): OrderSummaryResult = from(o, null)
+
+        /** [tier] 는 주문한 고객의 지금 등급(앱 목록). 결제완료·배송중 주문의 적립 예정에 쓴다. */
+        fun from(
+            o: Order,
+            tier: Tier?,
+        ): OrderSummaryResult {
             val first = o.items.firstOrNull()
             return OrderSummaryResult(
                 id = requireNotNull(o.id),
@@ -138,6 +147,8 @@ data class OrderSummaryResult(
                 firstItemName = first?.productName.orEmpty(),
                 firstImageUrl = first?.imageUrl,
                 createdAt = o.createdAt,
+                earn = earnOf(o),
+                expectedEarn = expectedEarnOf(o, tier),
             )
         }
     }
@@ -162,13 +173,20 @@ data class OrderDetailResult(
     val paidAt: LocalDateTime,
     val cancelledAt: LocalDateTime?,
     val createdAt: LocalDateTime?,
+    val deliveredAt: LocalDateTime?,
     val items: List<OrderItemResult>,
+    val earn: OrderEarnResult?,
+    val expectedEarn: ExpectedEarnResult?,
 ) {
     companion object {
-        /** [reviewIds] 는 orderItemId → reviewId. 앱 주문 상세만 넘기고 어드민·생성 응답은 비워 둔다. */
+        /**
+         * [reviewIds] 는 orderItemId → reviewId. 앱 주문 상세만 넘기고 어드민·생성 응답은 비워 둔다.
+         * [tier] 는 주문한 고객의 지금 등급(앱). 결제완료·배송중 주문의 적립 예정에 쓴다.
+         */
         fun from(
             o: Order,
             reviewIds: Map<Long, Long> = emptyMap(),
+            tier: Tier? = null,
         ) = OrderDetailResult(
             id = requireNotNull(o.id),
             orderNo = o.orderNo,
@@ -188,7 +206,22 @@ data class OrderDetailResult(
             paidAt = o.paidAt,
             cancelledAt = o.cancelledAt,
             createdAt = o.createdAt,
+            deliveredAt = o.deliveredAt,
             items = o.items.map { OrderItemResult.from(it, reviewIds[it.id]) },
+            earn = earnOf(o),
+            expectedEarn = expectedEarnOf(o, tier),
         )
     }
+}
+
+/** 적립이 정해진 주문만(배송 완료 뒤). */
+fun earnOf(o: Order): OrderEarnResult? = o.earnPoints?.let { OrderEarnResult(o.earnStatus, it, o.earnRate ?: 0) }
+
+/** 결제완료·배송중 주문의 적립 예정(고객의 지금 등급). 고객이 아니면 null. */
+fun expectedEarnOf(
+    o: Order,
+    tier: Tier?,
+): ExpectedEarnResult? {
+    if (tier == null || (o.status != OrderStatus.PAID && o.status != OrderStatus.SHIPPING)) return null
+    return ExpectedEarnResult(tier.earnFor(o.paymentAmount()), tier.earnRate)
 }

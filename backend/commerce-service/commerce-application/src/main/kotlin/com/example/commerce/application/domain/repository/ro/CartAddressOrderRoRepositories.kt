@@ -8,6 +8,8 @@ import com.example.commerce.application.domain.entity.OrderStatus
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
+import java.time.LocalDateTime
 
 interface CartItemRoRepository : RoRepository<CartItem, Long> {
     fun findAllByUserIdOrderByIdDesc(userId: String): List<CartItem>
@@ -21,6 +23,12 @@ interface AddressRoRepository : RoRepository<Address, Long> {
         userId: String,
     ): Address?
 }
+
+/** 회원별 금액 한 줄(등급 기준 금액). */
+data class UserAmount(
+    val userId: String,
+    val amount: Long?,
+)
 
 interface OrderCustomRepository {
     /** 어드민 목록. 상태·주문번호(부분 일치)로 거른다. 최신부터. */
@@ -45,6 +53,19 @@ interface OrderRoRepository :
     ): Order?
 
     fun findById(id: Long): Order?
+
+    /** 배송 완료 결제 금액(상품 − 쿠폰 − 포인트)의 회원별 합. 기간은 [from, to) UTC. */
+    @Query(
+        "select new com.example.commerce.application.domain.repository.ro.UserAmount(o.userId, " +
+            "sum(o.totalAmount - o.couponDiscount - o.pointAmount)) " +
+            "from Order o where o.status = com.example.commerce.application.domain.entity.OrderStatus.DELIVERED " +
+            "and o.deliveredAt >= :from and o.deliveredAt < :to and o.userId in :userIds group by o.userId",
+    )
+    fun sumDelivered(
+        @Param("userIds") userIds: Collection<String>,
+        @Param("from") from: LocalDateTime,
+        @Param("to") to: LocalDateTime,
+    ): List<UserAmount>
 
     /** 주문 줄 id 로 내 주문을 찾는다(리뷰 대상 확인). */
     @Query("select o from Order o join o.items i where i.id = :itemId and o.userId = :userId")

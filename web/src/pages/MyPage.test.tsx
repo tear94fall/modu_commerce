@@ -4,6 +4,9 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as catalog from '../api/catalog'
 import * as coupons from '../api/coupons'
+import * as customerApi from '../api/customer'
+import CustomerLayout from '../customer/CustomerProvider'
+import { customerMe, GOLD, VIP } from '../test-fixtures/customer'
 import * as me from '../api/me'
 import * as orders from '../api/orders'
 import * as points from '../api/points'
@@ -17,6 +20,19 @@ const renderMy = () =>
       <Routes>
         <Route path="/my" element={<MyPage />} />
         <Route path="/orders" element={<p>주문 화면</p>} />
+      </Routes>
+    </MemoryRouter>,
+  )
+
+/** CustomerProvider(앱과 같은 배치) 아래에서 연다. */
+const renderMyAsCustomer = () =>
+  render(
+    <MemoryRouter initialEntries={['/my']}>
+      <Routes>
+        <Route element={<CustomerLayout />}>
+          <Route path="/my" element={<MyPage />} />
+          <Route path="/membership" element={<p>회원 등급 화면</p>} />
+        </Route>
       </Routes>
     </MemoryRouter>,
   )
@@ -119,5 +135,40 @@ describe('MyPage', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: '로그아웃' }))
 
     expect(logout).toHaveBeenCalledOnce()
+  })
+
+  it('shows the tier badge and the progress to the next tier, linking to /membership', async () => {
+    vi.spyOn(customerApi, 'getMyCustomer').mockResolvedValue(
+      customerMe({ tier: GOLD, rolling: { amount: 184000, expectedTier: GOLD, nextTier: VIP, amountToNext: 516000 } }),
+    )
+    renderMyAsCustomer()
+
+    const line = await screen.findByRole('link', { name: /^회원 등급 골드/ })
+    expect(screen.getByText('골드')).toHaveClass('tier-badge')
+    expect(within(line).getByText('최근 6개월 구매 184,000원 · VIP까지 516,000원')).toBeInTheDocument()
+    const bar = within(line).getByRole('progressbar', { name: 'VIP까지' })
+    expect(bar).toHaveAttribute('aria-valuenow', '26') // 184,000 / 700,000
+
+    await userEvent.click(line)
+    expect(screen.getByText('회원 등급 화면')).toBeInTheDocument()
+  })
+
+  it('fills the bar and says so at the top tier', async () => {
+    vi.spyOn(customerApi, 'getMyCustomer').mockResolvedValue(customerMe({ tier: VIP, rolling: { amount: 910000, expectedTier: VIP, nextTier: null, amountToNext: null } }))
+    renderMyAsCustomer()
+
+    expect(await screen.findByText('최근 6개월 구매 910,000원 · 최고 등급이에요')).toBeInTheDocument()
+    expect(screen.getByRole('progressbar', { name: '최고 등급' })).toHaveAttribute('aria-valuenow', '100')
+  })
+
+  it('invites a non-customer to join instead of loading customer-only counts', async () => {
+    vi.spyOn(customerApi, 'getMyCustomer').mockResolvedValue(null)
+    renderMyAsCustomer()
+
+    expect(await screen.findByRole('link', { name: '모두의 커머스 가입하고 등급 적립 받기' })).toHaveAttribute('href', '/welcome?next=%2Fmy')
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+    expect(orders.getOrders).not.toHaveBeenCalled()
+    expect(catalog.getWishlist).not.toHaveBeenCalled()
+    expect(coupons.getMyCouponCount).not.toHaveBeenCalled()
   })
 })

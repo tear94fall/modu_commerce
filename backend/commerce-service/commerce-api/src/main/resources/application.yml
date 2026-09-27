@@ -87,6 +87,14 @@ modu:
     # "지금 보내기"를 요청 스레드 밖에서 보낸다. 테스트는 끈다(바로 보낸다).
     async-send: true
 
+  # 커머스 가입(약관 동의). 지금 약관 버전(동의할 때 고객 행에 남는다).
+  customer:
+    terms-version: "2026-10"
+  # 회원 등급: 매월 1일 00:10(KST) 산정 + 매월 쿠폰, 10분마다 실패한 구매 적립 재시도. 테스트는 끈다.
+  tier:
+    scheduler-enabled: true
+    earn-retry-enabled: true
+
 logging:
   level:
     org.hibernate.SQL: ${SQL_LOG_LEVEL:DEBUG}

@@ -33,10 +33,18 @@ interface CouponRwRepository : RwRepository<Coupon, Long> {
 }
 
 interface UserCouponRwRepository : RwRepository<UserCoupon, Long> {
-    fun existsByCouponIdAndUserId(
+    fun existsByCouponIdAndUserIdAndIssueKey(
         couponId: Long,
         userId: String,
+        issueKey: String,
     ): Boolean
+
+    /** 이 쿠폰을 [issueKey] 로 이미 받은 사람들(등급 쿠폰 중복 발급 방지). */
+    @Query("select uc.userId from UserCoupon uc where uc.coupon.id = :couponId and uc.issueKey = :issueKey")
+    fun findUserIdsByCouponAndKey(
+        @Param("couponId") couponId: Long,
+        @Param("issueKey") issueKey: String,
+    ): List<String>
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select uc from UserCoupon uc join fetch uc.coupon where uc.id = :id")

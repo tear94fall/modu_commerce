@@ -5,9 +5,12 @@ import com.example.commerce.application.domain.entity.Address
 import com.example.commerce.application.domain.entity.CartItem
 import com.example.commerce.application.domain.entity.Order
 import com.example.commerce.application.domain.entity.ProductSku
+import com.example.commerce.application.domain.repository.ro.UserAmount
 import jakarta.persistence.LockModeType
 import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
+import java.time.LocalDateTime
 
 interface CartItemRwRepository : RwRepository<CartItem, Long> {
     fun findByUserIdAndSkuId(
@@ -39,6 +42,40 @@ interface OrderRwRepository : RwRepository<Order, Long> {
     fun findByIdAndUserId(
         id: Long,
         userId: String,
+    ): Order?
+
+    /** 배송 완료 결제 금액(상품 − 쿠폰 − 포인트)의 회원별 합. 기간은 [from, to) UTC. 취소 주문은 상태가 달라 빠진다. */
+    @Query(
+        "select new com.example.commerce.application.domain.repository.ro.UserAmount(o.userId, " +
+            "sum(o.totalAmount - o.couponDiscount - o.pointAmount)) " +
+            "from Order o where o.status = com.example.commerce.application.domain.entity.OrderStatus.DELIVERED " +
+            "and o.deliveredAt >= :from and o.deliveredAt < :to group by o.userId",
+    )
+    fun sumDelivered(
+        @Param("from") from: LocalDateTime,
+        @Param("to") to: LocalDateTime,
+    ): List<UserAmount>
+
+    @Query(
+        "select new com.example.commerce.application.domain.repository.ro.UserAmount(o.userId, " +
+            "sum(o.totalAmount - o.couponDiscount - o.pointAmount)) " +
+            "from Order o where o.status = com.example.commerce.application.domain.entity.OrderStatus.DELIVERED " +
+            "and o.deliveredAt >= :from and o.deliveredAt < :to and o.userId in :userIds group by o.userId",
+    )
+    fun sumDeliveredOf(
+        @Param("userIds") userIds: Collection<String>,
+        @Param("from") from: LocalDateTime,
+        @Param("to") to: LocalDateTime,
+    ): List<UserAmount>
+
+    /** 적립 재시도 대상. */
+    @Query("select o.id from Order o where o.earnStatus = com.example.commerce.application.domain.entity.EarnStatus.PENDING order by o.id")
+    fun findPendingEarnIds(): List<Long>
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select o from Order o where o.id = :id")
+    fun findByIdForUpdate(
+        @Param("id") id: Long,
     ): Order?
 }
 

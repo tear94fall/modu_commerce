@@ -1,5 +1,6 @@
 package com.example.commerce.api.review
 
+import com.example.commerce.api.common.CustomerRequired
 import com.example.commerce.api.common.PageResponse
 import com.example.commerce.api.common.userId
 import com.example.commerce.application.domain.entity.ReviewSort
@@ -62,12 +63,14 @@ class ReviewController(
     ): ResponseEntity<ReviewSummaryResult> = ResponseEntity.ok(getReviewSummaryUseCase.execute(productId))
 
     /** 리뷰 쓰기 화면이 먼저 부른다: 주문 줄 정보와 쓸 수 있는지. 남의 주문 줄은 404. */
+    @CustomerRequired
     @GetMapping("/reviews/targets/{orderItemId}")
     fun target(
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable orderItemId: Long,
     ): ResponseEntity<ReviewTargetResult> = ResponseEntity.ok(getReviewTargetUseCase.execute(jwt.userId(), orderItemId))
 
+    @CustomerRequired
     @GetMapping("/me/reviews")
     fun myReviews(
         @AuthenticationPrincipal jwt: Jwt,
@@ -80,12 +83,14 @@ class ReviewController(
             },
         )
 
+    @CustomerRequired
     @GetMapping("/reviews/{id}")
     fun myReview(
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable id: Long,
     ): ResponseEntity<ReviewResult> = ResponseEntity.ok(getMyReviewUseCase.execute(jwt.userId(), id))
 
+    @CustomerRequired
     @PostMapping("/reviews")
     fun write(
         @AuthenticationPrincipal jwt: Jwt,
@@ -95,6 +100,7 @@ class ReviewController(
         return ResponseEntity.created(URI.create("/api/v1/reviews/${created.id}")).body(created)
     }
 
+    @CustomerRequired
     @PutMapping("/reviews/{id}")
     fun edit(
         @AuthenticationPrincipal jwt: Jwt,
@@ -102,6 +108,7 @@ class ReviewController(
         @Valid @RequestBody request: EditReviewRequest,
     ): ResponseEntity<ReviewResult> = ResponseEntity.ok(editReviewUseCase.execute(jwt.userId(), id, request.toCommand()))
 
+    @CustomerRequired
     @DeleteMapping("/reviews/{id}")
     fun delete(
         @AuthenticationPrincipal jwt: Jwt,

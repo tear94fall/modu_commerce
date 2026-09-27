@@ -1,5 +1,6 @@
 package com.example.commerce.api.cart
 
+import com.example.commerce.api.common.CustomerRequired
 import com.example.commerce.api.common.userId
 import com.example.commerce.application.usecase.cart.AddCartItemUseCase
 import com.example.commerce.application.usecase.cart.ChangeCartItemQuantityUseCase
@@ -39,6 +40,7 @@ data class ChangeQuantityRequest(
     val quantity: Int? = null,
 )
 
+@CustomerRequired
 @RestController
 @RequestMapping("/api/v1/cart")
 class CartController(

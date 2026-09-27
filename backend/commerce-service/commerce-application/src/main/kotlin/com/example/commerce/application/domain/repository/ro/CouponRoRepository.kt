@@ -53,7 +53,7 @@ interface UserCouponRoRepository : RoRepository<UserCoupon, Long> {
         @Param("userId") userId: String,
     ): List<UserCoupon>
 
-    @Query("select uc.coupon.id from UserCoupon uc where uc.userId = :userId and uc.coupon.id in :couponIds")
+    @Query("select uc.coupon.id from UserCoupon uc where uc.userId = :userId and uc.coupon.id in :couponIds and uc.issueKey = 'once'")
     fun findOwnedCouponIds(
         @Param("userId") userId: String,
         @Param("couponIds") couponIds: Collection<Long>,

@@ -20,7 +20,8 @@ enum class DiscountType { FIXED, PERCENT }
 /** CATEGORY 는 하위 카테고리까지 포함한다. */
 enum class CouponScope { ALL, CATEGORY, PRODUCT }
 
-enum class CouponSource { DOWNLOAD, CODE, ADMIN, EVENT }
+/** TIER = 매월 1일 회원 등급 쿠폰. */
+enum class CouponSource { DOWNLOAD, CODE, ADMIN, EVENT, TIER }
 
 enum class UserCouponStatus { AVAILABLE, USED, EXPIRED }
 
@@ -172,6 +173,13 @@ class Coupon(
 
     fun soldOut(): Boolean = totalQuantity?.let { issuedCount >= it } ?: false
 
+    /** "3,000원 할인" / "10% 할인" / "10% 할인(최대 5,000원)". */
+    fun discountLabel(): String =
+        when (discountType) {
+            DiscountType.FIXED -> "%,d원 할인".format(discountValue)
+            DiscountType.PERCENT -> "$discountValue% 할인" + (maxDiscount?.let { "(최대 %,d원)".format(it) } ?: "")
+        }
+
     /** 오늘 받으면 언제까지 쓸 수 있는가. */
     fun expiresOn(issuedOn: LocalDate): LocalDate = validUntil ?: issuedOn.plusDays((validDays ?: 1).toLong() - 1)
 
@@ -209,13 +217,14 @@ class Coupon(
 }
 
 /**
- * 받은 쿠폰. 쿠폰·사용자마다 하나(유니크). 주문에 쓰면 [orderId] 와 [usedAt] 이 채워지고, 주문을 취소하면 비워 돌려준다.
+ * 받은 쿠폰. 쿠폰·사용자·발급 키마다 하나(유니크). 받기·코드·이벤트·관리자 지급은 발급 키가 [ONCE] 라 쿠폰마다 한 장이고,
+ * 등급 쿠폰은 `tier:2026-10` 처럼 달마다 키가 달라 매달 한 장씩 받는다. 주문에 쓰면 [orderId] 와 [usedAt] 이 채워지고, 주문을 취소하면 비워 돌려준다.
  * 상태는 저장하지 않고 오늘 날짜로 정한다(쓴 적 있으면 USED, 기한이 지났으면 EXPIRED).
  */
 @Entity
 @Table(
     name = "user_coupons",
-    uniqueConstraints = [UniqueConstraint(name = "uk_user_coupons", columnNames = ["coupon_id", "user_id"])],
+    uniqueConstraints = [UniqueConstraint(name = "uk_user_coupons_issue", columnNames = ["coupon_id", "user_id", "issue_key"])],
     indexes = [Index(name = "ix_user_coupons_user", columnList = "user_id")],
 )
 class UserCoupon(
@@ -229,6 +238,8 @@ class UserCoupon(
     val source: CouponSource,
     @Column(name = "expires_on", nullable = false)
     val expiresOn: LocalDate,
+    @Column(name = "issue_key", nullable = false, length = 40, columnDefinition = "varchar(40) not null default 'once'")
+    val issueKey: String = ONCE,
 ) : BaseEntity() {
     @Column(name = "used_at")
     var usedAt: LocalDateTime? = null
@@ -263,5 +274,13 @@ class UserCoupon(
         usedAt = null
         orderId = null
         orderNo = null
+    }
+
+    companion object {
+        /** 한 사람이 쿠폰마다 한 장만 받는 발급(받기·코드·이벤트·관리자). */
+        const val ONCE = "once"
+
+        /** 등급 쿠폰의 발급 키. [month] 는 "2026-10". */
+        fun tierKey(month: String): String = "tier:$month"
     }
 }

@@ -1,6 +1,7 @@
 package com.example.commerce.application.usecase.order
 
 import com.example.commerce.application.domain.entity.OrderStatus
+import com.example.commerce.application.service.CustomerQueryService
 import com.example.commerce.application.service.OrderCommandService
 import com.example.commerce.application.service.OrderQueryService
 import com.example.commerce.application.service.ReviewQueryService
@@ -36,19 +37,24 @@ class CancelOrderUseCase(
 @Component
 class GetOrdersUseCase(
     private val orderQueryService: OrderQueryService,
+    private val customerQueryService: CustomerQueryService,
 ) {
     @Transactional(transactionManager = "roTransactionManager", readOnly = true)
     fun execute(
         userId: String,
         page: Int,
         size: Int,
-    ): PageResult<OrderSummaryResult> = PageResult.from(orderQueryService.page(userId, page, size), OrderSummaryResult::from)
+    ): PageResult<OrderSummaryResult> {
+        val tier = customerQueryService.currentTier(userId)
+        return PageResult.from(orderQueryService.page(userId, page, size)) { OrderSummaryResult.from(it, tier) }
+    }
 }
 
 @Component
 class GetOrderUseCase(
     private val orderQueryService: OrderQueryService,
     private val reviewQueryService: ReviewQueryService,
+    private val customerQueryService: CustomerQueryService,
 ) {
     @Transactional(transactionManager = "roTransactionManager", readOnly = true)
     fun execute(
@@ -56,7 +62,11 @@ class GetOrderUseCase(
         orderId: Long,
     ): OrderDetailResult {
         val order = orderQueryService.own(userId, orderId)
-        return OrderDetailResult.from(order, reviewQueryService.reviewIdsOf(order.items.map { requireNotNull(it.id) }))
+        return OrderDetailResult.from(
+            order,
+            reviewQueryService.reviewIdsOf(order.items.map { requireNotNull(it.id) }),
+            customerQueryService.currentTier(userId),
+        )
     }
 }
 

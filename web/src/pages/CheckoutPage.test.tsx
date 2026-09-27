@@ -6,6 +6,9 @@ import * as cart from '../api/cart'
 import * as catalog from '../api/catalog'
 import { ApiError } from '../api/client'
 import * as coupons from '../api/coupons'
+import * as customerApi from '../api/customer'
+import CustomerLayout from '../customer/CustomerProvider'
+import { customerMe, GOLD } from '../test-fixtures/customer'
 import * as orders from '../api/orders'
 import * as points from '../api/points'
 import { applicable } from '../test-fixtures/coupons'
@@ -186,5 +189,36 @@ describe('CheckoutPage', () => {
     expect(await screen.findByText('사용할 수 있는 쿠폰이 없습니다')).toBeInTheDocument()
     expect(screen.queryByText('쿠폰 할인')).not.toBeInTheDocument()
     expect(list).toHaveBeenCalledTimes(2)
+  })
+
+  it('previews the purchase earn from my tier rate on the payment amount', async () => {
+    vi.spyOn(customerApi, 'getMyCustomer').mockResolvedValue(customerMe({ tier: GOLD }))
+    vi.spyOn(points, 'getMyPoints').mockResolvedValue(3000)
+    vi.spyOn(cart, 'getCart').mockResolvedValue({ items: [cartItem], totalAmount: 0, itemCount: 1 })
+    vi.spyOn(orders, 'getAddresses').mockResolvedValue([address()])
+    render(
+      <MemoryRouter initialEntries={['/checkout?cartItemIds=9']}>
+        <Routes>
+          <Route element={<CustomerLayout />}>
+            <Route path="/checkout" element={<CheckoutPage />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    // floor(10,200 × 3 / 100) = 306
+    expect(await screen.findByText('골드 3% 적립 예정 · 306P')).toBeInTheDocument()
+    // 포인트로 낸 금액은 빠진다: floor(8,999 × 3 / 100) = 269
+    await userEvent.type(screen.getByLabelText('사용 포인트'), '1201')
+    expect(screen.getByText('골드 3% 적립 예정 · 269P')).toBeInTheDocument()
+  })
+
+  it('shows no earn preview without customer info', async () => {
+    vi.spyOn(cart, 'getCart').mockResolvedValue({ items: [cartItem], totalAmount: 0, itemCount: 1 })
+    vi.spyOn(orders, 'getAddresses').mockResolvedValue([address()])
+    renderAt('/checkout?cartItemIds=9')
+
+    expect(await screen.findByText('모두 스티커 팩')).toBeInTheDocument()
+    expect(screen.queryByText(/적립 예정/)).not.toBeInTheDocument()
   })
 })

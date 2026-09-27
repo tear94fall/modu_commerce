@@ -1,5 +1,6 @@
 package com.example.commerce.api.coupon
 
+import com.example.commerce.api.common.CustomerRequired
 import com.example.commerce.api.common.PageResponse
 import com.example.commerce.api.common.userId
 import com.example.commerce.application.domain.entity.CouponScope
@@ -41,12 +42,14 @@ class CouponController(
     private val issueCouponUseCase: IssueCouponUseCase,
     private val applicableCouponsUseCase: ApplicableCouponsUseCase,
 ) {
+    @CustomerRequired
     @GetMapping("/me/coupons")
     fun myCoupons(
         @AuthenticationPrincipal jwt: Jwt,
         @RequestParam(defaultValue = "AVAILABLE") status: UserCouponStatus,
     ): ResponseEntity<List<MyCouponResult>> = ResponseEntity.ok(myCouponsUseCase.list(jwt.userId(), status))
 
+    @CustomerRequired
     @GetMapping("/me/coupons/count")
     fun count(
         @AuthenticationPrincipal jwt: Jwt,
@@ -58,12 +61,14 @@ class CouponController(
         @RequestParam(required = false) productId: Long?,
     ): ResponseEntity<List<CouponOfferResult>> = ResponseEntity.ok(myCouponsUseCase.downloadable(jwt.userId(), productId))
 
+    @CustomerRequired
     @PostMapping("/coupons/{couponId}/download")
     fun download(
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable couponId: Long,
     ): ResponseEntity<MyCouponResult> = ResponseEntity.ok(issueCouponUseCase.download(jwt.userId(), couponId))
 
+    @CustomerRequired
     @PostMapping("/coupons/redeem")
     fun redeem(
         @AuthenticationPrincipal jwt: Jwt,
@@ -73,6 +78,7 @@ class CouponController(
         return ResponseEntity.ok(issueCouponUseCase.redeem(jwt.userId(), code))
     }
 
+    @CustomerRequired
     @PostMapping("/coupons/applicable")
     fun applicable(
         @AuthenticationPrincipal jwt: Jwt,
@@ -85,6 +91,7 @@ class CouponController(
             ),
         )
 
+    @CustomerRequired
     @PostMapping("/promotions/{id}/coupons")
     fun claimEvent(
         @AuthenticationPrincipal jwt: Jwt,

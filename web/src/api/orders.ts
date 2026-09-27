@@ -29,6 +29,22 @@ export const statusLabel = (status: string) => ORDER_STATUS_LABELS[status] ?? '�
 /** 서버 결제 수단 코드. 지금은 모의 결제뿐이다. */
 export const paymentLabel = (method: string) => (method === 'MOCK' || !method ? '모의 결제 (실제 결제 없음)' : method)
 
+/** 구매 적립 처리 상태. NONE = 적립 없음(비고객 · 0P), PENDING = 포인트 서비스 재시도 대기. */
+export type EarnStatus = 'NONE' | 'PENDING' | 'DONE' | 'FAILED'
+
+/** 배송 완료 때 정해진 구매 적립. */
+export interface OrderEarn {
+  status: EarnStatus
+  points: number | null
+  rate: number | null
+}
+
+/** 결제완료·배송중 주문의 예상 적립(지금 등급 기준). */
+export interface ExpectedEarn {
+  points: number
+  rate: number
+}
+
 export interface OrderItem {
   id: number
   productId: number
@@ -61,6 +77,10 @@ export interface OrderSummary {
   firstItemName: string
   firstImageUrl: string | null
   createdAt: string | null
+  /** 구매 적립. 아직 정해지지 않았으면 null. */
+  earn?: OrderEarn | null
+  /** 결제완료·배송중일 때 예상 적립. 그 밖에는 null. */
+  expectedEarn?: ExpectedEarn | null
 }
 
 export interface OrderDetail {
@@ -81,6 +101,10 @@ export interface OrderDetail {
   paidAt: string
   cancelledAt: string | null
   items: OrderItem[]
+  /** 구매 적립. 아직 정해지지 않았으면 null. */
+  earn?: OrderEarn | null
+  /** 결제완료·배송중일 때 예상 적립. 그 밖에는 null. */
+  expectedEarn?: ExpectedEarn | null
 }
 
 export interface OrderLine {

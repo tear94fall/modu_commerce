@@ -67,4 +67,46 @@ describe('OrderDetailPage', () => {
     expect(screen.getByText('-200원')).toBeInTheDocument()
     expect(screen.getByText('7,000원')).toBeInTheDocument()
   })
+
+  describe('purchase earn line', () => {
+    const renderOrder = () =>
+      render(
+        <MemoryRouter initialEntries={['/orders/77']}>
+          <Routes>
+            <Route path="/orders/:id" element={<OrderDetailPage />} />
+          </Routes>
+        </MemoryRouter>,
+      )
+
+    it('shows the expected earn while paid or shipping', async () => {
+      vi.spyOn(orders, 'getOrder').mockResolvedValue(order({ status: 'SHIPPING', paymentAmount: 40000, earn: null, expectedEarn: { points: 1200, rate: 3 } }))
+      renderOrder()
+      expect(await screen.findByText('배송 완료 시 3% 적립 예정 · 1,200P')).toBeInTheDocument()
+    })
+
+    it('shows the earned points once delivered', async () => {
+      vi.spyOn(orders, 'getOrder').mockResolvedValue(order({ status: 'DELIVERED', earn: { status: 'DONE', points: 1200, rate: 3 }, expectedEarn: null }))
+      renderOrder()
+      expect(await screen.findByText('1,200P 적립 완료')).toBeInTheDocument()
+    })
+
+    it('says the earn is being processed while pending', async () => {
+      vi.spyOn(orders, 'getOrder').mockResolvedValue(order({ status: 'DELIVERED', earn: { status: 'PENDING', points: 1200, rate: 3 }, expectedEarn: null }))
+      renderOrder()
+      expect(await screen.findByText('적립 처리 중')).toBeInTheDocument()
+    })
+
+    it('shows nothing for no earn or an older server without the fields', async () => {
+      vi.spyOn(orders, 'getOrder').mockResolvedValueOnce(order({ status: 'DELIVERED', earn: { status: 'NONE', points: 0, rate: 0 }, expectedEarn: null }))
+      const { unmount } = renderOrder()
+      expect(await screen.findByText('주문번호 20260919-ABC123')).toBeInTheDocument()
+      expect(screen.queryByText(/적립/)).not.toBeInTheDocument()
+      unmount()
+
+      vi.spyOn(orders, 'getOrder').mockResolvedValue(order({ status: 'CANCELLED' }))
+      renderOrder()
+      expect(await screen.findByText('주문번호 20260919-ABC123')).toBeInTheDocument()
+      expect(screen.queryByText(/적립/)).not.toBeInTheDocument()
+    })
+  })
 })

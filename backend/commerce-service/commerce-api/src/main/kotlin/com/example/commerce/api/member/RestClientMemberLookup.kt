@@ -35,6 +35,23 @@ class RestClientMemberLookup(
         }.onFailure { logger.warn { "member lookup failed for $userId: ${it.message}" } }
             .getOrNull()
 
+    /** 한 번에 여러 명(백오피스 고객 목록 한 페이지). 실패하면 빈 맵(이름·이메일 없이 보인다). */
+    override fun findAll(userIds: Collection<String>): Map<String, MemberProfile> {
+        val ids = userIds.distinct()
+        if (ids.isEmpty()) return emptyMap()
+        return runCatching {
+            client
+                .get()
+                .uri("/api-internal/member/members?userIds={userIds}", ids.joinToString(","))
+                .retrieve()
+                .body<List<MemberSummary>>()
+                .orEmpty()
+                .filter { it.userId != null && it.userId in ids }
+                .associate { requireNotNull(it.userId) to MemberProfile(requireNotNull(it.userId), it.username, it.email) }
+        }.onFailure { logger.warn { "member lookup failed for ${ids.size} user(s): ${it.message}" } }
+            .getOrDefault(emptyMap())
+    }
+
     /** member-service 응답 중 쓰는 필드만. 모르는 필드는 무시된다. */
     data class MemberSummary(
         val userId: String? = null,

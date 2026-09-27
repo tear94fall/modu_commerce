@@ -31,6 +31,9 @@ enum class OrderStatus {
         }
 }
 
+/** 구매 적립 상태. NONE = 적립 없음(고객 아님·0P), PENDING = 포인트 서버 호출 대기(재시도), DONE = 적립됨, FAILED = 거절됨. */
+enum class EarnStatus { NONE, PENDING, DONE, FAILED }
+
 /** 주문 한 줄. 상품이 나중에 바뀌어도 내역이 그대로이도록 이름·옵션·사진·단가를 복사해 둔다. */
 @Entity
 @Table(name = "order_items")
@@ -118,6 +121,30 @@ class Order(
     var cancelledAt: LocalDateTime? = null
         protected set
 
+    /** 배송 완료 시각(UTC). 회원 등급 기준 기간은 이 시각으로 센다. */
+    @Column(name = "delivered_at")
+    var deliveredAt: LocalDateTime? = null
+        protected set
+
+    /** 구매 적립 포인트. null 이면 아직 정하지 않았다(배송 완료 전). */
+    @Column(name = "earn_points")
+    var earnPoints: Long? = null
+        protected set
+
+    /** 적립을 정할 때의 등급 적립률(%). */
+    @Column(name = "earn_rate")
+    var earnRate: Int? = null
+        protected set
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "earn_status", nullable = false, length = 10, columnDefinition = "varchar(10) not null default 'NONE'")
+    var earnStatus: EarnStatus = EarnStatus.NONE
+        protected set
+
+    @Column(name = "earned_at")
+    var earnedAt: LocalDateTime? = null
+        protected set
+
     @OneToMany(mappedBy = "order", cascade = [CascadeType.ALL], orphanRemoval = true)
     @OrderBy("id ASC")
     val items: MutableList<OrderItem> = mutableListOf()
@@ -185,6 +212,29 @@ class Order(
         require(status.canTransitionTo(next)) { "${status.label()} 상태에서 ${next.label()} 로 바꿀 수 없습니다." }
         status = next
         if (next == OrderStatus.CANCELLED) cancelledAt = now
+        if (next == OrderStatus.DELIVERED) deliveredAt = now
+    }
+
+    /** 구매 적립 포인트의 멱등 키. */
+    fun purchaseEarnRefId(): String = "purchase:order:$id"
+
+    /** 적립액을 정한다. 0P 면 NONE, 아니면 PENDING(포인트 서버 호출 전). */
+    fun decideEarn(
+        points: Long,
+        rate: Int,
+    ) {
+        earnPoints = points
+        earnRate = rate
+        earnStatus = if (points > 0) EarnStatus.PENDING else EarnStatus.NONE
+    }
+
+    fun earned(now: LocalDateTime) {
+        earnStatus = EarnStatus.DONE
+        earnedAt = now
+    }
+
+    fun earnFailed() {
+        earnStatus = EarnStatus.FAILED
     }
 
     fun isCancelled(): Boolean = status == OrderStatus.CANCELLED
