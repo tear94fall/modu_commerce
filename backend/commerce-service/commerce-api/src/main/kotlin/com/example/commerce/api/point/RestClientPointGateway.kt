@@ -42,10 +42,26 @@ class RestClientPointGateway(
         return PointEarnResult(result.applied, result.amount, result.reason)
     }
 
+    override fun earnAmount(
+        userId: String,
+        amount: Long,
+        refId: String,
+        memo: String?,
+    ): PointEarnResult {
+        val result = wrap { pointClient.earnAmount(userId, amount, PURCHASE, refId, memo) }
+        logger.info { "point earn-amount $refId ($amount): applied=${result.applied} amount=${result.amount} reason=${result.reason}" }
+        return PointEarnResult(result.applied, result.amount, result.reason)
+    }
+
     private fun <T> wrap(block: () -> T): T =
         try {
             block()
         } catch (e: PointUnavailableException) {
             throw PointGatewayException(e)
         }
+
+    companion object {
+        /** 구매 적립의 point-service reason. */
+        const val PURCHASE = "PURCHASE"
+    }
 }

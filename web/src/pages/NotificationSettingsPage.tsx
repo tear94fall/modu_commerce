@@ -2,17 +2,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { errorMessage } from '../api/client'
 import { getPushConsent, updatePushConsent, type PushConsent } from '../api/push'
 import { bridge, type NotificationPermissionResult } from '../bridge/app'
-import { waitForNotificationPermission } from '../bridge/web'
+import { readNotificationPermission as readPermission, requestNotificationPermissionIfDefault } from '../bridge/web'
 import { ErrorBox, Loading } from '../components/Boxes'
 import { Screen, TopBar } from '../components/Layout'
 import Toast from '../components/Toast'
 import { formatDate } from '../util/format'
-
-/** 권한 창에 사용자가 답하기를 기다리는 최대 시간. 넘으면 앱에 다시 물어본다. */
-const PERMISSION_WAIT_MS = 60_000
-
-/** 앱(브리지)이 알림 권한 메서드를 가졌을 때만 권한 값. 브라우저·이전 버전 앱이면 null. */
-const readPermission = (): NotificationPermissionResult | null => bridge()?.getNotificationPermission?.() ?? null
 
 const today = () => formatDate(new Date().toISOString())
 
@@ -75,13 +69,9 @@ export default function NotificationSettingsPage() {
     const on = !consent.marketing
     if (on) {
       // 앱에서 켤 때는 OS 권한부터 묻는다. 거부해도 동의는 서버에 저장하고 배너로 안내한다.
-      const b = bridge()
-      if (b?.requestNotificationPermission && readPermission() === 'default') {
-        setSaving(true)
-        const waiting = waitForNotificationPermission(PERMISSION_WAIT_MS, () => readPermission() ?? 'default')
-        b.requestNotificationPermission()
-        setPermission(await waiting)
-      }
+      setSaving(true)
+      const asked = await requestNotificationPermissionIfDefault()
+      if (asked) setPermission(asked)
     }
     await save({ marketing: on, night: on ? consent.night : false }, (s) => consentToast('혜택·이벤트 알림', s.marketing, s.marketingUpdatedAt))
   }

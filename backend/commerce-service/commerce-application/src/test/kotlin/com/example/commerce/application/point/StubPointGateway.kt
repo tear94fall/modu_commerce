@@ -19,6 +19,13 @@ class StubPointGateway : PointGateway {
         memo: String?,
     ) = PointEarnResult(applied = true, amount = 10)
 
+    override fun earnAmount(
+        userId: String,
+        amount: Long,
+        refId: String,
+        memo: String?,
+    ) = PointEarnResult(applied = true, amount = amount)
+
     override fun refund(
         userId: String,
         amount: Long,

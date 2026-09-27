@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ModuAppBridge } from '../bridge/app'
 import { setToken } from '../auth/token'
-import { api, ApiError, serverMessage } from './client'
+import { api, ApiError, onCustomerRequired, serverMessage } from './client'
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status })
 
@@ -71,5 +71,25 @@ describe('api', () => {
   it('returns undefined for an empty 204', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }))
     await expect(api('/api/v1/wishlist/3', { method: 'DELETE' })).resolves.toBeUndefined()
+  })
+
+  it('calls the customer-required handler only for 403 CUSTOMER_REQUIRED', async () => {
+    const handler = vi.fn()
+    const off = onCustomerRequired(handler)
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+    try {
+      fetchMock.mockResolvedValueOnce(json(403, { message: '모두의 커머스 가입이 필요합니다', code: 'CUSTOMER_REQUIRED' }))
+      const err = await api('/api/v1/cart').catch((e: unknown) => e)
+      expect(err).toMatchObject({ status: 403, message: '모두의 커머스 가입이 필요합니다' })
+      expect(handler).toHaveBeenCalledOnce()
+
+      fetchMock.mockResolvedValueOnce(json(403, { message: '권한이 없습니다' }))
+      await api('/api/v1/cart').catch(() => {})
+      fetchMock.mockResolvedValueOnce(json(403, { code: 'CUSTOMER_REQUIRED' }))
+      await api('/api/v1/cart', { quiet: true }).catch(() => {})
+      expect(handler).toHaveBeenCalledOnce()
+    } finally {
+      off()
+    }
   })
 })

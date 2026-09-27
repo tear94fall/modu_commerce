@@ -21,6 +21,9 @@ import {
   TicketLineIcon,
 } from '../components/Icons'
 import { Screen, TopBar } from '../components/Layout'
+import { TierBadge, TierProgressBar } from '../components/Tier'
+import { useCustomer } from '../customer/context'
+import { tierProgressText } from '../util/tier'
 
 /** 주문 상태 집계에 받는 주문 수(서버 페이지 상한 100). 이보다 많으면 최근 100건만 센다. */
 const ORDER_COUNT_SIZE = 100
@@ -46,10 +49,20 @@ export default function MyPage() {
   const [orderCounts, setOrderCounts] = useState<Record<string, number> | null | undefined>(undefined)
   const [confirm, setConfirm] = useState(false)
   const navigate = useNavigate()
+  const { status, customer, refresh } = useCustomer()
+  /** 가입 전으로 확인됐으면 가입이 필요한 개수·주문은 부르지 않는다(403 이면 가입 화면으로 넘어가 버린다). */
+  const joined = status !== 'none'
+  const ready = status !== 'loading'
 
   useEffect(() => {
     getProfile().then(setProfile).catch(() => setProfile({ name: '', email: '', picture: '' }))
     getMyPoints().then(setPoints).catch(() => setPoints(null))
+    // 배송 완료 금액·등급이 바뀌었을 수 있으니 들어올 때마다 새로 받는다.
+    refresh()
+  }, [refresh])
+
+  useEffect(() => {
+    if (!ready || !joined) return
     getMyCouponCount().then(setCoupons).catch(() => setCoupons(null))
     getWishlist(0, 1).then((p) => setWishes(p.totalElements)).catch(() => setWishes(null))
     getMyReviews(0, 1).then((p) => setReviews(p.totalElements)).catch(() => setReviews(null))
@@ -60,7 +73,7 @@ export default function MyPage() {
         setOrderCounts(counts)
       })
       .catch(() => setOrderCounts(null))
-  }, [])
+  }, [ready, joined])
 
   /** 앱이면 토큰 폐기와 화면 전환을 앱이 맡고, 브라우저면 토큰만 지우고 로그인으로. */
   const logout = () => {
@@ -80,9 +93,30 @@ export default function MyPage() {
       <div className="my-hero">
         {profile?.picture ? <img className="avatar" src={profile.picture} alt="" /> : <div className="avatar" aria-hidden="true" />}
         <div className="who">
-          <div className="name">{profile?.name || '모두 회원'}</div>
+          <div className="name-row">
+            <span className="name">{profile?.name || '모두 회원'}</span>
+            {customer && <TierBadge tier={customer.tier} />}
+          </div>
           <div className="email">{profile?.email}</div>
         </div>
+        {customer ? (
+          <Link to="/membership" className="tier-line" aria-label={`회원 등급 ${customer.tier.name}. ${tierProgressText(customer.rolling)}`}>
+            <span className="txt">
+              <span>{tierProgressText(customer.rolling)}</span>
+              <ChevronRightIcon />
+            </span>
+            <TierProgressBar rolling={customer.rolling} />
+          </Link>
+        ) : (
+          !joined && (
+            <Link to="/welcome?next=%2Fmy" className="tier-line join">
+              <span className="txt">
+                <span>모두의 커머스 가입하고 등급 적립 받기</span>
+                <ChevronRightIcon />
+              </span>
+            </Link>
+          )
+        )}
       </div>
 
       <nav className="benefits" aria-label="내 혜택">

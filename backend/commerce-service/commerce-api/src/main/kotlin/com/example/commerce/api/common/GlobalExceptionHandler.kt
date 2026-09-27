@@ -5,8 +5,11 @@ import com.example.commerce.application.point.PointGatewayException
 import com.example.commerce.application.service.AlreadyCheckedInException
 import com.example.commerce.application.service.CouponAlreadyIssuedException
 import com.example.commerce.application.service.CouponCodeNotFoundException
+import com.example.commerce.application.service.CustomerRequiredException
 import com.example.commerce.application.service.PushCampaignStateException
 import com.example.commerce.application.service.PushSendFailedException
+import com.example.commerce.application.service.TierRunConflictException
+import com.fasterxml.jackson.annotation.JsonInclude
 import jakarta.persistence.EntityNotFoundException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -62,11 +65,25 @@ class GlobalExceptionHandler {
     fun handlePushSend(ex: PushSendFailedException): ResponseEntity<ErrorResponse> =
         ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(ErrorResponse(ex.message ?: "푸시를 보내지 못했습니다."))
 
+    /** 커머스 가입(약관 동의)이 필요한 API. 앱은 code 를 보고 가입 화면으로 보낸다. */
+    @ExceptionHandler(CustomerRequiredException::class)
+    fun handleCustomerRequired(ex: CustomerRequiredException): ResponseEntity<ErrorResponse> =
+        ResponseEntity.status(HttpStatus.FORBIDDEN).body(customerRequired())
+
+    @ExceptionHandler(TierRunConflictException::class)
+    fun handleTierRunConflict(ex: TierRunConflictException): ResponseEntity<ErrorResponse> =
+        ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse(ex.message ?: "이미 등급 산정이 진행 중입니다."))
+
     @ExceptionHandler(PointUnavailableException::class, PointGatewayException::class)
     fun handlePointUnavailable(ex: RuntimeException): ResponseEntity<ErrorResponse> =
         ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(ErrorResponse(ex.message ?: "포인트 서비스에 연결할 수 없습니다."))
 }
 
+/** [code] 는 앱이 분기할 때만 붙는다(CUSTOMER_REQUIRED). 없으면 JSON 에서 빠진다. */
+@JsonInclude(JsonInclude.Include.NON_NULL)
 data class ErrorResponse(
     val message: String,
+    val code: String? = null,
 )
+
+fun customerRequired() = ErrorResponse(CustomerRequiredException.MESSAGE, CustomerRequiredException.CODE)

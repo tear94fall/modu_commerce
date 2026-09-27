@@ -1,5 +1,6 @@
 package com.example.commerce.api.promotion
 
+import com.example.commerce.api.common.CustomerRequired
 import com.example.commerce.api.common.PageResponse
 import com.example.commerce.api.common.userId
 import com.example.commerce.api.product.response.ProductSummaryResponse
@@ -55,6 +56,7 @@ class PromotionController(
     ): ResponseEntity<PromotionDetailResponse> =
         ResponseEntity.ok(PromotionDetailResponse.from(getPromotionUseCase.execute(jwt.userId(), id)))
 
+    @CustomerRequired
     @PostMapping("/{id}/attendance")
     fun attend(
         @AuthenticationPrincipal jwt: Jwt,

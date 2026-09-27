@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getCart } from '../api/cart'
 import { getProduct } from '../api/catalog'
 import { ApiError } from '../api/client'
+import { earnPoints } from '../api/customer'
 import { expiresOnLabel, getApplicableCoupons, type ApplicableCoupon } from '../api/coupons'
 import { createAddress, createOrder, getAddresses, type Address, type AddressInput } from '../api/orders'
 import { formatPoints, getMyPoints } from '../api/points'
@@ -13,6 +14,7 @@ import CouponCard from '../components/CouponCard'
 import { Screen, TopBar } from '../components/Layout'
 import OrderItems, { type LineView } from '../components/OrderItems'
 import Toast from '../components/Toast'
+import { useCustomer } from '../customer/context'
 import { formatPrice } from '../util/format'
 
 interface Line extends LineView {
@@ -87,6 +89,9 @@ export default function CheckoutPage() {
   const usePoints = clampPoints(pointText, maxPoints)
   const payment = total - couponDiscount - usePoints
   const canPay = !paying && !!lines && lines.length > 0 && selected !== null
+  /** 배송 완료 때 받을 구매 적립 미리 보기(지금 등급 기준). 서버와 같은 계산: floor(결제 금액 × 적립률 / 100). */
+  const tier = useCustomer().customer?.tier ?? null
+  const expectedEarn = tier && tier.earnRate > 0 ? earnPoints(payment, tier.earnRate) : null
 
   const closePicker = useCallback(() => setPicker(false), [])
   const closeForm = useCallback(() => setForm(false), [])
@@ -260,6 +265,11 @@ export default function CheckoutPage() {
               <span>결제 금액</span>
               <span className="v">{formatPrice(payment)}</span>
             </div>
+            {tier && expectedEarn !== null && (
+              <div className="earn-line" role="note">
+                {tier.name} {tier.earnRate}% 적립 예정 · {formatPoints(expectedEarn)}
+              </div>
+            )}
           </section>
           <div className="bottom-bar">
             <div className="summary">

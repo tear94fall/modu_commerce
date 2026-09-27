@@ -25,6 +25,17 @@ interface PointGateway {
         memo: String?,
     ): PointEarnResult
 
+    /**
+     * 규칙 없이 [amount] 만큼 적립한다(구매 적립). [refId] 는 멱등 키라 같은 키로 다시 오면 applied=false, reason=DUPLICATE.
+     * 서버를 못 부르면 [PointGatewayException], 요청을 거절하면(4xx) [PointEarnRejectedException].
+     */
+    fun earnAmount(
+        userId: String,
+        amount: Long,
+        refId: String,
+        memo: String?,
+    ): PointEarnResult
+
     /** 차감을 되돌린다(주문 취소). [refId] 는 멱등 키. */
     fun refund(
         userId: String,
@@ -41,6 +52,11 @@ class InsufficientPointException : IllegalArgumentException("포인트가 부족
 class PointGatewayException(
     cause: Throwable? = null,
 ) : RuntimeException("포인트 서비스에 연결할 수 없습니다.", cause)
+
+/** 포인트 서버가 적립 요청을 거절했다(잘못된 값). 다시 보내도 같으니 재시도하지 않는다. */
+class PointEarnRejectedException(
+    message: String,
+) : RuntimeException(message)
 
 /** 적립 결과. [reason] 은 적립되지 않은 이유(point-service 의 RULE_DISABLED, DAILY_LIMIT, TOTAL_LIMIT, DUPLICATE, 또는 RULE_NOT_FOUND). */
 data class PointEarnResult(

@@ -1,5 +1,6 @@
 package com.example.commerce.api.push
 
+import com.example.commerce.api.common.CustomerRequired
 import com.example.commerce.api.common.PageResponse
 import com.example.commerce.api.common.userId
 import com.example.commerce.application.domain.entity.PushCampaignStatus
@@ -41,6 +42,7 @@ class PushController(
     private val pushConsentUseCase: PushConsentUseCase,
     private val markPushOpenedUseCase: MarkPushOpenedUseCase,
 ) {
+    @CustomerRequired
     @PutMapping("/me/push/devices")
     fun registerDevice(
         @AuthenticationPrincipal jwt: Jwt,
@@ -65,6 +67,7 @@ class PushController(
         @AuthenticationPrincipal jwt: Jwt,
     ): ResponseEntity<PushConsentResult> = ResponseEntity.ok(pushConsentUseCase.get(jwt.userId()))
 
+    @CustomerRequired
     @PutMapping("/me/push/consent")
     fun changeConsent(
         @AuthenticationPrincipal jwt: Jwt,
@@ -86,6 +89,7 @@ class PushController(
 }
 
 /** 앱: 알림함. 받은 지 30일 안쪽의 캠페인 알림, 최신 순. */
+@CustomerRequired
 @RestController
 @RequestMapping("/api/v1/me/notifications")
 class NotificationController(

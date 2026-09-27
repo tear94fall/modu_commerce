@@ -1,5 +1,6 @@
 package com.example.commerce.api.order
 
+import com.example.commerce.api.common.CustomerRequired
 import com.example.commerce.api.common.PageResponse
 import com.example.commerce.api.common.userId
 import com.example.commerce.application.usecase.command.CreateOrderCommand
@@ -59,6 +60,7 @@ data class CreateOrderRequest(
         )
 }
 
+@CustomerRequired
 @RestController
 @RequestMapping("/api/v1/orders")
 class OrderController(

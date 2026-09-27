@@ -20,7 +20,8 @@ export interface Cart {
   itemCount: number
 }
 
-export const getCart = () => api<Cart>('/api/v1/cart')
+/** quiet: 상단바 뱃지처럼 가입 전이어도 가입 화면으로 보내지 않을 때. */
+export const getCart = (quiet = false) => api<Cart>('/api/v1/cart', { quiet })
 
 export const addCartItem = (skuId: number, quantity: number) =>
   api<CartItem>('/api/v1/cart/items', { method: 'POST', body: JSON.stringify({ skuId, quantity }) })

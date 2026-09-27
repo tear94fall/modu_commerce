@@ -2,6 +2,7 @@ package com.example.commerce.api.point
 
 import com.example.commerce.api.config.ModuPointProperties
 import com.example.commerce.application.point.InsufficientPointException
+import com.example.commerce.application.point.PointEarnRejectedException
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
@@ -89,6 +90,30 @@ class PointClient(
             }
         }
 
+    /**
+     * 규칙 없는 금액 적립(구매 적립). 같은 refId 는 point-service 가 applied=false, reason=DUPLICATE 로 답한다.
+     * 값이 잘못돼 거절되면(400) [PointEarnRejectedException] — 다시 보내도 같으니 재시도하지 않는다.
+     */
+    fun earnAmount(
+        userId: String,
+        amount: Long,
+        reason: String,
+        refId: String,
+        memo: String?,
+    ): PointEarnResponse =
+        call {
+            try {
+                client
+                    .post()
+                    .uri("/api-internal/point/earn-amount")
+                    .body(PointEarnAmountRequest(userId, amount, reason, refId, memo))
+                    .retrieve()
+                    .body<PointEarnResponse>()
+            } catch (e: HttpClientErrorException.BadRequest) {
+                throw PointEarnRejectedException("point-service rejected earn-amount $refId: ${e.responseBodyAsString}")
+            }
+        }
+
     /** 환불(차감 되돌리기). 같은 refId 는 한 번만. */
     fun refund(
         userId: String,
@@ -166,6 +191,15 @@ data class PointChangeResult(
 data class PointEarnRequest(
     val userId: String,
     val ruleCode: String,
+    val refId: String,
+    val memo: String?,
+)
+
+/** point-service 의 earn-amount 요청(규칙 없이 금액으로 적립). */
+data class PointEarnAmountRequest(
+    val userId: String,
+    val amount: Long,
+    val reason: String,
     val refId: String,
     val memo: String?,
 )

@@ -1,5 +1,6 @@
 package com.example.commerce.application.service
 
+import com.example.commerce.application.common.TierPeriods
 import com.example.commerce.application.common.logger
 import com.example.commerce.application.domain.entity.Order
 import com.example.commerce.application.domain.entity.OrderStatus
@@ -14,6 +15,7 @@ import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
 
 @Service
 @Transactional(transactionManager = "roTransactionManager", readOnly = true)
@@ -66,6 +68,8 @@ class OrderCommandService(
     private val cartCommandService: CartCommandService,
     private val pointGateway: PointGateway,
     private val couponUseService: CouponUseService,
+    private val purchaseEarnService: PurchaseEarnService,
+    private val clock: Clock,
 ) {
     fun create(
         userId: String,
@@ -117,12 +121,14 @@ class OrderCommandService(
         next: OrderStatus,
     ): Order {
         val order = orderRwRepository.findById(orderId).orElse(null) ?: throw OrderQueryService.notFound(orderId)
-        order.transition(next)
+        order.transition(next, TierPeriods.utcNow(clock))
         if (next == OrderStatus.CANCELLED) {
             restock(order)
             couponUseService.restore(order)
             refundPoints(order)
         }
+        // 배송 완료: 커밋 뒤 구매 적립(고객의 지금 등급 적립률).
+        if (next == OrderStatus.DELIVERED) purchaseEarnService.afterCommit(orderId)
         return order
     }
 

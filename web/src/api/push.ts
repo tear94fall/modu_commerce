@@ -32,7 +32,8 @@ export interface NotificationItem {
 /** 최근 30일, 최신순. */
 export const getNotifications = (page = 0, size = 20) => api<Page<NotificationItem> & { size: number }>(`/api/v1/me/notifications?page=${page}&size=${size}`)
 
-export const getUnreadNotificationCount = () => api<{ unread: number }>('/api/v1/me/notifications/unread-count').then((r) => r.unread)
+/** 상단바 뱃지용. 가입 전(403)이어도 가입 화면으로 보내지 않는다. */
+export const getUnreadNotificationCount = () => api<{ unread: number }>('/api/v1/me/notifications/unread-count', { quiet: true }).then((r) => r.unread)
 
 export const markNotificationRead = (id: number) => api<void>(`/api/v1/me/notifications/${id}/read`, { method: 'POST' })
 
