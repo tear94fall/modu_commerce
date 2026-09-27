@@ -1,5 +1,6 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import RequireAuth from './auth/RequireAuth'
+import { ModuWebBridge } from './bridge/web'
 import AddressesPage from './pages/AddressesPage'
 import CartPage from './pages/CartPage'
 import CategoryPage from './pages/CategoryPage'
@@ -10,6 +11,8 @@ import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import MyReviewsPage from './pages/MyReviewsPage'
 import MyPage from './pages/MyPage'
+import NotificationsPage from './pages/NotificationsPage'
+import NotificationSettingsPage from './pages/NotificationSettingsPage'
 import OrderDetailPage from './pages/OrderDetailPage'
 import OrdersPage from './pages/OrdersPage'
 import PointsPage from './pages/PointsPage'
@@ -24,6 +27,7 @@ import WishlistPage from './pages/WishlistPage'
 export default function App() {
   return (
     <BrowserRouter>
+      <ModuWebBridge />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route element={<RequireAuth />}>
@@ -47,6 +51,8 @@ export default function App() {
           <Route path="/orders" element={<OrdersPage />} />
           <Route path="/orders/:id" element={<OrderDetailPage />} />
           <Route path="/addresses" element={<AddressesPage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
+          <Route path="/settings/notifications" element={<NotificationSettingsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

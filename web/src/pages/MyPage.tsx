@@ -9,6 +9,7 @@ import { getMyReviews } from '../api/reviews'
 import { logoutSession } from '../auth/session'
 import { bridge } from '../bridge/app'
 import {
+  BellLineIcon,
   ChevronRightIcon,
   GiftLineIcon,
   HeartLineIcon,
@@ -130,6 +131,7 @@ export default function MyPage() {
       </MenuGroup>
       <MenuGroup title="설정">
         <MenuRow to="/addresses" tone="green" icon={<PinLineIcon />} label="배송지 관리" />
+        <MenuRow to="/settings/notifications" tone="teal" icon={<BellLineIcon />} label="알림 설정" />
       </MenuGroup>
 
       <button type="button" className="logout-link" onClick={() => setConfirm(true)}>

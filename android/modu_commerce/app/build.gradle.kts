@@ -8,6 +8,12 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
+// 푸시(FCM)용 Firebase 설정. app/google-services.json 은 gitignore 되어 있고, 없으면 플러그인을 걸지 않는다.
+// 그래도 빌드는 되고, 앱은 Firebase 가 초기화되지 않았음을 보고 푸시 기능만 끈다(PushTokens).
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 android {
     namespace = "com.example.moducommerce"
     compileSdk = 35
@@ -89,6 +95,9 @@ dependencies {
     implementation(libs.okhttp.logging)
     implementation(libs.gson)
     implementation(libs.play.services.auth)
+
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)

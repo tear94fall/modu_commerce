@@ -4,6 +4,7 @@ import com.example.moducommerce.core.auth.OAuthClient
 import com.example.moducommerce.core.model.UserProfile
 import com.example.moducommerce.core.network.ApiException
 import com.example.moducommerce.core.network.safeCall
+import com.example.moducommerce.core.push.PushRegistrar
 import com.example.moducommerce.core.session.SessionEvents
 import com.example.moducommerce.core.session.SessionStore
 import com.example.moducommerce.data.api.AuthApi
@@ -17,7 +18,7 @@ interface AuthRepository {
 
     suspend fun loginWithGoogle(idToken: String): Result<UserProfile>
 
-    /** revoke 를 시도하고(실패해도) 세션을 지운 뒤 앱 전체에 알린다. */
+    /** 푸시 토큰 해제와 revoke 를 시도하고(실패해도) 세션을 지운 뒤 앱 전체에 알린다. */
     suspend fun logout()
 }
 
@@ -27,6 +28,7 @@ class AuthRepositoryImpl @Inject constructor(
     private val authApi: AuthApi,
     private val sessionStore: SessionStore,
     private val sessionEvents: SessionEvents,
+    private val pushRegistrar: PushRegistrar,
 ) : AuthRepository {
 
     override suspend fun loginWithSsoCode(code: String, codeVerifier: String): Result<UserProfile> =
@@ -35,6 +37,8 @@ class AuthRepositoryImpl @Inject constructor(
     override suspend fun loginWithGoogle(idToken: String): Result<UserProfile> = exchange(OAuthClient.googleForm(idToken))
 
     override suspend fun logout() {
+        // 세션을 지우기 전에(토큰이 있어야 부를 수 있다) 이 기기로 푸시가 더 오지 않게 한다. 실패해도 로그아웃은 계속.
+        pushRegistrar.unregisterCurrent()
         val refresh = sessionStore.refreshToken()
         if (!refresh.isNullOrBlank()) safeCall { plainAuthApi.revoke(refresh, OAuthClient.CLIENT_ID) }
         sessionStore.clearSession()
@@ -48,6 +52,7 @@ class AuthRepositoryImpl @Inject constructor(
         // 프로필은 못 받아도 로그인은 성공이다. 이름은 마이 탭에서 비어 보일 뿐이다.
         val profile = runCatching { authApi.userinfo().toModel() }.getOrDefault(UserProfile())
         sessionStore.saveProfile(profile)
+        pushRegistrar.registerCurrentAsync()
         profile
     }
 }

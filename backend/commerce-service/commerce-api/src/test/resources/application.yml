@@ -36,3 +36,8 @@ modu:
     url: http://point.test
   member:
     url: http://member.test
+  # 푸시: 스케줄러는 끄고(테스트가 runDue 를 직접 부른다) 지금 보내기는 요청 스레드에서 바로 보낸다.
+  push:
+    firebase-credentials: ""
+    scheduler-enabled: false
+    async-send: false

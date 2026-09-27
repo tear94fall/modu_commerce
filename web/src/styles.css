@@ -299,6 +299,26 @@ img { display: block; }
 .my-row .chev { display: flex; color: #c4c5cd; }
 .logout-link { display: block; min-height: 44px; margin: 20px auto 8px; padding: 0 16px; color: #9a9ba4; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }
 
+/* 알림 설정 */
+.notify-note { margin: 16px 16px 0; padding: 12px 14px; border-radius: 12px; background: #eef2ff; color: #3f4a8a; font-size: 13.5px; }
+.notify-banner { display: flex; align-items: center; gap: 12px; margin: 16px 16px 0; padding: 10px 8px 10px 14px; border-radius: 12px; background: #fff7ed; color: #9a3412; font-size: 13.5px; }
+.notify-banner span { flex: 1; min-width: 0; }
+.notify-banner button { flex: 0 0 auto; min-height: 36px; padding: 0 12px; border-radius: 18px; background: #fff; color: #c2410c; font-weight: 700; font-size: 13px; box-shadow: 0 0 0 1px #fed7aa inset; }
+.notify-card { margin-top: 16px; }
+.notify-row { display: flex; align-items: center; gap: 12px; padding: 16px 16px; }
+.notify-row + .notify-row { border-top: 1px solid #f1f2f5; }
+.notify-row .body { flex: 1; min-width: 0; }
+.notify-row .lbl { font-size: 15px; font-weight: 600; }
+.notify-row .desc { margin-top: 3px; color: var(--muted); font-size: 12.5px; }
+.notify-row .status { margin-top: 6px; color: #9a9ba4; font-size: 12px; font-variant-numeric: tabular-nums; }
+.notify-row.disabled .lbl { color: #9a9ba4; }
+.switch { position: relative; flex: 0 0 auto; width: 50px; height: 30px; border-radius: 15px; background: #d4d6dc; transition: background 0.15s; }
+.switch .knob { position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); transition: transform 0.15s; }
+.switch.on { background: var(--brand); }
+.switch.on .knob { transform: translateX(20px); }
+.switch:disabled { opacity: 0.45; cursor: default; }
+.notify-settings .toast { bottom: calc(20px + var(--safe-bottom)); }
+
 /* 포인트 */
 .point-head { padding: 24px 20px; background: var(--surface); margin-bottom: 8px; }
 .point-head .label { color: var(--muted); font-size: 13px; }
@@ -576,3 +596,26 @@ a.coupon-get { background: var(--surface); color: var(--brand); border: 1px soli
 /* 기획전·이벤트 상세 배너: 상단 바와 같은 색이어도 섞이지 않게 여백을 둔 둥근 카드로(홈 배너와 같은 모양). */
 .promo-hero { padding: 12px 16px 4px; background: var(--surface); }
 .promo-hero .promo-art { border-radius: 16px; box-shadow: 0 4px 14px rgba(17, 24, 39, 0.12); }
+
+/* 알림함 */
+.top-bar .text-btn { flex: 0 0 auto; min-height: 44px; padding: 0 10px; border-radius: 22px; color: #fff; font-size: 14px; font-weight: 600; }
+.top-bar .text-btn:active { background: rgba(255, 255, 255, 0.18); }
+.notify-list { list-style: none; padding: 0; margin-top: 12px; }
+.notify-list li + li { border-top: 1px solid #f1f2f5; }
+.notify-item { width: 100%; display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; text-align: left; }
+.notify-item:active { background: #fafafb; }
+.notify-item.unread { background: var(--surface-tint); }
+.notify-item .body { flex: 1; min-width: 0; }
+.notify-item .meta { display: flex; align-items: center; gap: 6px; color: #9a9ba4; font-size: 12px; }
+.notify-item .ad-tag { padding: 1px 6px; border-radius: 4px; background: #f1f2f5; color: #6b6d78; font-size: 11px; font-weight: 600; line-height: 16px; }
+.notify-item .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--brand); }
+.notify-item .title { margin-top: 6px; font-size: 15px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.notify-item.unread .title { font-weight: 700; }
+.notify-item .text { margin-top: 3px; color: #5b5e69; font-size: 13.5px; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-all; }
+.notify-item:not(.unread) .text { color: var(--muted); }
+.notify-item .thumb { flex: 0 0 auto; width: 64px; height: 64px; border-radius: 12px; object-fit: cover; background: #f1f2f5; }
+.notify-more { margin-top: 16px; }
+.notify-foot { margin: 16px 16px 0; color: #9a9ba4; font-size: 12.5px; text-align: center; }
+.notify-empty .art { color: var(--brand); }
+.notify-empty .art .line-icon { width: 44px; height: 44px; }
+.notifications .toast { bottom: calc(20px + var(--safe-bottom)); }

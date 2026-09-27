@@ -79,6 +79,14 @@ modu:
     banners-ttl: 5m
     promotion-ttl: 10m
 
+  # 푸시 캠페인. 키 파일 경로가 비었거나 파일이 없으면 보내지 않고 로그만 남긴다(compose 가 /secrets 에 키를 마운트한다).
+  push:
+    firebase-credentials: ${MODU_PUSH_FIREBASE_CREDENTIALS:}
+    # 1분마다 예약 캠페인을 보낸다. 테스트는 끈다.
+    scheduler-enabled: true
+    # "지금 보내기"를 요청 스레드 밖에서 보낸다. 테스트는 끈다(바로 보낸다).
+    async-send: true
+
 logging:
   level:
     org.hibernate.SQL: ${SQL_LOG_LEVEL:DEBUG}
