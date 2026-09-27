@@ -27,6 +27,11 @@ class CatalogTestSupport(
         // 테스트끼리 같은 컨텍스트(같은 캐시)를 쓴다. 지운 행이 캐시에 남지 않게 먼저 비운다.
         cacheManager.cacheNames.forEach { cacheManager.getCache(it)?.clear() }
         listOf(
+            "push_inbox_items",
+            "push_campaign_opens",
+            "push_campaigns",
+            "push_devices",
+            "push_consents",
             "promotion_coupons",
             "attendance_checks",
             "promotion_products",

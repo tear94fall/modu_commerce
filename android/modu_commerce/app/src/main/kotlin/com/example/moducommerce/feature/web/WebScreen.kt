@@ -44,6 +44,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.json.JSONObject
 import com.example.moducommerce.BuildConfig
 import com.example.moducommerce.R
 import com.example.moducommerce.core.network.ApiConfig
@@ -57,6 +59,8 @@ import kotlinx.coroutines.delay
  *
  * 메인 문서를 못 열면 흰 오류 덮개 + 다시 시도. WebView 기본 오류 페이지는 덮개 아래에만 있고 보이지 않는다
  * (규칙은 [WebLoadState]). 인터넷이 없으면 오프라인 안내를 보이고, 연결이 돌아오면 알아서 다시 불러온다.
+ *
+ * 푸시 딥링크: 웹이 떠 있으면 `window.ModuWeb.navigate(path)`, 아직이면 `WEB_URL + path` 를 새로 연다.
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -112,7 +116,27 @@ fun WebScreen(viewModel: WebViewModel = hiltViewModel()) {
                     if (BuildConfig.DEBUG) Log.d(TAG, "error ${error.errorCode} ${error.description} -> ${state.cover}")
                 }
             }
-            loadUrl(ApiConfig.WEB_URL)
+            loadUrl(viewModel.takeInitialLink()?.webUrl(ApiConfig.WEB_URL) ?: ApiConfig.WEB_URL)
+        }
+    }
+
+    // 알림을 눌러 들어온 링크. 로그인 전에 눌렀으면 이 화면이 뜰 때까지 기다렸다가 여기서 연다.
+    val pendingLink by viewModel.pendingLink.collectAsStateWithLifecycle()
+    val pageReady = state.cover == WebCover.NONE
+    LaunchedEffect(pendingLink, pageReady) {
+        val link = pendingLink ?: return@LaunchedEffect
+        if (!viewModel.take(link)) return@LaunchedEffect
+        if (pageReady) {
+            webView.evaluateJavascript(link.navigateJs(), null)
+        } else {
+            webView.loadUrl(link.webUrl(ApiConfig.WEB_URL))
+        }
+    }
+
+    // 웹이 요청한 알림 권한의 결과를 돌려준다.
+    LaunchedEffect(webView) {
+        viewModel.notificationPermissions.results.collect { result ->
+            webView.evaluateJavascript("window.ModuWeb && window.ModuWeb.onNotificationPermission(${JSONObject.quote(result)})", null)
         }
     }
 

@@ -4,6 +4,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- 웹을 못 열었을 때 인터넷 연결 여부를 보고, 연결이 돌아오면 자동으로 다시 불러온다 -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- 혜택·이벤트 푸시(Android 13+). 웹의 알림 설정에서 수신을 켤 때만 묻는다. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- 모두의 채팅이 signature 보호로 여는 SSO 액티비티를 부르기 위한 권한. 같은 키로 서명돼야 얻는다. -->
     <uses-permission android:name="com.example.modumessenger.permission.SSO" />
 
@@ -37,5 +39,25 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- FCM 수신. 앱이 앞에 있을 때 알림을 직접 만들고, 새 토큰을 서버에 등록한다. -->
+        <service
+            android:name=".core.push.CommerceMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- 앱이 백그라운드일 때 시스템이 띄우는 FCM 알림의 기본값 -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="promotions" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_notification" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/brand_red" />
     </application>
 </manifest>

@@ -102,7 +102,10 @@ describe('MyPage', () => {
       ['쿠폰 받으러 가기', '/coupons'],
       ['포인트 내역', '/points'],
     ])
-    expectLinks('설정', [['배송지 관리', '/addresses']])
+    expectLinks('설정', [
+      ['배송지 관리', '/addresses'],
+      ['알림 설정', '/settings/notifications'],
+    ])
   })
 
   it('logs out through the app bridge after confirming', async () => {

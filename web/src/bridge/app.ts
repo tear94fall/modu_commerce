@@ -17,11 +17,31 @@ export interface ModuAppBridge {
   logout(): void
   /** userinfo 프로필 JSON: {"name","email","picture"}. 없으면 "{}". */
   getProfile(): string
+  /*
+   * 알림 권한(푸시 캠페인). 이전 버전 앱에는 없으므로 선택 메서드다. 부를 때는 `b.getNotificationPermission?.()` 처럼.
+   */
+  /** OS 알림 권한. 'default' = 아직 물어본 적 없음. */
+  getNotificationPermission?(): NotificationPermissionResult
+  /** 권한을 묻는다. 결과는 나중에 `window.ModuWeb.onNotificationPermission(result)` 로 온다. */
+  requestNotificationPermission?(): void
+  /** 앱의 시스템 알림 설정 화면을 연다. */
+  openNotificationSettings?(): void
+}
+
+export type NotificationPermissionResult = 'granted' | 'denied' | 'default'
+
+/** 앱이 `evaluateJavascript` 로 부르는 웹 쪽 진입점. `bridge/web.ts` 가 앱 시작 때 심는다. */
+export interface ModuWeb {
+  /** 푸시 딥링크. 허용된 경로만 이동하고 나머지는 무시한다. */
+  navigate(path: string): void
+  /** requestNotificationPermission 의 결과. */
+  onNotificationPermission(result: string): void
 }
 
 declare global {
   interface Window {
     ModuApp?: ModuAppBridge
+    ModuWeb?: ModuWeb
   }
 }
 

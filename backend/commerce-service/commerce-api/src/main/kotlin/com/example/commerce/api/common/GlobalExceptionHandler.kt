@@ -5,6 +5,8 @@ import com.example.commerce.application.point.PointGatewayException
 import com.example.commerce.application.service.AlreadyCheckedInException
 import com.example.commerce.application.service.CouponAlreadyIssuedException
 import com.example.commerce.application.service.CouponCodeNotFoundException
+import com.example.commerce.application.service.PushCampaignStateException
+import com.example.commerce.application.service.PushSendFailedException
 import jakarta.persistence.EntityNotFoundException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -51,6 +53,14 @@ class GlobalExceptionHandler {
     @ExceptionHandler(AlreadyCheckedInException::class)
     fun handleAlreadyChecked(ex: AlreadyCheckedInException): ResponseEntity<ErrorResponse> =
         ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse(ex.message ?: "오늘은 이미 출석했습니다."))
+
+    @ExceptionHandler(PushCampaignStateException::class)
+    fun handlePushState(ex: PushCampaignStateException): ResponseEntity<ErrorResponse> =
+        ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse(ex.message ?: "예약 상태인 캠페인만 취소할 수 있습니다."))
+
+    @ExceptionHandler(PushSendFailedException::class)
+    fun handlePushSend(ex: PushSendFailedException): ResponseEntity<ErrorResponse> =
+        ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(ErrorResponse(ex.message ?: "푸시를 보내지 못했습니다."))
 
     @ExceptionHandler(PointUnavailableException::class, PointGatewayException::class)
     fun handlePointUnavailable(ex: RuntimeException): ResponseEntity<ErrorResponse> =
