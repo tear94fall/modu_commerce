@@ -83,14 +83,14 @@ class CustomerSummaryControllerTest
             val addressId =
                 JsonPath.read<Int>(
                     postJson(
-                        "/api/v1/addresses",
+                        "/api-public/v1/addresses",
                         """{"recipient":"임준섭","phone":"010-1234-5678","zipCode":"06236","address1":"서울 강남구"}""",
                     ).andReturn().response.contentAsString,
                     "$.id",
                 )
             val items = names.joinToString(",") { """{"skuId":${support.skuId(it)},"quantity":1}""" }
             val body =
-                postJson("/api/v1/orders", """{"addressId":$addressId,"items":[$items]}""")
+                postJson("/api-public/v1/orders", """{"addressId":$addressId,"items":[$items]}""")
                     .andExpect { status { isCreated() } }
                     .andReturn()
                     .response.contentAsString
@@ -109,7 +109,7 @@ class CustomerSummaryControllerTest
 
         private fun review(itemId: Int): Int =
             JsonPath.read(
-                postJson("/api/v1/reviews", """{"orderItemId":$itemId,"rating":5,"content":"좋아요 잘 쓰고 있어요"}""")
+                postJson("/api-public/v1/reviews", """{"orderItemId":$itemId,"rating":5,"content":"좋아요 잘 쓰고 있어요"}""")
                     .andExpect { status { isCreated() } }
                     .andReturn()
                     .response.contentAsString,
@@ -152,7 +152,7 @@ class CustomerSummaryControllerTest
             status(delivered, "DELIVERED")
             // 머그컵 → 취소.
             val (cancelled, _) = order("모두 머그컵 세트")
-            mockMvc.post("/api/v1/orders/$cancelled/cancel") { with(me) }.andExpect { status { isOk() } }
+            mockMvc.post("/api-public/v1/orders/$cancelled/cancel") { with(me) }.andExpect { status { isOk() } }
             // 노트 → 결제 완료.
             val (paid, paidItems) = order("모두 하드커버 노트")
 
@@ -177,12 +177,12 @@ class CustomerSummaryControllerTest
             userCoupon(couponId, "22", "a", LocalDate.of(2026, 10, 5))
             // 앱 내 쿠폰과 같은 상태여야 한다.
             mapOf("AVAILABLE" to 2, "USED" to 1, "EXPIRED" to 1).forEach { (status, count) ->
-                mockMvc.get("/api/v1/me/coupons?status=$status") { with(me) }.andExpect { jsonPath("$.length()") { value(count) } }
+                mockMvc.get("/api-public/v1/me/coupons?status=$status") { with(me) }.andExpect { jsonPath("$.length()") { value(count) } }
             }
 
             // 찜 3개 중 1개 상품은 삭제된다.
             listOf("모두 볼캡", "모두 디퓨저", "모두 무드등").forEach {
-                mockMvc.post("/api/v1/wishlist/${support.productId(it)}") { with(me) }.andExpect { status { is2xxSuccessful() } }
+                mockMvc.post("/api-public/v1/wishlist/${support.productId(it)}") { with(me) }.andExpect { status { is2xxSuccessful() } }
             }
             jdbc.update("update products set deleted_at = ? where name = '모두 무드등'", Timestamp.valueOf(LocalDateTime.now()))
 
@@ -190,7 +190,7 @@ class CustomerSummaryControllerTest
             review(deliveredItems[0])
             review(deliveredItems[1])
             val removed = review(paidItems[0])
-            mockMvc.delete("/api/v1/reviews/$removed") { with(me) }.andExpect { status { is2xxSuccessful() } }
+            mockMvc.delete("/api-public/v1/reviews/$removed") { with(me) }.andExpect { status { is2xxSuccessful() } }
 
             val body =
                 mockMvc

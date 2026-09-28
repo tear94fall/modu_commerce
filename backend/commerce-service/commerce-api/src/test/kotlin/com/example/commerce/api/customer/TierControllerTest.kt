@@ -234,7 +234,7 @@ class TierControllerTest
             // 꺼진 골드 쿠폰(g1) + 소진된 VIP 쿠폰(v1)
             assertThat((run["COUPONS_SKIPPED"] as Number).toInt()).isEqualTo(2)
             // 앱 쿠폰함에 보인다.
-            mockMvc.get("/api/v1/me/coupons") { with(jwt().jwt { it.subject("s2") }) }.andExpect {
+            mockMvc.get("/api-public/v1/me/coupons") { with(jwt().jwt { it.subject("s2") }) }.andExpect {
                 jsonPath("$.length()") { value(1) }
                 jsonPath("$[0].source") { value("TIER") }
                 jsonPath("$[0].name") { value("실버 3천원") }
@@ -322,7 +322,7 @@ class TierControllerTest
                 jsonPath("$[2].coupons[0].discountLabel") { value("3,000원 할인") }
                 jsonPath("$[0].customerCount") { value(CatalogTestSupport.TEST_CUSTOMERS.size) }
             }
-            mockMvc.get("/api/v1/tiers").andExpect {
+            mockMvc.get("/api-public/v1/tiers").andExpect {
                 jsonPath("$[2].minAmount") { value(250_000) }
                 jsonPath("$[2].monthlyCoupons[0].name") { value("골드 쿠폰") }
                 jsonPath("$[2].monthlyCoupons[0].discountLabel") { value("3,000원 할인") }

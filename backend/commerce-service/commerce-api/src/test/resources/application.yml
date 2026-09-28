@@ -25,6 +25,11 @@ spring:
         default_batch_fetch_size: 1000
     open-in-view: false
 
+# 테스트는 discovery-service 에 등록하지 않는다.
+eureka:
+  client:
+    enabled: false
+
 modu:
   oauth:
     issuer: http://auth.test/auth-service

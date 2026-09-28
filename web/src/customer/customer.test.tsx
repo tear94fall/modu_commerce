@@ -14,7 +14,7 @@ const forbidden = () => new Response(JSON.stringify({ message: '모두의 커머
 /** 버튼을 누르면 가입이 필요한 API 를 부르는 화면. */
 function Caller({ label, quiet = false }: { label: string; quiet?: boolean }) {
   return (
-    <button type="button" onClick={() => api('/api/v1/cart/items', { method: 'POST', body: '{}', quiet }).catch(() => {})}>
+    <button type="button" onClick={() => api('/api-public/v1/cart/items', { method: 'POST', body: '{}', quiet }).catch(() => {})}>
       {label}
     </button>
   )

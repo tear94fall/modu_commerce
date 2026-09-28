@@ -61,25 +61,25 @@ export interface EventClaimResult {
   alreadyHad: number
 }
 
-export const getMyCoupons = (status: UserCouponStatus = 'AVAILABLE') => api<MyCoupon[]>(`/api/v1/me/coupons?status=${status}`)
+export const getMyCoupons = (status: UserCouponStatus = 'AVAILABLE') => api<MyCoupon[]>(`/api-public/v1/me/coupons?status=${status}`)
 
-export const getMyCouponCount = () => api<{ available: number }>('/api/v1/me/coupons/count').then((r) => r.available)
+export const getMyCouponCount = () => api<{ available: number }>('/api-public/v1/me/coupons/count').then((r) => r.available)
 
 /** productId 를 주면 그 상품에 쓸 수 있는 것만. */
 export const getDownloadableCoupons = (productId?: number) =>
-  api<CouponOffer[]>(`/api/v1/coupons/downloadable${productId ? `?productId=${productId}` : ''}`)
+  api<CouponOffer[]>(`/api-public/v1/coupons/downloadable${productId ? `?productId=${productId}` : ''}`)
 
 /** 409 = 이미 받음, 400 = 받을 수 없음(기간 · 소진). */
-export const downloadCoupon = (couponId: number) => api<MyCoupon>(`/api/v1/coupons/${couponId}/download`, { method: 'POST' })
+export const downloadCoupon = (couponId: number) => api<MyCoupon>(`/api-public/v1/coupons/${couponId}/download`, { method: 'POST' })
 
 /** 404 = 없는 코드, 409 = 이미 받음, 400 = 기간 · 소진. */
-export const redeemCoupon = (code: string) => api<MyCoupon>('/api/v1/coupons/redeem', { method: 'POST', body: JSON.stringify({ code }) })
+export const redeemCoupon = (code: string) => api<MyCoupon>('/api-public/v1/coupons/redeem', { method: 'POST', body: JSON.stringify({ code }) })
 
 export const getApplicableCoupons = (items: OrderLine[]) =>
-  api<ApplicableCoupon[]>('/api/v1/coupons/applicable', { method: 'POST', body: JSON.stringify({ items }) })
+  api<ApplicableCoupon[]>('/api-public/v1/coupons/applicable', { method: 'POST', body: JSON.stringify({ items }) })
 
 /** 쿠폰 이벤트의 쿠폰을 한 번에 받는다. 모두 이미 받았으면 409. */
-export const claimEventCoupons = (promotionId: number) => api<EventClaimResult>(`/api/v1/promotions/${promotionId}/coupons`, { method: 'POST' })
+export const claimEventCoupons = (promotionId: number) => api<EventClaimResult>(`/api-public/v1/promotions/${promotionId}/coupons`, { method: 'POST' })
 
 /** "3,000원 할인" / "10% 할인 (최대 5,000원)" */
 export function discountLabel(c: Pick<CouponTerms, 'discountType' | 'discountValue' | 'maxDiscount'>): string {

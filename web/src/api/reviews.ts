@@ -53,15 +53,15 @@ export const REVIEW_MIN = 10
 export const REVIEW_MAX = 1000
 
 export const getProductReviews = (productId: number, page = 0, sort: ReviewSort = 'latest', size = 10) =>
-  api<Page<Review>>(`/api/v1/products/${productId}/reviews?page=${page}&size=${size}&sort=${sort}`)
-export const getReviewSummary = (productId: number) => api<ReviewSummary>(`/api/v1/products/${productId}/reviews/summary`)
-export const getReviewTarget = (orderItemId: number) => api<ReviewTarget>(`/api/v1/reviews/targets/${orderItemId}`)
-export const getMyReviews = (page = 0, size = 20) => api<Page<Review>>(`/api/v1/me/reviews?page=${page}&size=${size}`)
-export const getMyReview = (id: number) => api<Review>(`/api/v1/reviews/${id}`)
+  api<Page<Review>>(`/api-public/v1/products/${productId}/reviews?page=${page}&size=${size}&sort=${sort}`)
+export const getReviewSummary = (productId: number) => api<ReviewSummary>(`/api-public/v1/products/${productId}/reviews/summary`)
+export const getReviewTarget = (orderItemId: number) => api<ReviewTarget>(`/api-public/v1/reviews/targets/${orderItemId}`)
+export const getMyReviews = (page = 0, size = 20) => api<Page<Review>>(`/api-public/v1/me/reviews?page=${page}&size=${size}`)
+export const getMyReview = (id: number) => api<Review>(`/api-public/v1/reviews/${id}`)
 export const writeReview = (orderItemId: number, rating: number, content: string) =>
-  api<Review>('/api/v1/reviews', { method: 'POST', body: JSON.stringify({ orderItemId, rating, content }) })
-export const editReview = (id: number, rating: number, content: string) => api<Review>(`/api/v1/reviews/${id}`, { method: 'PUT', body: JSON.stringify({ rating, content }) })
-export const deleteReview = (id: number) => api<void>(`/api/v1/reviews/${id}`, { method: 'DELETE' })
+  api<Review>('/api-public/v1/reviews', { method: 'POST', body: JSON.stringify({ orderItemId, rating, content }) })
+export const editReview = (id: number, rating: number, content: string) => api<Review>(`/api-public/v1/reviews/${id}`, { method: 'PUT', body: JSON.stringify({ rating, content }) })
+export const deleteReview = (id: number) => api<void>(`/api-public/v1/reviews/${id}`, { method: 'DELETE' })
 
 /** 4.5 → "4.5", 4 → "4.0". 카드와 요약이 같은 표기를 쓴다. */
 export const formatRating = (average: number) => average.toFixed(1)

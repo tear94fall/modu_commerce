@@ -102,7 +102,7 @@ class PromotionControllerTest
             exhibition(title = "다음 달", start = "2026-10-01", end = "2026-10-31")
             exhibition(title = "지난 달", start = "2026-08-01", end = "2026-08-31")
 
-            mockMvc.get("/api/v1/promotions/banners") { with(me) }.andExpect {
+            mockMvc.get("/api-public/v1/promotions/banners") { with(me) }.andExpect {
                 status { isOk() }
                 jsonPath("$.length()") { value(2) }
                 jsonPath("$[0].id") { value(first) }
@@ -115,7 +115,7 @@ class PromotionControllerTest
         @Test
         fun `exhibition detail lists products in admin order, hidden promotions are 404`() {
             val id = exhibition()
-            mockMvc.get("/api/v1/promotions/$id") { with(me) }.andExpect {
+            mockMvc.get("/api-public/v1/promotions/$id") { with(me) }.andExpect {
                 status { isOk() }
                 jsonPath("$.type") { value("EXHIBITION") }
                 jsonPath("$.status") { value("ONGOING") }
@@ -125,20 +125,20 @@ class PromotionControllerTest
                 jsonPath("$.attendance") { doesNotExist() }
             }
             val hidden = exhibition(visible = false)
-            mockMvc.get("/api/v1/promotions/$hidden") { with(me) }.andExpect { status { isNotFound() } }
+            mockMvc.get("/api-public/v1/promotions/$hidden") { with(me) }.andExpect { status { isNotFound() } }
         }
 
         @Test
         fun `attendance credits the rule once per day and shows the calendar`() {
             val id = event()
-            mockMvc.get("/api/v1/promotions/$id") { with(me) }.andExpect {
+            mockMvc.get("/api-public/v1/promotions/$id") { with(me) }.andExpect {
                 jsonPath("$.attendance.rewardPoints") { value(10) }
                 jsonPath("$.attendance.today") { value("2026-09-25") }
                 jsonPath("$.attendance.checkedToday") { value(false) }
                 jsonPath("$.attendance.totalDays") { value(3) }
             }
 
-            mockMvc.post("/api/v1/promotions/$id/attendance") { with(me) }.andExpect {
+            mockMvc.post("/api-public/v1/promotions/$id/attendance") { with(me) }.andExpect {
                 status { isOk() }
                 jsonPath("$.checkedDate") { value("2026-09-25") }
                 jsonPath("$.rewardPoints") { value(10) }
@@ -146,23 +146,23 @@ class PromotionControllerTest
             }
             verify(pointGateway).earn(eq("11"), eq("EVENT_ATTEND"), eq("attend:$id:2026-09-25"), any())
 
-            mockMvc.post("/api/v1/promotions/$id/attendance") { with(me) }.andExpect {
+            mockMvc.post("/api-public/v1/promotions/$id/attendance") { with(me) }.andExpect {
                 status { isConflict() }
                 jsonPath("$.message") { value("오늘은 이미 출석했습니다.") }
             }
 
             clock.today = LocalDate.of(2026, 9, 26)
-            mockMvc.post("/api/v1/promotions/$id/attendance") { with(me) }.andExpect {
+            mockMvc.post("/api-public/v1/promotions/$id/attendance") { with(me) }.andExpect {
                 status { isOk() }
                 jsonPath("$.checkedDates.length()") { value(2) }
             }
-            mockMvc.get("/api/v1/promotions/$id") { with(me) }.andExpect {
+            mockMvc.get("/api-public/v1/promotions/$id") { with(me) }.andExpect {
                 jsonPath("$.attendance.checkedToday") { value(true) }
                 jsonPath("$.attendance.checkedDates.length()") { value(2) }
             }
 
             clock.today = LocalDate.of(2026, 9, 27)
-            mockMvc.post("/api/v1/promotions/$id/attendance") { with(me) }.andExpect {
+            mockMvc.post("/api-public/v1/promotions/$id/attendance") { with(me) }.andExpect {
                 status { isBadRequest() }
                 jsonPath("$.message") { value("진행 중인 이벤트가 아닙니다.") }
             }
@@ -178,13 +178,13 @@ class PromotionControllerTest
         fun `a limit keeps the attendance with 0 points, an outage keeps nothing`() {
             val id = event()
             whenever(pointGateway.earn(any(), any(), any(), any())).thenThrow(PointGatewayException())
-            mockMvc.post("/api/v1/promotions/$id/attendance") { with(me) }.andExpect { status { isServiceUnavailable() } }
-            mockMvc.get("/api/v1/promotions/$id") { with(me) }.andExpect { jsonPath("$.attendance.checkedToday") { value(false) } }
+            mockMvc.post("/api-public/v1/promotions/$id/attendance") { with(me) }.andExpect { status { isServiceUnavailable() } }
+            mockMvc.get("/api-public/v1/promotions/$id") { with(me) }.andExpect { jsonPath("$.attendance.checkedToday") { value(false) } }
 
             whenever(
                 pointGateway.earn(any(), any(), any(), any()),
             ).thenReturn(PointEarnResult(applied = false, amount = 0, reason = "DAILY_LIMIT"))
-            mockMvc.post("/api/v1/promotions/$id/attendance") { with(me) }.andExpect {
+            mockMvc.post("/api-public/v1/promotions/$id/attendance") { with(me) }.andExpect {
                 status { isOk() }
                 jsonPath("$.rewardPoints") { value(0) }
                 jsonPath("$.rewardMessage") { value("오늘 받을 수 있는 포인트를 이미 받아 적립되지 않았습니다.") }
@@ -194,7 +194,7 @@ class PromotionControllerTest
         @Test
         fun `an event without a reward rule records attendance without calling the point service`() {
             val id = event(rule = null)
-            mockMvc.post("/api/v1/promotions/$id/attendance") { with(me) }.andExpect {
+            mockMvc.post("/api-public/v1/promotions/$id/attendance") { with(me) }.andExpect {
                 status { isOk() }
                 jsonPath("$.rewardPoints") { value(0) }
                 jsonPath("$.rewardMessage") { doesNotExist() }
@@ -205,7 +205,7 @@ class PromotionControllerTest
         @Test
         fun `exhibitions cannot be checked in`() {
             val id = exhibition()
-            mockMvc.post("/api/v1/promotions/$id/attendance") { with(me) }.andExpect { status { isBadRequest() } }
+            mockMvc.post("/api-public/v1/promotions/$id/attendance") { with(me) }.andExpect { status { isBadRequest() } }
         }
 
         @Test
@@ -297,7 +297,7 @@ class PromotionControllerTest
             mockMvc.get("/api-admin/v1/promotions") { with(me) }.andExpect { status { isForbidden() } }
 
             mockMvc.delete("/api-admin/v1/promotions/$ex") { with(admin) }.andExpect { status { isNoContent() } }
-            mockMvc.get("/api/v1/promotions/$ex") { with(me) }.andExpect { status { isNotFound() } }
+            mockMvc.get("/api-public/v1/promotions/$ex") { with(me) }.andExpect { status { isNotFound() } }
             mockMvc.get("/api-admin/v1/promotions") { with(admin) }.andExpect { jsonPath("$.totalElements") { value(1) } }
         }
 

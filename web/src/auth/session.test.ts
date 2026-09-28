@@ -31,7 +31,7 @@ describe('browser session', () => {
       .mockResolvedValueOnce(json(200, { access_token: 'a2' }))
       .mockResolvedValueOnce(json(200, { ok: true }))
 
-    await expect(api('/api/v1/cart')).resolves.toEqual({ ok: true })
+    await expect(api('/api-public/v1/cart')).resolves.toEqual({ ok: true })
     expect(formOf(fetchMock.mock.calls[1])).toEqual({ grant_type: GRANT_REFRESH, client_id: CLIENT_ID, refresh_token: 'r1' })
     expect((fetchMock.mock.calls[2][1]?.headers as Headers).get('Authorization')).toBe('Bearer a2')
     expect(storedAccessToken()).toBe('a2')

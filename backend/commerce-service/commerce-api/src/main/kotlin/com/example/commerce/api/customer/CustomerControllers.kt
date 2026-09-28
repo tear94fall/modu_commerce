@@ -52,11 +52,11 @@ data class JoinCustomerRequest(
 @Tag(
     name = "커머스 가입 (앱)",
     description =
-        "커머스 웹/앱(웹뷰)이 같은 출처 /api 로 부른다(nginx → commerce-service). " +
+        "커머스 웹/앱(웹뷰)이 API 게이트웨이 /commerce-service/api-public/** 로 부른다(토큰은 게이트웨이가 보고 서비스가 다시 본다). " +
             "모두 계정 토큰(aud modu-commerce) 필요. 가입 전에도 부를 수 있다(가입 여부 확인과 가입 자체).",
 )
 @RestController
-@RequestMapping("/api/v1/me/customer")
+@RequestMapping("/api-public/v1/me/customer")
 class MyCustomerController(
     private val myCustomerUseCase: MyCustomerUseCase,
 ) {
@@ -96,17 +96,17 @@ class MyCustomerController(
                 agreePrivacy = request.agreePrivacy == true,
                 marketing = request.marketing == true,
             )
-        return ResponseEntity.created(URI.create("/api/v1/me/customer")).body(me)
+        return ResponseEntity.created(URI.create("/api-public/v1/me/customer")).body(me)
     }
 }
 
 /** 앱: 등급 안내(로그인 없이도 볼 수 있다). */
 @Tag(
     name = "등급 안내 (앱)",
-    description = "커머스 웹/앱(웹뷰)이 같은 출처 /api 로 부른다(nginx → commerce-service). 로그인 없이 볼 수 있다(토큰 불필요).",
+    description = "커머스 웹/앱(웹뷰)이 API 게이트웨이 /commerce-service/api-public/** 로 부른다. 로그인 없이 볼 수 있다(게이트웨이도 서비스도 토큰을 보지 않는다).",
 )
 @RestController
-@RequestMapping("/api/v1/tiers")
+@RequestMapping("/api-public/v1/tiers")
 class TierController(
     private val publicTiersUseCase: PublicTiersUseCase,
 ) {

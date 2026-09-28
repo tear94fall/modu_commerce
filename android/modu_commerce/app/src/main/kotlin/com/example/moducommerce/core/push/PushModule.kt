@@ -22,7 +22,7 @@ abstract class PushModule {
     abstract fun bindPushTokenSource(impl: FirebasePushTokenSource): PushTokenSource
 
     companion object {
-        /** commerce-service 는 게이트웨이가 아니라 웹과 같은 출처(nginx·Vite 의 /api 프록시)로 부른다. 토큰·갱신은 "api" 클라이언트가. */
+        /** commerce-service 는 웹과 같은 출처의 /api-public 으로 부른다(nginx·Vite 가 게이트웨이 /commerce-service/api-public 로 넘긴다). 토큰·갱신은 "api" 클라이언트가. */
         @Provides
         @Singleton
         fun providePushApi(@Named("api") client: OkHttpClient, gson: Gson): PushApi = Retrofit.Builder()

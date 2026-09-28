@@ -22,7 +22,7 @@ class ApiDocsTest
                 jsonPath("$.openapi") { exists() }
                 jsonPath("$.info.title") { value("commerce-service") }
                 jsonPath("$.info.version") { value("v1") }
-                jsonPath("$.paths['/api/v1/products']") { exists() }
+                jsonPath("$.paths['/api-public/v1/products']") { exists() }
                 jsonPath("$.paths['/api-admin/v1/push-campaigns']") { exists() }
                 jsonPath("$.components.schemas.ErrorResponse") { exists() }
             }
@@ -33,7 +33,7 @@ class ApiDocsTest
             mockMvc.get("/v3/api-docs").andExpect {
                 status { isOk() }
                 jsonPath("$.tags[?(@.name == '장바구니 (앱)')]") { exists() }
-                jsonPath("$.paths['/api/v1/cart/items'].post.summary") { value("장바구니 담기") }
+                jsonPath("$.paths['/api-public/v1/cart/items'].post.summary") { value("장바구니 담기") }
                 jsonPath("$.components.schemas.AddCartItemRequest.properties.quantity.description") { exists() }
             }
         }

@@ -54,7 +54,7 @@ class CustomerControllerTest
         private fun join(
             user: String,
             body: String = """{"agreeTerms":true,"agreePrivacy":true}""",
-        ) = mockMvc.post("/api/v1/me/customer") {
+        ) = mockMvc.post("/api-public/v1/me/customer") {
             with(jwt().jwt { it.subject(user) })
             contentType = MediaType.APPLICATION_JSON
             content = body
@@ -64,15 +64,15 @@ class CustomerControllerTest
         fun `가입 전에는 보호된 API 가 403 CUSTOMER_REQUIRED 이고 둘러보기는 열려 있다`() {
             val productId = support.productId("모두 머그컵 세트")
             listOf(
-                "/api/v1/cart",
-                "/api/v1/orders",
-                "/api/v1/wishlist",
-                "/api/v1/addresses",
-                "/api/v1/me/coupons",
-                "/api/v1/me/coupons/count",
-                "/api/v1/me/reviews",
-                "/api/v1/me/notifications",
-                "/api/v1/me/notifications/unread-count",
+                "/api-public/v1/cart",
+                "/api-public/v1/orders",
+                "/api-public/v1/wishlist",
+                "/api-public/v1/addresses",
+                "/api-public/v1/me/coupons",
+                "/api-public/v1/me/coupons/count",
+                "/api-public/v1/me/reviews",
+                "/api-public/v1/me/notifications",
+                "/api-public/v1/me/notifications/unread-count",
             ).forEach { path ->
                 mockMvc.get(path) { with(stranger) }.andExpect {
                     status { isForbidden() }
@@ -81,45 +81,45 @@ class CustomerControllerTest
                 }
             }
             mockMvc
-                .post("/api/v1/wishlist/$productId") { with(stranger) }
+                .post("/api-public/v1/wishlist/$productId") { with(stranger) }
                 .andExpect { status { isForbidden() } }
             mockMvc
-                .put("/api/v1/me/push/devices") {
+                .put("/api-public/v1/me/push/devices") {
                     with(stranger)
                     contentType = MediaType.APPLICATION_JSON
                     content = """{"token":"t-99","platform":"ANDROID"}"""
                 }.andExpect { status { isForbidden() } }
             mockMvc
-                .put("/api/v1/me/push/consent") {
+                .put("/api-public/v1/me/push/consent") {
                     with(stranger)
                     contentType = MediaType.APPLICATION_JSON
                     content = """{"marketing":true,"night":false}"""
                 }.andExpect { status { isForbidden() } }
 
             listOf(
-                "/api/v1/products",
-                "/api/v1/products/$productId",
-                "/api/v1/categories",
-                "/api/v1/promotions/banners",
-                "/api/v1/products/$productId/reviews",
-                "/api/v1/coupons/downloadable",
-                "/api/v1/me/push/consent",
+                "/api-public/v1/products",
+                "/api-public/v1/products/$productId",
+                "/api-public/v1/categories",
+                "/api-public/v1/promotions/banners",
+                "/api-public/v1/products/$productId/reviews",
+                "/api-public/v1/coupons/downloadable",
+                "/api-public/v1/me/push/consent",
             ).forEach { path -> mockMvc.get(path) { with(stranger) }.andExpect { status { isOk() } } }
             // 로그아웃 때 기기 해제는 가입 전에도 된다.
-            mockMvc.delete("/api/v1/me/push/devices?token=t-99") { with(stranger) }.andExpect { status { isNoContent() } }
+            mockMvc.delete("/api-public/v1/me/push/devices?token=t-99") { with(stranger) }.andExpect { status { isNoContent() } }
         }
 
         @Test
         fun `GET me customer 는 가입 전·동의 전·탈퇴면 404 CUSTOMER_REQUIRED`() {
-            mockMvc.get("/api/v1/me/customer") { with(stranger) }.andExpect {
+            mockMvc.get("/api-public/v1/me/customer") { with(stranger) }.andExpect {
                 status { isNotFound() }
                 jsonPath("$.code") { value("CUSTOMER_REQUIRED") }
             }
             support.joinCustomer("55", agreed = false, migrated = true)
-            mockMvc.get("/api/v1/me/customer") { with(jwt().jwt { it.subject("55") }) }.andExpect { status { isNotFound() } }
+            mockMvc.get("/api-public/v1/me/customer") { with(jwt().jwt { it.subject("55") }) }.andExpect { status { isNotFound() } }
             jdbc.update("update commerce_customers set status = 'WITHDRAWN' where user_id = '11'")
-            mockMvc.get("/api/v1/me/customer") { with(me) }.andExpect { status { isNotFound() } }
-            mockMvc.get("/api/v1/cart") { with(me) }.andExpect { status { isForbidden() } }
+            mockMvc.get("/api-public/v1/me/customer") { with(me) }.andExpect { status { isNotFound() } }
+            mockMvc.get("/api-public/v1/cart") { with(me) }.andExpect { status { isForbidden() } }
         }
 
         @Test
@@ -127,7 +127,7 @@ class CustomerControllerTest
             join("99", """{"agreeTerms":true,"agreePrivacy":false}""").andExpect { status { isBadRequest() } }
             join("99", """{"agreeTerms":true}""").andExpect { status { isBadRequest() } }
             join("99", """{}""").andExpect { status { isBadRequest() } }
-            mockMvc.get("/api/v1/me/customer") { with(stranger) }.andExpect { status { isNotFound() } }
+            mockMvc.get("/api-public/v1/me/customer") { with(stranger) }.andExpect { status { isNotFound() } }
 
             join("99").andExpect {
                 status { isCreated() }
@@ -147,16 +147,16 @@ class CustomerControllerTest
                 jsonPath("$.rolling.amountToNext") { value(100_000) }
                 jsonPath("$.periodLabel") { value("2026.03 ~ 2026.08") }
             }
-            mockMvc.get("/api/v1/cart") { with(stranger) }.andExpect { status { isOk() } }
-            mockMvc.get("/api/v1/me/customer") { with(stranger) }.andExpect { status { isOk() } }
+            mockMvc.get("/api-public/v1/cart") { with(stranger) }.andExpect { status { isOk() } }
+            mockMvc.get("/api-public/v1/me/customer") { with(stranger) }.andExpect { status { isOk() } }
             // 혜택 알림을 고르지 않았으면 동의를 건드리지 않는다.
-            mockMvc.get("/api/v1/me/push/consent") { with(stranger) }.andExpect { jsonPath("$.marketing") { value(false) } }
+            mockMvc.get("/api-public/v1/me/push/consent") { with(stranger) }.andExpect { jsonPath("$.marketing") { value(false) } }
         }
 
         @Test
         fun `혜택 알림에 동의하고 가입하면 광고성 푸시 동의가 켜진다(야간 제외)`() {
             join("98", """{"agreeTerms":true,"agreePrivacy":true,"marketing":true}""").andExpect { status { isCreated() } }
-            mockMvc.get("/api/v1/me/push/consent") { with(jwt().jwt { it.subject("98") }) }.andExpect {
+            mockMvc.get("/api-public/v1/me/push/consent") { with(jwt().jwt { it.subject("98") }) }.andExpect {
                 jsonPath("$.marketing") { value(true) }
                 jsonPath("$.night") { value(false) }
             }
@@ -233,12 +233,12 @@ class CustomerControllerTest
             // 이미 있는 고객(테스트 고객 11 등)은 건드리지 않고, 다시 돌려도 새로 넣지 않는다.
             assertThat(customerMigration.backfillCustomers()).isZero()
             // 동의 전이라 보호된 API 는 403.
-            mockMvc.get("/api/v1/cart") { with(jwt().jwt { it.subject("77") }) }.andExpect { status { isForbidden() } }
+            mockMvc.get("/api-public/v1/cart") { with(jwt().jwt { it.subject("77") }) }.andExpect { status { isForbidden() } }
         }
 
         @Test
         fun `등급 안내는 로그인 없이 볼 수 있다`() {
-            mockMvc.get("/api/v1/tiers").andExpect {
+            mockMvc.get("/api-public/v1/tiers").andExpect {
                 status { isOk() }
                 jsonPath("$.length()") { value(4) }
                 jsonPath("$[0].code") { value("WELCOME") }
@@ -254,13 +254,13 @@ class CustomerControllerTest
         @Test
         fun `내부 탈퇴 API 는 토큰이 있어야 하고 고객을 탈퇴 처리하며 푸시 기기·동의를 지운다`() {
             mockMvc
-                .put("/api/v1/me/push/devices") {
+                .put("/api-public/v1/me/push/devices") {
                     with(me)
                     contentType = MediaType.APPLICATION_JSON
                     content = """{"token":"t-11","platform":"ANDROID"}"""
                 }.andExpect { status { isNoContent() } }
             mockMvc
-                .put("/api/v1/me/push/consent") {
+                .put("/api-public/v1/me/push/consent") {
                     with(me)
                     contentType = MediaType.APPLICATION_JSON
                     content = """{"marketing":true,"night":true}"""
@@ -286,7 +286,7 @@ class CustomerControllerTest
             ).isNotNull()
             assertThat(jdbc.queryForObject("select count(*) from push_devices where user_id = '11'", Long::class.java)).isZero()
             assertThat(jdbc.queryForObject("select count(*) from push_consents where user_id = '11'", Long::class.java)).isZero()
-            mockMvc.get("/api/v1/me/customer") { with(me) }.andExpect { status { isNotFound() } }
+            mockMvc.get("/api-public/v1/me/customer") { with(me) }.andExpect { status { isNotFound() } }
 
             // 다시 불러도, 없는 고객이어도 204.
             mockMvc

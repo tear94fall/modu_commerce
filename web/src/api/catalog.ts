@@ -103,19 +103,19 @@ export function categoryPath(roots: Category[], id: number): Category[] {
   return []
 }
 
-export const getCategories = () => api<Category[]>('/api/v1/categories')
+export const getCategories = () => api<Category[]>('/api-public/v1/categories')
 
 export function getProducts({ categoryId, q, sort, page = 0, size = PAGE_SIZE }: ProductQuery) {
   const params = new URLSearchParams({ page: String(page), size: String(size) })
   if (categoryId !== undefined) params.set('categoryId', String(categoryId))
   if (q) params.set('q', q)
   if (sort) params.set('sort', sort)
-  return api<Page<ProductSummary>>(`/api/v1/products?${params}`)
+  return api<Page<ProductSummary>>(`/api-public/v1/products?${params}`)
 }
 
-export const getProduct = (id: number) => api<ProductDetail>(`/api/v1/products/${id}`)
+export const getProduct = (id: number) => api<ProductDetail>(`/api-public/v1/products/${id}`)
 
-export const getWishlist = (page = 0, size = PAGE_SIZE) => api<Page<ProductSummary>>(`/api/v1/wishlist?page=${page}&size=${size}`)
+export const getWishlist = (page = 0, size = PAGE_SIZE) => api<Page<ProductSummary>>(`/api-public/v1/wishlist?page=${page}&size=${size}`)
 
 export const setWish = (productId: number, wished: boolean) =>
-  api<void>(`/api/v1/wishlist/${productId}`, { method: wished ? 'POST' : 'DELETE' })
+  api<void>(`/api-public/v1/wishlist/${productId}`, { method: wished ? 'POST' : 'DELETE' })

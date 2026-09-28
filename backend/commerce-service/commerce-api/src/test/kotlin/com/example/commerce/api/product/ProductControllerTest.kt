@@ -24,14 +24,14 @@ class ProductControllerTest
 
         @Test
         fun `토큰이 없으면 401`() {
-            mockMvc.get("/api/v1/products").andExpect { status { isUnauthorized() } }
-            mockMvc.get("/api/v1/categories").andExpect { status { isUnauthorized() } }
+            mockMvc.get("/api-public/v1/products").andExpect { status { isUnauthorized() } }
+            mockMvc.get("/api-public/v1/categories").andExpect { status { isUnauthorized() } }
         }
 
         @Test
         fun `목록은 최신순 페이지로 준다`() {
             mockMvc
-                .get("/api/v1/products") { with(jwt().jwt { it.subject("11").audience(listOf("modu-commerce")) }) }
+                .get("/api-public/v1/products") { with(jwt().jwt { it.subject("11").audience(listOf("modu-commerce")) }) }
                 .andExpect {
                     status { isOk() }
                     jsonPath("$.content.length()") { value(20) }
@@ -47,7 +47,7 @@ class ProductControllerTest
         fun `카테고리 정렬 검색`() {
             val fashion = support.categoryId("패션")
             mockMvc
-                .get("/api/v1/products") {
+                .get("/api-public/v1/products") {
                     param("categoryId", fashion.toString())
                     param("sort", "priceAsc")
                     with(jwt())
@@ -57,7 +57,7 @@ class ProductControllerTest
                     jsonPath("$.content[0].name") { value("모두 베이직 티셔츠") }
                 }
             mockMvc
-                .get("/api/v1/products") {
+                .get("/api-public/v1/products") {
                     param("q", "텀블러")
                     with(jwt())
                 }.andExpect {
@@ -66,12 +66,12 @@ class ProductControllerTest
                     jsonPath("$.content[0].name") { value("모두 텀블러 500ml") }
                 }
             mockMvc
-                .get("/api/v1/products") {
+                .get("/api-public/v1/products") {
                     param("q", "버킷햇")
                     with(jwt())
                 }.andExpect { jsonPath("$.content[0].soldOut") { value(true) } }
             mockMvc
-                .get("/api/v1/products") {
+                .get("/api-public/v1/products") {
                     param("categoryId", "999999")
                     with(jwt())
                 }.andExpect { status { isNotFound() } }
@@ -81,7 +81,7 @@ class ProductControllerTest
         fun `상세는 사진 옵션 SKU 카테고리 경로를 준다`() {
             val id = support.productId("모두 베이직 티셔츠")
             mockMvc
-                .get("/api/v1/products/$id") { with(jwt()) }
+                .get("/api-public/v1/products/$id") { with(jwt()) }
                 .andExpect {
                     status { isOk() }
                     jsonPath("$.images.length()") { value(2) }
@@ -101,7 +101,7 @@ class ProductControllerTest
                     jsonPath("$.detail") { exists() }
                     jsonPath("$.wished") { value(false) }
                 }
-            mockMvc.get("/api/v1/products/999999") { with(jwt()) }.andExpect {
+            mockMvc.get("/api-public/v1/products/999999") { with(jwt()) }.andExpect {
                 status { isNotFound() }
                 jsonPath("$.message") { exists() }
             }
@@ -111,14 +111,14 @@ class ProductControllerTest
         fun `할인율과 카테고리 트리`() {
             val id = support.productId("모두 무선 이어폰")
             mockMvc
-                .get("/api/v1/products/$id") { with(jwt()) }
+                .get("/api-public/v1/products/$id") { with(jwt()) }
                 .andExpect {
                     jsonPath("$.price") { value(89000) }
                     jsonPath("$.listPrice") { value(109000) }
                     jsonPath("$.discountRate") { value(18) }
                 }
             mockMvc
-                .get("/api/v1/categories") { with(jwt()) }
+                .get("/api-public/v1/categories") { with(jwt()) }
                 .andExpect {
                     status { isOk() }
                     jsonPath("$.length()") { value(4) }

@@ -1,9 +1,22 @@
 /// <reference types="vitest/config" />
 import react from '@vitejs/plugin-react'
+import type { ProxyOptions } from 'vite'
 import { defineConfig } from 'vitest/config'
 
-// 앱(WebView)과 브라우저 모두 같은 출처의 /api, /auth-service 를 부른다. 개발은 Vite 가, 배포는 nginx 가 프록시한다.
-// 그래서 commerce-service 에 CORS 설정이 없어도 된다.
+// 앱(WebView)과 브라우저 모두 같은 출처의 /api-public, /auth-service 를 부른다. 개발은 Vite 가, 배포는 nginx 가 프록시한다.
+// 그래서 commerce-service 에 CORS 설정이 없어도 된다. commerce API 는 게이트웨이(/commerce-service/api-public/**)를 거친다.
+const gateway = process.env.GATEWAY_URL ?? 'http://localhost:8000'
+
+// 게이트웨이 CORS 가 다른 출처를 막으므로(POST·PUT 등은 같은 출처여도 Origin 이 붙는다) nginx 처럼 Origin 을 지우고 넘긴다.
+const commerceViaGateway = (from: RegExp, to: string): ProxyOptions => ({
+  target: gateway,
+  changeOrigin: true,
+  rewrite: (path) => path.replace(from, to),
+  configure: (proxy) => {
+    proxy.on('proxyReq', (proxyReq) => proxyReq.removeHeader('origin'))
+  },
+})
+
 export default defineConfig({
   plugins: [react()],
   server: {
@@ -11,8 +24,10 @@ export default defineConfig({
     port: 5174,
     strictPort: true,
     proxy: {
-      '/api': { target: process.env.COMMERCE_URL ?? 'http://localhost:8200', changeOrigin: true },
-      '/auth-service': { target: process.env.GATEWAY_URL ?? 'http://localhost:8000', changeOrigin: true },
+      '/api-public': commerceViaGateway(/^\/api-public/, '/commerce-service/api-public'),
+      // 호환: 옛 /api/v1/** 도 같은 게이트웨이 경로로.
+      '/api/v1': commerceViaGateway(/^\/api\/v1/, '/commerce-service/api-public/v1'),
+      '/auth-service': { target: gateway, changeOrigin: true },
       // 프로필 사진(공개 다운로드). 게이트웨이를 거치면 토큰을 요구하므로 storage-service 로 바로 간다.
       '/storage-service': { target: process.env.STORAGE_URL ?? 'http://localhost:9999', changeOrigin: true, rewrite: (path) => path.replace(/^\/storage-service/, '') },
     },

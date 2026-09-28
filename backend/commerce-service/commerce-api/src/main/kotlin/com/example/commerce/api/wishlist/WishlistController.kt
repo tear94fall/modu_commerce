@@ -25,12 +25,12 @@ import org.springframework.web.bind.annotation.RestController
 @Tag(
     name = "찜 (앱)",
     description =
-        "커머스 웹/앱(웹뷰)이 같은 출처 /api 로 부른다(nginx → commerce-service). " +
+        "커머스 웹/앱(웹뷰)이 API 게이트웨이 /commerce-service/api-public/** 로 부른다(토큰은 게이트웨이가 보고 서비스가 다시 본다). " +
             "모두 계정 토큰(aud modu-commerce) 필요. 모두의 커머스 가입(약관 동의) 필요, 아니면 403 CUSTOMER_REQUIRED.",
 )
 @CustomerRequired
 @RestController
-@RequestMapping("/api/v1/wishlist")
+@RequestMapping("/api-public/v1/wishlist")
 class WishlistController(
     private val getWishlistUseCase: GetWishlistUseCase,
     private val addWishUseCase: AddWishUseCase,

@@ -68,7 +68,7 @@ class PushCampaignControllerTest
             token: String,
         ) {
             mockMvc
-                .put("/api/v1/me/push/devices") {
+                .put("/api-public/v1/me/push/devices") {
                     with(user(userId))
                     contentType = MediaType.APPLICATION_JSON
                     content = """{"token":"$token","platform":"ANDROID"}"""
@@ -81,7 +81,7 @@ class PushCampaignControllerTest
             night: Boolean = false,
         ) {
             mockMvc
-                .put("/api/v1/me/push/consent") {
+                .put("/api-public/v1/me/push/consent") {
                     with(user(userId))
                     contentType = MediaType.APPLICATION_JSON
                     content = """{"marketing":$marketing,"night":$night}"""
@@ -122,14 +122,14 @@ class PushCampaignControllerTest
             assertThat(deviceRepository.findAll().filter { it.token == "tok-a" }).hasSize(1)
             assertThat(deviceRepository.findByToken("tok-a")!!.userId).isEqualTo("u2")
 
-            mockMvc.delete("/api/v1/me/push/devices?token=tok-a") { with(user("u1")) }.andExpect { status { isNoContent() } }
+            mockMvc.delete("/api-public/v1/me/push/devices?token=tok-a") { with(user("u1")) }.andExpect { status { isNoContent() } }
             assertThat(deviceRepository.findByToken("tok-a")).isNotNull
 
-            mockMvc.delete("/api/v1/me/push/devices?token=tok-a") { with(user("u2")) }.andExpect { status { isNoContent() } }
+            mockMvc.delete("/api-public/v1/me/push/devices?token=tok-a") { with(user("u2")) }.andExpect { status { isNoContent() } }
             assertThat(deviceRepository.findByToken("tok-a")).isNull()
 
             mockMvc
-                .put("/api/v1/me/push/devices") {
+                .put("/api-public/v1/me/push/devices") {
                     with(user("u1"))
                     contentType = MediaType.APPLICATION_JSON
                     content = """{"token":"  "}"""
@@ -141,7 +141,7 @@ class PushCampaignControllerTest
 
         @Test
         fun `consent defaults off, night is forced off without marketing, timestamps change only for changed flags`() {
-            mockMvc.get("/api/v1/me/push/consent") { with(user("u1")) }.andExpect {
+            mockMvc.get("/api-public/v1/me/push/consent") { with(user("u1")) }.andExpect {
                 status { isOk() }
                 jsonPath("$.marketing") { value(false) }
                 jsonPath("$.marketingUpdatedAt") { value(nullValue()) }
@@ -151,7 +151,7 @@ class PushCampaignControllerTest
 
             // 밤 동의만 켜려 해도 혜택 알림이 꺼져 있으면 꺼진 채(바뀐 것 없음)
             mockMvc
-                .put("/api/v1/me/push/consent") {
+                .put("/api-public/v1/me/push/consent") {
                     with(user("u1"))
                     contentType = MediaType.APPLICATION_JSON
                     content = """{"marketing":false,"night":true}"""
@@ -162,7 +162,7 @@ class PushCampaignControllerTest
 
             // 12:00 KST = 03:00 UTC
             mockMvc
-                .put("/api/v1/me/push/consent") {
+                .put("/api-public/v1/me/push/consent") {
                     with(user("u1"))
                     contentType = MediaType.APPLICATION_JSON
                     content = """{"marketing":true,"night":true}"""
@@ -175,7 +175,7 @@ class PushCampaignControllerTest
 
             clock.set(2026, 9, 27, 15, 0)
             mockMvc
-                .put("/api/v1/me/push/consent") {
+                .put("/api-public/v1/me/push/consent") {
                     with(user("u1"))
                     contentType = MediaType.APPLICATION_JSON
                     content = """{"marketing":true,"night":false}"""
@@ -187,7 +187,7 @@ class PushCampaignControllerTest
 
             clock.set(2026, 9, 27, 16, 0)
             mockMvc
-                .put("/api/v1/me/push/consent") {
+                .put("/api-public/v1/me/push/consent") {
                     with(user("u1"))
                     contentType = MediaType.APPLICATION_JSON
                     content = """{"marketing":false,"night":true}"""
@@ -198,11 +198,11 @@ class PushCampaignControllerTest
                     jsonPath("$.nightUpdatedAt") { value(startsWith("2026-09-27T06:00")) }
                 }
 
-            mockMvc.get("/api/v1/me/push/consent") { with(user("u1")) }.andExpect {
+            mockMvc.get("/api-public/v1/me/push/consent") { with(user("u1")) }.andExpect {
                 jsonPath("$.marketingUpdatedAt") { value(startsWith("2026-09-27T07:00")) }
             }
             mockMvc
-                .put("/api/v1/me/push/consent") {
+                .put("/api-public/v1/me/push/consent") {
                     with(user("u1"))
                     contentType = MediaType.APPLICATION_JSON
                     content = """{"marketing":true}"""
@@ -474,9 +474,11 @@ class PushCampaignControllerTest
         @Test
         fun `opened is counted once per user and unknown campaigns are ignored`() {
             val id = productCampaign(scheduledAt = null)
-            repeat(2) { mockMvc.post("/api/v1/push/campaigns/$id/opened") { with(user("u1")) }.andExpect { status { isNoContent() } } }
-            mockMvc.post("/api/v1/push/campaigns/$id/opened") { with(user("u3")) }.andExpect { status { isNoContent() } }
-            mockMvc.post("/api/v1/push/campaigns/999999/opened") { with(user("u1")) }.andExpect { status { isNoContent() } }
+            repeat(
+                2,
+            ) { mockMvc.post("/api-public/v1/push/campaigns/$id/opened") { with(user("u1")) }.andExpect { status { isNoContent() } } }
+            mockMvc.post("/api-public/v1/push/campaigns/$id/opened") { with(user("u3")) }.andExpect { status { isNoContent() } }
+            mockMvc.post("/api-public/v1/push/campaigns/999999/opened") { with(user("u1")) }.andExpect { status { isNoContent() } }
 
             mockMvc.get("/api-admin/v1/push-campaigns/$id") { with(admin) }.andExpect { jsonPath("$.openedCount") { value(2) } }
         }
@@ -519,7 +521,7 @@ class PushCampaignControllerTest
             mockMvc
                 .get("/api-admin/v1/push-campaigns") { with(jwt().authorities(SimpleGrantedAuthority("ROLE_USER"))) }
                 .andExpect { status { isForbidden() } }
-            mockMvc.put("/api/v1/me/push/consent").andExpect { status { isUnauthorized() } }
+            mockMvc.put("/api-public/v1/me/push/consent").andExpect { status { isUnauthorized() } }
         }
 
         private fun inboxUsers(campaignId: Int): List<String> =
@@ -528,7 +530,7 @@ class PushCampaignControllerTest
         private fun unread(userId: String): Int =
             JsonPath.read(
                 mockMvc
-                    .get("/api/v1/me/notifications/unread-count") { with(user(userId)) }
+                    .get("/api-public/v1/me/notifications/unread-count") { with(user(userId)) }
                     .andExpect { status { isOk() } }
                     .andReturn()
                     .response.contentAsString,
@@ -538,7 +540,7 @@ class PushCampaignControllerTest
         private fun inboxIds(userId: String): List<Int> =
             JsonPath.read(
                 mockMvc
-                    .get("/api/v1/me/notifications") { with(user(userId)) }
+                    .get("/api-public/v1/me/notifications") { with(user(userId)) }
                     .andReturn()
                     .response.contentAsString,
                 "$.content[*].id",
@@ -593,7 +595,7 @@ class PushCampaignControllerTest
                        "imageUrl":"https://img.test/c.png","scheduledAt":null}""",
                 )!!
 
-            mockMvc.get("/api/v1/me/notifications") { with(user("u1")) }.andExpect {
+            mockMvc.get("/api-public/v1/me/notifications") { with(user("u1")) }.andExpect {
                 status { isOk() }
                 jsonPath("$.totalElements") { value(2) }
                 jsonPath("$.totalPages") { value(1) }
@@ -614,10 +616,10 @@ class PushCampaignControllerTest
                 jsonPath("$.content[1].receivedAt") { value(startsWith("2026-09-27T03:00")) }
             }
             // 다른 사람의 알림함은 비어 있다
-            mockMvc.get("/api/v1/me/notifications") { with(user("u2")) }.andExpect { jsonPath("$.totalElements") { value(0) } }
+            mockMvc.get("/api-public/v1/me/notifications") { with(user("u2")) }.andExpect { jsonPath("$.totalElements") { value(0) } }
             // 한 쪽에 50개까지
             mockMvc
-                .get("/api/v1/me/notifications") {
+                .get("/api-public/v1/me/notifications") {
                     with(user("u1"))
                     param("size", "100")
                     param("page", "0")
@@ -628,7 +630,7 @@ class PushCampaignControllerTest
             clock.set(2026, 10, 27, 12, 0)
             assertThat(inboxIds("u1")).hasSize(2)
             clock.set(2026, 10, 27, 12, 1)
-            mockMvc.get("/api/v1/me/notifications") { with(user("u1")) }.andExpect {
+            mockMvc.get("/api-public/v1/me/notifications") { with(user("u1")) }.andExpect {
                 jsonPath("$.totalElements") { value(1) }
                 jsonPath("$.content[0].campaignId") { value(newer) }
             }
@@ -650,28 +652,28 @@ class PushCampaignControllerTest
             val u2Items = inboxIds("u2")
 
             // 남의 줄·없는 줄은 404
-            mockMvc.post("/api/v1/me/notifications/${u2Items[0]}/read") { with(user("u1")) }.andExpect {
+            mockMvc.post("/api-public/v1/me/notifications/${u2Items[0]}/read") { with(user("u1")) }.andExpect {
                 status { isNotFound() }
                 jsonPath("$.message") { exists() }
             }
-            mockMvc.post("/api/v1/me/notifications/999999/read") { with(user("u1")) }.andExpect { status { isNotFound() } }
+            mockMvc.post("/api-public/v1/me/notifications/999999/read") { with(user("u1")) }.andExpect { status { isNotFound() } }
             assertThat(unread("u2")).isEqualTo(3)
 
             // 내 줄은 읽음(두 번 해도 204)
             repeat(2) {
-                mockMvc.post("/api/v1/me/notifications/$u1Third/read") { with(user("u1")) }.andExpect { status { isNoContent() } }
+                mockMvc.post("/api-public/v1/me/notifications/$u1Third/read") { with(user("u1")) }.andExpect { status { isNoContent() } }
             }
             assertThat(unread("u1")).isEqualTo(2)
-            mockMvc.get("/api/v1/me/notifications") { with(user("u1")) }.andExpect {
+            mockMvc.get("/api-public/v1/me/notifications") { with(user("u1")) }.andExpect {
                 jsonPath("$.content[0].campaignId") { value(third) }
                 jsonPath("$.content[0].read") { value(true) }
                 jsonPath("$.content[1].read") { value(false) }
             }
 
             // 알림을 눌러 열면 그 캠페인의 내 줄도 읽음
-            mockMvc.post("/api/v1/push/campaigns/$second/opened") { with(user("u1")) }.andExpect { status { isNoContent() } }
+            mockMvc.post("/api-public/v1/push/campaigns/$second/opened") { with(user("u1")) }.andExpect { status { isNoContent() } }
             assertThat(unread("u1")).isEqualTo(1)
-            mockMvc.get("/api/v1/me/notifications") { with(user("u1")) }.andExpect {
+            mockMvc.get("/api-public/v1/me/notifications") { with(user("u1")) }.andExpect {
                 jsonPath("$.content[1].id") { value(u1Second) }
                 jsonPath("$.content[1].read") { value(true) }
                 jsonPath("$.content[2].campaignId") { value(first) }
@@ -680,10 +682,10 @@ class PushCampaignControllerTest
             assertThat(unread("u2")).isEqualTo(3)
 
             // 모두 읽음은 내 것만
-            mockMvc.post("/api/v1/me/notifications/read-all") { with(user("u1")) }.andExpect { status { isNoContent() } }
+            mockMvc.post("/api-public/v1/me/notifications/read-all") { with(user("u1")) }.andExpect { status { isNoContent() } }
             assertThat(unread("u1")).isEqualTo(0)
             assertThat(unread("u2")).isEqualTo(3)
-            mockMvc.get("/api/v1/me/notifications").andExpect { status { isUnauthorized() } }
+            mockMvc.get("/api-public/v1/me/notifications").andExpect { status { isUnauthorized() } }
         }
 
         /** 분 단위로 옮기는 KST 시계. */

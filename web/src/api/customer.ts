@@ -16,7 +16,7 @@ export interface MonthlyCoupon {
   discountLabel: string | null
 }
 
-/** GET /api/v1/tiers 한 줄. 낮은 등급부터. */
+/** GET /api-public/v1/tiers 한 줄. 낮은 등급부터. */
 export interface Tier extends TierSummary {
   monthlyCoupons: MonthlyCoupon[]
 }
@@ -56,14 +56,14 @@ export interface JoinCustomerInput {
 
 /** 내 커머스 고객 정보. 가입(약관 동의) 전이면 null(서버 404/403 CUSTOMER_REQUIRED). */
 export const getMyCustomer = () =>
-  api<CustomerMe>('/api/v1/me/customer', { quiet: true }).catch((e: unknown) => {
+  api<CustomerMe>('/api-public/v1/me/customer', { quiet: true }).catch((e: unknown) => {
     if ((e instanceof ApiError && e.status === 404) || isCustomerRequired(e)) return null
     throw e
   })
 
-export const joinCustomer = (input: JoinCustomerInput) => api<CustomerMe>('/api/v1/me/customer', { method: 'POST', body: JSON.stringify(input) })
+export const joinCustomer = (input: JoinCustomerInput) => api<CustomerMe>('/api-public/v1/me/customer', { method: 'POST', body: JSON.stringify(input) })
 
-export const getTiers = () => api<Tier[]>('/api/v1/tiers')
+export const getTiers = () => api<Tier[]>('/api-public/v1/tiers')
 
 /** 구매 적립 예상 포인트 = floor(결제 금액 × 적립률 / 100). */
 export const earnPoints = (paymentAmount: number, earnRate: number) => Math.max(0, Math.floor((paymentAmount * earnRate) / 100))

@@ -37,7 +37,7 @@ class OrderControllerTest
         private fun address(user: RequestPostProcessor): Int =
             JsonPath.read(
                 mockMvc
-                    .post("/api/v1/addresses") {
+                    .post("/api-public/v1/addresses") {
                         with(user)
                         contentType = MediaType.APPLICATION_JSON
                         content = """{"recipient":"임준섭","phone":"010-1234-5678","zipCode":"06236","address1":"서울 강남구","address2":"101동"}"""
@@ -52,7 +52,7 @@ class OrderControllerTest
         ): Int =
             JsonPath.read(
                 mockMvc
-                    .post("/api/v1/cart/items") {
+                    .post("/api-public/v1/cart/items") {
                         with(me)
                         contentType = MediaType.APPLICATION_JSON
                         content = """{"skuId":$skuId,"quantity":$quantity}"""
@@ -71,7 +71,7 @@ class OrderControllerTest
 
             val created =
                 mockMvc
-                    .post("/api/v1/orders") {
+                    .post("/api-public/v1/orders") {
                         with(me)
                         contentType = MediaType.APPLICATION_JSON
                         content =
@@ -90,25 +90,25 @@ class OrderControllerTest
 
             assertEquals(8, support.stockOf("모두 베이직 티셔츠", "블랙 / M"))
             assertEquals(44, support.stockOf("모두 머그컵 세트"))
-            mockMvc.get("/api/v1/cart") { with(me) }.andExpect { jsonPath("$.itemCount") { value(0) } }
+            mockMvc.get("/api-public/v1/cart") { with(me) }.andExpect { jsonPath("$.itemCount") { value(0) } }
 
-            mockMvc.get("/api/v1/orders") { with(me) }.andExpect {
+            mockMvc.get("/api-public/v1/orders") { with(me) }.andExpect {
                 status { isOk() }
                 jsonPath("$.totalElements") { value(1) }
                 jsonPath("$.content[0].itemCount") { value(3) }
                 jsonPath("$.content[0].firstItemName") { value("모두 머그컵 세트") }
             }
-            mockMvc.get("/api/v1/orders/$orderId") { with(other) }.andExpect { status { isNotFound() } }
-            mockMvc.get("/api/v1/orders") { with(other) }.andExpect { jsonPath("$.totalElements") { value(0) } }
+            mockMvc.get("/api-public/v1/orders/$orderId") { with(other) }.andExpect { status { isNotFound() } }
+            mockMvc.get("/api-public/v1/orders") { with(other) }.andExpect { jsonPath("$.totalElements") { value(0) } }
 
             // 취소하면 재고가 돌아온다. 두 번은 안 된다.
-            mockMvc.post("/api/v1/orders/$orderId/cancel") { with(me) }.andExpect {
+            mockMvc.post("/api-public/v1/orders/$orderId/cancel") { with(me) }.andExpect {
                 status { isOk() }
                 jsonPath("$.status") { value("CANCELLED") }
                 jsonPath("$.cancelledAt") { exists() }
             }
             assertEquals(10, support.stockOf("모두 베이직 티셔츠", "블랙 / M"))
-            mockMvc.post("/api/v1/orders/$orderId/cancel") { with(me) }.andExpect {
+            mockMvc.post("/api-public/v1/orders/$orderId/cancel") { with(me) }.andExpect {
                 status { isBadRequest() }
                 jsonPath("$.message") { value("취소 상태에서 취소 로 바꿀 수 없습니다.") }
             }
@@ -119,7 +119,7 @@ class OrderControllerTest
             val addressId = address(me)
             val navyL = support.skuId("모두 베이직 티셔츠", "네이비 / L") // 재고 0
             mockMvc
-                .post("/api/v1/orders") {
+                .post("/api-public/v1/orders") {
                     with(me)
                     contentType = MediaType.APPLICATION_JSON
                     content = """{"addressId":$addressId,"items":[{"skuId":$navyL,"quantity":1}]}"""
@@ -127,16 +127,16 @@ class OrderControllerTest
                     status { isBadRequest() }
                     jsonPath("$.message") { value("재고가 부족합니다: 모두 베이직 티셔츠 (네이비 / L) (남은 수량 0)") }
                 }
-            mockMvc.get("/api/v1/orders") { with(me) }.andExpect { jsonPath("$.totalElements") { value(0) } }
+            mockMvc.get("/api-public/v1/orders") { with(me) }.andExpect { jsonPath("$.totalElements") { value(0) } }
 
             mockMvc
-                .post("/api/v1/orders") {
+                .post("/api-public/v1/orders") {
                     with(me)
                     contentType = MediaType.APPLICATION_JSON
                     content = """{"addressId":$addressId,"items":[]}"""
                 }.andExpect { jsonPath("$.message") { value("items: 주문할 상품이 없습니다.") } }
             mockMvc
-                .post("/api/v1/orders") {
+                .post("/api-public/v1/orders") {
                     with(me)
                     contentType = MediaType.APPLICATION_JSON
                     content = """{"addressId":999999,"items":[{"skuId":$navyL,"quantity":1}]}"""
@@ -150,7 +150,7 @@ class OrderControllerTest
             val orderId =
                 JsonPath.read<Int>(
                     mockMvc
-                        .post("/api/v1/orders") {
+                        .post("/api-public/v1/orders") {
                             with(me)
                             contentType = MediaType.APPLICATION_JSON
                             content = """{"addressId":$addressId,"items":[{"skuId":$mug,"quantity":3}]}"""
@@ -180,7 +180,7 @@ class OrderControllerTest
                 jsonPath("$.message") { value("결제완료 상태에서 배송완료 로 바꿀 수 없습니다.") }
             }
             change("SHIPPING").andExpect { jsonPath("$.status") { value("SHIPPING") } }
-            mockMvc.post("/api/v1/orders/$orderId/cancel") { with(me) }.andExpect { status { isBadRequest() } }
+            mockMvc.post("/api-public/v1/orders/$orderId/cancel") { with(me) }.andExpect { status { isBadRequest() } }
             change("DELIVERED").andExpect { jsonPath("$.status") { value("DELIVERED") } }
             mockMvc.get("/api-admin/v1/orders/$orderId") { with(admin) }.andExpect { jsonPath("$.items[0].quantity") { value(3) } }
             assertEquals(42, support.stockOf("모두 머그컵 세트"))
@@ -189,7 +189,7 @@ class OrderControllerTest
             val second =
                 JsonPath.read<Int>(
                     mockMvc
-                        .post("/api/v1/orders") {
+                        .post("/api-public/v1/orders") {
                             with(me)
                             contentType = MediaType.APPLICATION_JSON
                             content = """{"addressId":$addressId,"items":[{"skuId":$mug,"quantity":2}]}"""
