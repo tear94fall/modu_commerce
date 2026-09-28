@@ -65,6 +65,8 @@ class SecurityConfig {
             .authorizeHttpRequests {
                 // 등급 안내는 로그인 전에도 볼 수 있다.
                 it.requestMatchers(HttpMethod.GET, "/api/v1/tiers").permitAll()
+                // API 문서. 서비스 포트는 도커 네트워크 안에서만 열리고 외부 접근은 게이트웨이가 막는다.
+                it.requestMatchers(*API_DOCS_PATHS).permitAll()
                 it.anyRequest().authenticated()
             }.oauth2ResourceServer { it.jwt {} }
             .build()
@@ -75,6 +77,7 @@ class SecurityConfig {
 
     companion object {
         const val ADMIN_ROLE = "ROLE_ADMIN"
+        val API_DOCS_PATHS = arrayOf("/v3/api-docs", "/v3/api-docs/**")
 
         fun tokenValidator(
             issuer: String,
