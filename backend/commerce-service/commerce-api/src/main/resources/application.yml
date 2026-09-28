@@ -95,6 +95,14 @@ modu:
     scheduler-enabled: true
     earn-retry-enabled: true
 
+# API 문서(GET /v3/api-docs). 도커 네트워크 안에서만 열리고 외부는 게이트웨이(ROLE_SYSTEM)가 막는다.
+springdoc:
+  api-docs:
+    enabled: ${SPRINGDOC_API_DOCS_ENABLED:true}
+    path: /v3/api-docs
+  default-produces-media-type: application/json
+  paths-to-exclude: /actuator/**, /error
+
 logging:
   level:
     org.hibernate.SQL: ${SQL_LOG_LEVEL:DEBUG}

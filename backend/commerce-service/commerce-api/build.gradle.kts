@@ -8,6 +8,8 @@ dependencies {
     implementation("org.springframework.cloud:spring-cloud-starter-config")
     // admin 상품 등록·수정 요청 검증(@Valid)
     implementation("org.springframework.boot:spring-boot-starter-validation")
+    // API 문서(GET /v3/api-docs, JSON 만). 화면은 시스템 콘솔(modu-system)이 게이트웨이를 거쳐 그린다. Boot 3.5 ↔ springdoc 2.8.x
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-api:2.8.17")
     // 모두 계정(auth-service) 토큰을 JWKS 로 검증하는 리소스 서버
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
