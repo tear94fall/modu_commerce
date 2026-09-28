@@ -4,12 +4,15 @@ import com.example.commerce.application.domain.entity.Coupon
 import com.example.commerce.application.domain.entity.Customer
 import com.example.commerce.application.domain.entity.CustomerStatus
 import com.example.commerce.application.domain.entity.EarnStatus
+import com.example.commerce.application.domain.entity.Order
+import com.example.commerce.application.domain.entity.OrderStatus
 import com.example.commerce.application.domain.entity.Tier
 import com.example.commerce.application.domain.entity.TierChangeReason
 import com.example.commerce.application.domain.entity.TierHistory
 import com.example.commerce.application.domain.entity.TierRun
 import com.example.commerce.application.domain.entity.TierRunReason
 import com.example.commerce.application.domain.entity.TierRunStatus
+import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.annotation.JsonUnwrapped
 import java.time.LocalDateTime
 
@@ -191,3 +194,62 @@ data class ExpectedEarnResult(
 )
 
 fun Customer.summaryTier(tiers: List<Tier>): Tier = tiers.firstOrNull { it.code == tierCode } ?: tiers.minBy { it.minAmount }
+
+/** 백오피스 회원 요약의 주문 상태별 개수. */
+data class OrderCountsResult(
+    @get:JsonProperty("PAID") val paid: Long,
+    @get:JsonProperty("SHIPPING") val shipping: Long,
+    @get:JsonProperty("DELIVERED") val delivered: Long,
+    @get:JsonProperty("CANCELLED") val cancelled: Long,
+)
+
+data class CustomerRecentOrderResult(
+    val id: Long,
+    val orderNo: String,
+    val status: OrderStatus,
+    val paymentAmount: Long,
+    val createdAt: LocalDateTime?,
+    /** "모두 다이어리 2027 외 1건". 한 줄이면 상품명만. */
+    val itemSummary: String,
+) {
+    companion object {
+        fun from(o: Order) =
+            CustomerRecentOrderResult(
+                requireNotNull(o.id),
+                o.orderNo,
+                o.status,
+                o.paymentAmount(),
+                o.createdAt,
+                itemSummary(o.items.map { it.productName }),
+            )
+
+        fun itemSummary(names: List<String>): String =
+            when (names.size) {
+                0 -> ""
+                1 -> names[0]
+                else -> "${names[0]} 외 ${names.size - 1}건"
+            }
+    }
+}
+
+data class CustomerCouponCountsResult(
+    val available: Long,
+    val used: Long,
+    val expired: Long,
+)
+
+/**
+ * 백오피스 회원 요약(GET /api-admin/v1/customers/{userId}/summary). 고객이 아니어도 0·null 로 채워 돌려준다.
+ * [points] 는 커머스 것이 아니라 늘 null(어드민이 포인트 서버에서 읽는다).
+ */
+data class CustomerSummaryResult(
+    val customer: AdminCustomerResult?,
+    val orderCounts: OrderCountsResult,
+    val deliveredAmountTotal: Long,
+    val lastOrderAt: LocalDateTime?,
+    val recentOrders: List<CustomerRecentOrderResult>,
+    val coupons: CustomerCouponCountsResult,
+    val wishlistCount: Long,
+    val reviewCount: Long,
+    val points: Long? = null,
+)
