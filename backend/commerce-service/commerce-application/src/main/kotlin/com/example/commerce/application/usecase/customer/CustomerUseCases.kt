@@ -1,10 +1,12 @@
 package com.example.commerce.application.usecase.customer
 
 import com.example.commerce.application.domain.entity.Customer
+import com.example.commerce.application.domain.entity.OrderStatus
 import com.example.commerce.application.domain.entity.Tier
 import com.example.commerce.application.member.MemberLookup
 import com.example.commerce.application.service.CustomerCommandService
 import com.example.commerce.application.service.CustomerQueryService
+import com.example.commerce.application.service.CustomerSummaryQueryService
 import com.example.commerce.application.service.TierCommandService
 import com.example.commerce.application.service.TierRunService
 import com.example.commerce.application.service.above
@@ -13,9 +15,13 @@ import com.example.commerce.application.usecase.command.TierCommand
 import com.example.commerce.application.usecase.result.AdminCustomerDetailResult
 import com.example.commerce.application.usecase.result.AdminCustomerResult
 import com.example.commerce.application.usecase.result.AdminTierResult
+import com.example.commerce.application.usecase.result.CustomerCouponCountsResult
 import com.example.commerce.application.usecase.result.CustomerLookupResult
 import com.example.commerce.application.usecase.result.CustomerMeResult
+import com.example.commerce.application.usecase.result.CustomerRecentOrderResult
+import com.example.commerce.application.usecase.result.CustomerSummaryResult
 import com.example.commerce.application.usecase.result.MonthlyCouponResult
+import com.example.commerce.application.usecase.result.OrderCountsResult
 import com.example.commerce.application.usecase.result.PageResult
 import com.example.commerce.application.usecase.result.PublicTierResult
 import com.example.commerce.application.usecase.result.RollingResult
@@ -127,6 +133,7 @@ class AdminTierUseCase(
 @Component
 class AdminCustomerUseCase(
     private val customerQueryService: CustomerQueryService,
+    private val customerSummaryQueryService: CustomerSummaryQueryService,
     private val memberLookup: MemberLookup,
 ) {
     @Transactional(transactionManager = "roTransactionManager", readOnly = true)
@@ -162,6 +169,30 @@ class AdminCustomerUseCase(
         )
     }
 
+    /** 회원 허브 요약. 고객이 아니거나 없는 회원이어도 0·null 로 채운다. */
+    @Transactional(transactionManager = "roTransactionManager", readOnly = true)
+    fun summary(userId: String): CustomerSummaryResult {
+        val customer = customerQueryService.find(userId)?.let { results(listOf(it)).single() }
+        val stats = customerSummaryQueryService.orderStats(userId).associateBy { it.status }
+        val coupons = customerSummaryQueryService.couponCounts(userId)
+        return CustomerSummaryResult(
+            customer = customer,
+            orderCounts =
+                OrderCountsResult(
+                    paid = stats[OrderStatus.PAID]?.count ?: 0,
+                    shipping = stats[OrderStatus.SHIPPING]?.count ?: 0,
+                    delivered = stats[OrderStatus.DELIVERED]?.count ?: 0,
+                    cancelled = stats[OrderStatus.CANCELLED]?.count ?: 0,
+                ),
+            deliveredAmountTotal = stats[OrderStatus.DELIVERED]?.paymentAmount ?: 0,
+            lastOrderAt = stats.values.mapNotNull { it.lastCreatedAt }.maxOrNull(),
+            recentOrders = customerSummaryQueryService.recentOrders(userId, RECENT_ORDERS).map(CustomerRecentOrderResult::from),
+            coupons = CustomerCouponCountsResult(coupons.available ?: 0, coupons.used ?: 0, coupons.expired ?: 0),
+            wishlistCount = customerSummaryQueryService.wishlistCount(userId),
+            reviewCount = customerSummaryQueryService.reviewCount(userId),
+        )
+    }
+
     private fun results(customers: List<Customer>): List<AdminCustomerResult> {
         if (customers.isEmpty()) return emptyList()
         val ids = customers.map { it.userId }
@@ -185,6 +216,8 @@ class AdminCustomerUseCase(
         }
     }
 }
+
+private const val RECENT_ORDERS = 5
 
 /** 내부: 모두 계정 탈퇴. */
 @Component

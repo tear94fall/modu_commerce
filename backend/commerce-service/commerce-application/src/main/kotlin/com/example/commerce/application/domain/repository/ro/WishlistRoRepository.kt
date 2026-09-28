@@ -23,4 +23,8 @@ interface WishlistRoRepository : RoRepository<Wishlist, Long> {
         userId: String,
         pageable: Pageable,
     ): Page<Wishlist>
+
+    /** 찜 개수. 삭제된 상품은 뺀다. */
+    @Query("select count(w) from Wishlist w join w.product p where w.userId = :userId and p.deletedAt is null")
+    fun countLiveByUserId(userId: String): Long
 }

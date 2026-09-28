@@ -15,6 +15,7 @@ import com.example.commerce.application.usecase.result.AdminCustomerResult
 import com.example.commerce.application.usecase.result.AdminTierResult
 import com.example.commerce.application.usecase.result.CustomerLookupResult
 import com.example.commerce.application.usecase.result.CustomerMeResult
+import com.example.commerce.application.usecase.result.CustomerSummaryResult
 import com.example.commerce.application.usecase.result.PublicTierResult
 import com.example.commerce.application.usecase.result.TierRunResult
 import org.springframework.http.HttpStatus
@@ -108,6 +109,12 @@ class AdminCustomerController(
     fun customer(
         @PathVariable userId: String,
     ): ResponseEntity<AdminCustomerDetailResult> = ResponseEntity.ok(adminCustomerUseCase.detail(userId))
+
+    /** 회원 허브 요약. 고객이 아니거나 없는 회원이어도 200(0·null). */
+    @GetMapping("/{userId}/summary")
+    fun summary(
+        @PathVariable userId: String,
+    ): ResponseEntity<CustomerSummaryResult> = ResponseEntity.ok(adminCustomerUseCase.summary(userId))
 }
 
 data class TierRequest(

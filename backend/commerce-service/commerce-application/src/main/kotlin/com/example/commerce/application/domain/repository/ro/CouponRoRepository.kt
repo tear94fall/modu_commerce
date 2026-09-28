@@ -15,6 +15,13 @@ data class CouponCount(
     val count: Long,
 )
 
+/** 회원 한 명의 받은 쿠폰 상태별 개수(오늘 기준). */
+data class UserCouponCounts(
+    val available: Long?,
+    val used: Long?,
+    val expired: Long?,
+)
+
 interface CouponRoRepository : RoRepository<Coupon, Long> {
     @Query("select c from Coupon c where c.id = :id and c.deletedAt is null")
     fun findLive(
@@ -80,4 +87,17 @@ interface UserCouponRoRepository : RoRepository<UserCoupon, Long> {
         @Param("today") today: LocalDate,
         pageable: Pageable,
     ): Page<UserCoupon>
+
+    /** 받은 쿠폰 상태별 개수. [UserCoupon.statusOn] 과 같은 규칙(쓴 적 있으면 USED, 기한이 오늘보다 앞이면 EXPIRED). 없으면 null 합. */
+    @Query(
+        "select new com.example.commerce.application.domain.repository.ro.UserCouponCounts(" +
+            "sum(case when uc.usedAt is null and uc.expiresOn >= :today then 1L else 0L end), " +
+            "sum(case when uc.usedAt is not null then 1L else 0L end), " +
+            "sum(case when uc.usedAt is null and uc.expiresOn < :today then 1L else 0L end)) " +
+            "from UserCoupon uc where uc.userId = :userId",
+    )
+    fun countByStatus(
+        @Param("userId") userId: String,
+        @Param("today") today: LocalDate,
+    ): UserCouponCounts
 }

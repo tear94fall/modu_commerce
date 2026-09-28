@@ -51,4 +51,7 @@ interface ReviewRoRepository :
     fun findAllByOrderItemIdIn(orderItemIds: Collection<Long>): List<Review>
 
     fun findByOrderItemId(orderItemId: Long): Review?
+
+    /** 쓴 리뷰 개수(삭제 제외, 숨김 포함). */
+    fun countByUserId(userId: String): Long
 }

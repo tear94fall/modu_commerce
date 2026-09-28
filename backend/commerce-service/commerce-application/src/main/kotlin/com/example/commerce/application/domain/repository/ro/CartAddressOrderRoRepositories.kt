@@ -30,6 +30,14 @@ data class UserAmount(
     val amount: Long?,
 )
 
+/** 회원 한 명의 주문 상태별 개수·결제 금액 합·마지막 주문 시각(백오피스 회원 요약). */
+data class OrderStatusStat(
+    val status: OrderStatus,
+    val count: Long,
+    val paymentAmount: Long?,
+    val lastCreatedAt: LocalDateTime?,
+)
+
 interface OrderCustomRepository {
     /** 어드민 목록. 상태·주문번호(부분 일치)로 거른다. 최신부터. */
     fun searchAdminPage(
@@ -66,6 +74,16 @@ interface OrderRoRepository :
         @Param("from") from: LocalDateTime,
         @Param("to") to: LocalDateTime,
     ): List<UserAmount>
+
+    /** 회원 한 명의 주문을 상태별로 묶는다. 결제 금액은 상품 − 쿠폰 − 포인트. 주문이 없는 상태는 빠진다. */
+    @Query(
+        "select new com.example.commerce.application.domain.repository.ro.OrderStatusStat(o.status, count(o), " +
+            "sum(o.totalAmount - o.couponDiscount - o.pointAmount), max(o.createdAt)) " +
+            "from Order o where o.userId = :userId group by o.status",
+    )
+    fun statsByStatus(
+        @Param("userId") userId: String,
+    ): List<OrderStatusStat>
 
     /** 주문 줄 id 로 내 주문을 찾는다(리뷰 대상 확인). */
     @Query("select o from Order o join o.items i where i.id = :itemId and o.userId = :userId")
