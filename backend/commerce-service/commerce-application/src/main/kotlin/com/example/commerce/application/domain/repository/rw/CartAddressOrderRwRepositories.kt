@@ -13,6 +13,9 @@ import org.springframework.data.repository.query.Param
 import java.time.LocalDateTime
 
 interface CartItemRwRepository : RwRepository<CartItem, Long> {
+    /** 내 장바구니(최근 담은 것부터). 조회도 master 에서 한다 — CartQueryService 참고. */
+    fun findAllByUserIdOrderByIdDesc(userId: String): List<CartItem>
+
     fun findByUserIdAndSkuId(
         userId: String,
         skuId: Long,
@@ -31,6 +34,9 @@ interface CartItemRwRepository : RwRepository<CartItem, Long> {
 
 interface AddressRwRepository : RwRepository<Address, Long> {
     fun findAllByUserId(userId: String): List<Address>
+
+    /** 내 배송지(기본 먼저, 최근 것부터). 조회도 master 에서 한다 — AddressQueryService 참고. */
+    fun findAllByUserIdOrderByIsDefaultDescIdDesc(userId: String): List<Address>
 
     fun findByIdAndUserId(
         id: Long,

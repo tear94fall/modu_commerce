@@ -92,6 +92,11 @@ interface PushCampaignOpenRwRepository : RwRepository<PushCampaignOpen, Long> {
 }
 
 interface PushInboxItemRwRepository : RwRepository<PushInboxItem, Long> {
+    fun countByUserIdAndCreatedAtGreaterThanEqualAndReadAtIsNull(
+        userId: String,
+        since: LocalDateTime,
+    ): Long
+
     fun existsByIdAndUserId(
         id: Long,
         userId: String,

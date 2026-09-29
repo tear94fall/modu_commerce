@@ -8,6 +8,7 @@ import com.example.commerce.application.service.CustomerCommandService
 import com.example.commerce.application.service.CustomerQueryService
 import com.example.commerce.application.service.CustomerSummaryQueryService
 import com.example.commerce.application.service.TierCommandService
+import com.example.commerce.application.service.TierRunCommandService
 import com.example.commerce.application.service.TierRunService
 import com.example.commerce.application.service.above
 import com.example.commerce.application.service.tierFor
@@ -39,9 +40,12 @@ class MyCustomerUseCase(
     private val customerQueryService: CustomerQueryService,
     private val customerCommandService: CustomerCommandService,
 ) {
-    /** 가입(동의)한 고객만. 아니면 CustomerRequiredException. */
+    /**
+     * 가입(동의)한 고객만. 아니면 CustomerRequiredException. 앱은 이 응답으로 가입 화면을 띄울지 정하므로
+     * 고객 행은 master 에서 읽는다(가입 직후 다시 불러도 404 가 나지 않게). 등급표·누적 금액은 레플리카.
+     */
     @Transactional(transactionManager = "roTransactionManager", readOnly = true)
-    fun get(userId: String): CustomerMeResult = me(customerQueryService.agreed(userId))
+    fun get(userId: String): CustomerMeResult = me(customerCommandService.agreed(userId))
 
     /** 필수 약관 둘 다 동의해야 한다. */
     fun join(
@@ -51,8 +55,8 @@ class MyCustomerUseCase(
         marketing: Boolean,
     ): CustomerMeResult {
         require(agreeTerms && agreePrivacy) { "필수 약관(이용약관, 개인정보 수집·이용)에 모두 동의해 주세요." }
-        customerCommandService.join(userId, marketing)
-        return get(userId)
+        // 방금 쓴 고객 행으로 응답한다(레플리카에서 다시 읽으면 지연 동안 "가입 필요"가 나온다).
+        return me(customerCommandService.join(userId, marketing))
     }
 
     private fun me(c: Customer): CustomerMeResult {
@@ -101,14 +105,13 @@ class AdminTierUseCase(
     private val customerQueryService: CustomerQueryService,
     private val tierCommandService: TierCommandService,
     private val tierRunService: TierRunService,
+    private val tierRunCommandService: TierRunCommandService,
 ) {
     @Transactional(transactionManager = "roTransactionManager", readOnly = true)
     fun list(): List<AdminTierResult> = results(customerQueryService.tiers())
 
-    fun update(commands: List<TierCommand>): List<AdminTierResult> {
-        tierCommandService.update(commands)
-        return list()
-    }
+    /** 방금 저장한 등급(master)으로 응답한다. 레플리카에서 다시 읽으면 지연 동안 옛 설정이 보인다. */
+    fun update(commands: List<TierCommand>): List<AdminTierResult> = results(tierCommandService.update(commands))
 
     @Transactional(transactionManager = "roTransactionManager", readOnly = true)
     fun runs(
@@ -119,7 +122,7 @@ class AdminTierUseCase(
     /** 수동 산정을 시작하고 그 실행 행(지금 상태)을 돌려준다. */
     fun startRun(): TierRunResult {
         val id = tierRunService.startManual()
-        return TierRunResult.from(requireNotNull(customerQueryService.run(id)))
+        return TierRunResult.from(tierRunCommandService.find(id))
     }
 
     private fun results(tiers: List<Tier>): List<AdminTierResult> {

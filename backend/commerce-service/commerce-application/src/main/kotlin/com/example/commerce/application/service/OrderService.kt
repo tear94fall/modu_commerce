@@ -28,10 +28,11 @@ class OrderQueryService(
         size: Int,
     ): Page<Order> = orderRoRepository.findAllByUserIdOrderByIdDesc(userId, pageOf(page, size))
 
-    fun own(
+    /** 레플리카에 없으면 null — 방금 만든 주문일 수 있으니 부르는 쪽이 master 로 다시 본다([OrderCommandService.readOwn]). */
+    fun findOwn(
         userId: String,
         id: Long,
-    ): Order = orderRoRepository.findByIdAndUserId(id, userId) ?: throw notFound(id)
+    ): Order? = orderRoRepository.findByIdAndUserId(id, userId)
 
     fun adminPage(
         status: OrderStatus?,
@@ -103,6 +104,17 @@ class OrderCommandService(
         }
         return saved
     }
+
+    /**
+     * 내 주문을 master 에서 읽어 트랜잭션 안에서 [map] 한다(주문 줄 지연 로딩). 없거나 남의 것이면 404.
+     * 결제 직후 주문 상세로 넘어가면 레플리카에는 아직 주문이 없을 수 있어 그때 쓴다.
+     */
+    @Transactional(transactionManager = "rwTransactionManager", readOnly = true)
+    fun <T> readOwn(
+        userId: String,
+        orderId: Long,
+        map: (Order) -> T,
+    ): T = map(orderRwRepository.findByIdAndUserId(orderId, userId) ?: throw OrderQueryService.notFound(orderId))
 
     fun cancel(
         userId: String,

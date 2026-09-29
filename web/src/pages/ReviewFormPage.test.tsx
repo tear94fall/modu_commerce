@@ -80,7 +80,7 @@ describe('ReviewFormPage', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: '리뷰 삭제' }))
     await userEvent.click(screen.getByRole('dialog').querySelector('.actions button:last-child')!)
-    expect(del).toHaveBeenCalledWith(7)
+    expect(del).toHaveBeenCalledWith(7, expect.objectContaining({ productId: 5, orderItemId: 10 }))
     expect(await screen.findByText('내 리뷰 화면')).toBeInTheDocument()
   })
 })

@@ -1,8 +1,6 @@
 package com.example.commerce.application.domain.repository.ro
 
 import com.example.commerce.application.config.RoRepository
-import com.example.commerce.application.domain.entity.Address
-import com.example.commerce.application.domain.entity.CartItem
 import com.example.commerce.application.domain.entity.Order
 import com.example.commerce.application.domain.entity.OrderStatus
 import org.springframework.data.domain.Page
@@ -11,18 +9,7 @@ import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import java.time.LocalDateTime
 
-interface CartItemRoRepository : RoRepository<CartItem, Long> {
-    fun findAllByUserIdOrderByIdDesc(userId: String): List<CartItem>
-}
-
-interface AddressRoRepository : RoRepository<Address, Long> {
-    fun findAllByUserIdOrderByIsDefaultDescIdDesc(userId: String): List<Address>
-
-    fun findByIdAndUserId(
-        id: Long,
-        userId: String,
-    ): Address?
-}
+// 장바구니·배송지는 조회도 master 에서 한다(쓴 직후 다시 읽는 화면이라) — rw 저장소를 쓴다.
 
 /** 회원별 금액 한 줄(등급 기준 금액). */
 data class UserAmount(

@@ -84,6 +84,10 @@ class TierRunCommandService(
         return TierRecalcOutcome(month, targets)
     }
 
+    /** 방금 만든·도는 실행을 master 에서 읽는다(레플리카에는 아직 없을 수 있다). */
+    @Transactional(transactionManager = "rwTransactionManager", readOnly = true)
+    fun find(runId: Long): TierRun = tierRunRwRepository.findByIdOrNull(runId) ?: error("tier run $runId not found")
+
     fun finish(
         runId: Long,
         issued: Int,

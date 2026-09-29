@@ -1,6 +1,7 @@
-import type { ProductSummary } from './catalog'
-import type { CouponOffer } from './coupons'
+import { withRecentWish, type ProductSummary } from './catalog'
 import { api } from './client'
+import { withRecentOffers, type CouponOffer } from './coupons'
+import { RecentMap } from './recent'
 
 /** 기획전(상품 묶음) · 이벤트(출석 체크 또는 쿠폰). */
 export type PromotionType = 'EXHIBITION' | 'EVENT'
@@ -58,10 +59,31 @@ export interface AttendanceResult {
 
 export const getPromotionBanners = () => api<PromotionBanner[]>('/api-public/v1/promotions/banners')
 
-export const getPromotion = (id: number) => api<PromotionDetail>(`/api-public/v1/promotions/${id}`)
+/** 방금 한 출석(기획전 id → 출석 결과). 레플리카가 늦어도 다시 들어오면 '오늘 출석 완료'로 보인다. */
+const attended = new RecentMap<number, AttendanceResult>()
+
+function withRecentAttendance(id: number, a: AttendanceInfo | null): AttendanceInfo | null {
+  const r = attended.get(id)
+  if (!a || !r || r.checkedDate !== a.today || a.checkedToday) return a
+  const dates = [...new Set([...a.checkedDates, ...r.checkedDates, r.checkedDate])].sort()
+  return { ...a, checkedToday: true, checkedDates: dates }
+}
+
+/** 찜 · 받은 쿠폰 · 출석은 방금 한 쓰기를 덮는다(recent.ts). */
+export const getPromotion = (id: number) =>
+  api<PromotionDetail>(`/api-public/v1/promotions/${id}`).then((d) => ({
+    ...d,
+    products: d.products.map(withRecentWish),
+    coupons: d.coupons ? withRecentOffers(d.coupons) : d.coupons,
+    attendance: withRecentAttendance(id, d.attendance),
+  }))
 
 /** 409 = 오늘 이미 출석, 503 = 포인트 서비스 장애(출석도 기록되지 않음). */
-export const checkAttendance = (id: number) => api<AttendanceResult>(`/api-public/v1/promotions/${id}/attendance`, { method: 'POST' })
+export const checkAttendance = (id: number) =>
+  api<AttendanceResult>(`/api-public/v1/promotions/${id}/attendance`, { method: 'POST' }).then((r) => {
+    attended.set(id, r)
+    return r
+  })
 
 export const TYPE_LABELS: Record<PromotionType, string> = { EXHIBITION: '기획전', EVENT: '이벤트' }
 

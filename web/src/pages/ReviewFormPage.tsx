@@ -82,7 +82,7 @@ export default function ReviewFormPage() {
     if (reviewId === null || working) return
     setWorking(true)
     try {
-      await deleteReview(reviewId)
+      await deleteReview(reviewId, target ?? undefined)
       navigate('/my/reviews', { replace: true, state: { message: '리뷰를 삭제했습니다' } })
     } catch {
       setMessage('리뷰를 삭제하지 못했습니다')

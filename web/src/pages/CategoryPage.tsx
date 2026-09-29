@@ -92,7 +92,7 @@ function RootPane({ root }: { root: Category }) {
     if (!current) return
     const patch = (wished: boolean) => setPopular((list) => list.map((p) => (p.id === productId ? { ...p, wished } : p)))
     patch(!current.wished)
-    setWish(productId, !current.wished).catch(() => {
+    setWish(productId, !current.wished, current).catch(() => {
       patch(current.wished)
       setMessage('찜을 바꾸지 못했습니다.')
     })

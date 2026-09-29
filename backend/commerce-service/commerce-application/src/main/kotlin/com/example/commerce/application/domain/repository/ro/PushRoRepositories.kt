@@ -13,8 +13,6 @@ import org.springframework.data.repository.query.Param
 import java.time.LocalDateTime
 
 interface PushConsentRoRepository : RoRepository<PushConsent, String> {
-    fun findByUserId(userId: String): PushConsent?
-
     @Query("select count(c) from PushConsent c where c.marketing = true and (:night = false or c.night = true)")
     fun countConsented(
         @Param("night") night: Boolean,
@@ -63,9 +61,4 @@ interface PushInboxItemRoRepository : RoRepository<PushInboxItem, Long> {
         since: LocalDateTime,
         pageable: Pageable,
     ): Page<PushInboxItem>
-
-    fun countByUserIdAndCreatedAtGreaterThanEqualAndReadAtIsNull(
-        userId: String,
-        since: LocalDateTime,
-    ): Long
 }

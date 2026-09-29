@@ -11,6 +11,7 @@ import com.example.commerce.application.service.CouponCommandService
 import com.example.commerce.application.service.CouponIssueService
 import com.example.commerce.application.service.CouponQueryService
 import com.example.commerce.application.service.CouponUseService
+import com.example.commerce.application.service.PromotionCommandService
 import com.example.commerce.application.service.PromotionQueryService
 import com.example.commerce.application.usecase.command.CouponCommand
 import com.example.commerce.application.usecase.command.OrderLineCommand
@@ -81,6 +82,7 @@ class IssueCouponUseCase(
     private val couponIssueService: CouponIssueService,
     private val couponQueryService: CouponQueryService,
     private val promotionQueryService: PromotionQueryService,
+    private val promotionCommandService: PromotionCommandService,
 ) {
     fun download(
         userId: String,
@@ -100,7 +102,8 @@ class IssueCouponUseCase(
         userId: String,
         promotionId: Long,
     ): CouponClaimResult {
-        val promotion = promotionQueryService.visible(promotionId)
+        // 발급 전에 보는 조건(노출·진행 중·쿠폰 목록)이라 master 에서 읽는다(방금 숨기거나 끝낸 이벤트로 발급하지 않게).
+        val promotion = promotionCommandService.visible(promotionId)
         require(promotion.kind() == EventKind.COUPON) { "쿠폰 이벤트가 아닙니다." }
         require(promotion.statusOn(promotionQueryService.today()) == PromotionStatus.ONGOING) { "진행 중인 이벤트가 아닙니다." }
         val issued = mutableListOf<MyCouponResult>()
@@ -162,21 +165,21 @@ class AdminCouponUseCase(
     }
 
     @Transactional(transactionManager = "roTransactionManager", readOnly = true)
-    fun detail(id: Long): AdminCouponDetailResult {
-        val coupon = couponQueryService.find(id)
-        val summary = couponQueryService.adminSummaries(listOf(coupon)).single()
-        val targets = couponQueryService.scopeTargets(coupon).map { ScopeTargetResult(it.first, it.second) }
-        return AdminCouponDetailResult(summary, coupon.description, coupon.scopeIds.toList(), targets)
-    }
+    fun detail(id: Long): AdminCouponDetailResult = detailOf(couponQueryService.find(id))
 
-    fun create(command: CouponCommand): AdminCouponDetailResult = detail(requireNotNull(couponCommandService.create(command).id))
+    /** 방금 저장한 쿠폰(master 엔티티)으로 응답한다. 레플리카에서 다시 읽으면 지연 동안 404·옛값이 나온다. */
+    fun create(command: CouponCommand): AdminCouponDetailResult = detailOf(couponCommandService.create(command))
 
     fun update(
         id: Long,
         command: CouponCommand,
-    ): AdminCouponDetailResult {
-        couponCommandService.update(id, command)
-        return detail(id)
+    ): AdminCouponDetailResult = detailOf(couponCommandService.update(id, command))
+
+    /** 쿠폰 자체는 넘겨받은 엔티티, 사용 수·적용 대상 이름(쓰기와 상관없는 값)은 레플리카에서. */
+    private fun detailOf(coupon: Coupon): AdminCouponDetailResult {
+        val summary = couponQueryService.adminSummaries(listOf(coupon)).single()
+        val targets = couponQueryService.scopeTargets(coupon).map { ScopeTargetResult(it.first, it.second) }
+        return AdminCouponDetailResult(summary, coupon.description, coupon.scopeIds.toList(), targets)
     }
 
     fun delete(id: Long) = couponCommandService.delete(id)
@@ -199,7 +202,7 @@ class AdminCouponUseCase(
     ): CouponGrantResult {
         val ids = userIds.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
         require(ids.size in 1..100) { "지급할 회원을 1~100명 고르세요." }
-        couponQueryService.find(id)
+        // 쿠폰이 없으면 첫 발급(master 에서 쿠폰 행을 잠근다)이 404 를 던진다. 레플리카로 미리 보지 않는다(방금 만든 쿠폰이 없다고 나올 수 있다).
         var issued = 0
         val skipped = mutableListOf<SkippedUserResult>()
         ids.forEach { userId ->
