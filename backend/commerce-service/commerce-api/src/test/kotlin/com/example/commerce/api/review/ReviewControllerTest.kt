@@ -57,7 +57,7 @@ class ReviewControllerTest
             val addressId =
                 JsonPath.read<Int>(
                     mockMvc
-                        .post("/api/v1/addresses") {
+                        .post("/api-public/v1/addresses") {
                             with(user)
                             contentType = MediaType.APPLICATION_JSON
                             content =
@@ -68,7 +68,7 @@ class ReviewControllerTest
                 )
             val body =
                 mockMvc
-                    .post("/api/v1/orders") {
+                    .post("/api-public/v1/orders") {
                         with(user)
                         contentType = MediaType.APPLICATION_JSON
                         content = """{"addressId":$addressId,"items":[{"skuId":${support.skuId(productName, optionLabel)},"quantity":1}]}"""
@@ -82,7 +82,7 @@ class ReviewControllerTest
             orderItemId: Int,
             rating: Int,
             text: String,
-        ) = mockMvc.post("/api/v1/reviews") {
+        ) = mockMvc.post("/api-public/v1/reviews") {
             with(user)
             contentType = MediaType.APPLICATION_JSON
             content = """{"orderItemId":$orderItemId,"rating":$rating,"content":"$text"}"""
@@ -93,12 +93,12 @@ class ReviewControllerTest
             val productId = support.productId("모두 머그컵 세트")
             val (orderId, itemId) = orderItem(me, "모두 머그컵 세트")
 
-            mockMvc.get("/api/v1/reviews/targets/$itemId") { with(me) }.andExpect {
+            mockMvc.get("/api-public/v1/reviews/targets/$itemId") { with(me) }.andExpect {
                 status { isOk() }
                 jsonPath("$.reviewable") { value(true) }
                 jsonPath("$.productName") { value("모두 머그컵 세트") }
             }
-            mockMvc.get("/api/v1/reviews/targets/$itemId") { with(other) }.andExpect { status { isNotFound() } }
+            mockMvc.get("/api-public/v1/reviews/targets/$itemId") { with(other) }.andExpect { status { isNotFound() } }
 
             val reviewId =
                 JsonPath.read<Int>(
@@ -117,29 +117,29 @@ class ReviewControllerTest
             // 남의 주문 줄은 404
             write(other, itemId, 4, "남의 주문 줄에는 못 씁니다").andExpect { status { isNotFound() } }
 
-            mockMvc.get("/api/v1/products/$productId") { with(other) }.andExpect {
+            mockMvc.get("/api-public/v1/products/$productId") { with(other) }.andExpect {
                 jsonPath("$.reviewCount") { value(1) }
                 jsonPath("$.ratingAverage") { value(5.0) }
             }
-            mockMvc.get("/api/v1/products/$productId/reviews") { with(other) }.andExpect {
+            mockMvc.get("/api-public/v1/products/$productId/reviews") { with(other) }.andExpect {
                 status { isOk() }
                 jsonPath("$.totalElements") { value(1) }
                 jsonPath("$.content[0].authorName") { value("임*섭") }
                 jsonPath("$.content[0].authorEmail") { value(null) }
                 jsonPath("$.content[0].mine") { value(false) }
             }
-            mockMvc.get("/api/v1/products/$productId/reviews/summary") { with(other) }.andExpect {
+            mockMvc.get("/api-public/v1/products/$productId/reviews/summary") { with(other) }.andExpect {
                 jsonPath("$.count") { value(1) }
                 jsonPath("$.average") { value(5.0) }
                 jsonPath("$.distribution[0].rating") { value(5) }
                 jsonPath("$.distribution[0].count") { value(1) }
                 jsonPath("$.distribution[4].count") { value(0) }
             }
-            mockMvc.get("/api/v1/orders/$orderId") { with(me) }.andExpect {
+            mockMvc.get("/api-public/v1/orders/$orderId") { with(me) }.andExpect {
                 jsonPath("$.items[0].reviewId") { value(reviewId) }
                 jsonPath("$.items[0].reviewable") { value(false) }
             }
-            mockMvc.get("/api/v1/reviews/targets/$itemId") { with(me) }.andExpect {
+            mockMvc.get("/api-public/v1/reviews/targets/$itemId") { with(me) }.andExpect {
                 jsonPath("$.reviewable") { value(false) }
                 jsonPath("$.reviewId") { value(reviewId) }
             }
@@ -153,10 +153,10 @@ class ReviewControllerTest
             val id = JsonPath.read<Int>(write(me, mine, 5, "머그컵이 튼튼하고 색이 예뻐요").andReturn().response.contentAsString, "$.id")
             write(other, theirs, 3, "생각보다 작아요 그래도 괜찮아요").andExpect { status { isCreated() } }
 
-            mockMvc.get("/api/v1/products/$productId") { with(me) }.andExpect { jsonPath("$.ratingAverage") { value(4.0) } }
+            mockMvc.get("/api-public/v1/products/$productId") { with(me) }.andExpect { jsonPath("$.ratingAverage") { value(4.0) } }
 
             mockMvc
-                .put("/api/v1/reviews/$id") {
+                .put("/api-public/v1/reviews/$id") {
                     with(me)
                     contentType = MediaType.APPLICATION_JSON
                     content = """{"rating":1,"content":"쓰다 보니 손잡이가 깨졌어요"}"""
@@ -164,28 +164,28 @@ class ReviewControllerTest
                     status { isOk() }
                     jsonPath("$.rating") { value(1) }
                 }
-            mockMvc.get("/api/v1/products/$productId") { with(me) }.andExpect { jsonPath("$.ratingAverage") { value(2.0) } }
-            mockMvc.get("/api/v1/products/$productId/reviews?sort=high") { with(me) }.andExpect {
+            mockMvc.get("/api-public/v1/products/$productId") { with(me) }.andExpect { jsonPath("$.ratingAverage") { value(2.0) } }
+            mockMvc.get("/api-public/v1/products/$productId/reviews?sort=high") { with(me) }.andExpect {
                 jsonPath("$.content[0].rating") { value(3) }
                 jsonPath("$.content[1].rating") { value(1) }
             }
 
             // 남이 내 리뷰를 수정·삭제할 수는 없다
             mockMvc
-                .put("/api/v1/reviews/$id") {
+                .put("/api-public/v1/reviews/$id") {
                     with(other)
                     contentType = MediaType.APPLICATION_JSON
                     content = """{"rating":5,"content":"남의 리뷰를 고칠 수는 없어요"}"""
                 }.andExpect { status { isNotFound() } }
-            mockMvc.delete("/api/v1/reviews/$id") { with(other) }.andExpect { status { isNotFound() } }
+            mockMvc.delete("/api-public/v1/reviews/$id") { with(other) }.andExpect { status { isNotFound() } }
 
-            mockMvc.get("/api/v1/me/reviews") { with(me) }.andExpect {
+            mockMvc.get("/api-public/v1/me/reviews") { with(me) }.andExpect {
                 jsonPath("$.totalElements") { value(1) }
                 jsonPath("$.content[0].productName") { value("모두 머그컵 세트") }
             }
-            mockMvc.delete("/api/v1/reviews/$id") { with(me) }.andExpect { status { isNoContent() } }
-            mockMvc.get("/api/v1/me/reviews") { with(me) }.andExpect { jsonPath("$.totalElements") { value(0) } }
-            mockMvc.get("/api/v1/products/$productId") { with(me) }.andExpect {
+            mockMvc.delete("/api-public/v1/reviews/$id") { with(me) }.andExpect { status { isNoContent() } }
+            mockMvc.get("/api-public/v1/me/reviews") { with(me) }.andExpect { jsonPath("$.totalElements") { value(0) } }
+            mockMvc.get("/api-public/v1/products/$productId") { with(me) }.andExpect {
                 jsonPath("$.reviewCount") { value(1) }
                 jsonPath("$.ratingAverage") { value(3.0) }
             }
@@ -196,12 +196,12 @@ class ReviewControllerTest
             val (orderId, itemId) = orderItem(me, "모두 머그컵 세트")
             write(me, itemId, 5, "짧아요").andExpect { status { isBadRequest() } }
             write(me, itemId, 6, "별점이 범위를 벗어났습니다").andExpect { status { isBadRequest() } }
-            mockMvc.post("/api/v1/orders/$orderId/cancel") { with(me) }.andExpect { status { isOk() } }
+            mockMvc.post("/api-public/v1/orders/$orderId/cancel") { with(me) }.andExpect { status { isOk() } }
             write(me, itemId, 5, "취소한 주문에는 못 씁니다").andExpect {
                 status { isBadRequest() }
                 jsonPath("$.message") { value("취소된 주문의 상품에는 리뷰를 쓸 수 없습니다.") }
             }
-            mockMvc.get("/api/v1/reviews/targets/$itemId") { with(me) }.andExpect { jsonPath("$.reviewable") { value(false) } }
+            mockMvc.get("/api-public/v1/reviews/targets/$itemId") { with(me) }.andExpect { jsonPath("$.reviewable") { value(false) } }
         }
 
         @Test
@@ -228,9 +228,9 @@ class ReviewControllerTest
                     status { isOk() }
                     jsonPath("$.hidden") { value(true) }
                 }
-            mockMvc.get("/api/v1/products/$productId/reviews") { with(me) }.andExpect { jsonPath("$.totalElements") { value(0) } }
-            mockMvc.get("/api/v1/products/$productId") { with(me) }.andExpect { jsonPath("$.reviewCount") { value(0) } }
-            mockMvc.get("/api/v1/me/reviews") { with(other) }.andExpect {
+            mockMvc.get("/api-public/v1/products/$productId/reviews") { with(me) }.andExpect { jsonPath("$.totalElements") { value(0) } }
+            mockMvc.get("/api-public/v1/products/$productId") { with(me) }.andExpect { jsonPath("$.reviewCount") { value(0) } }
+            mockMvc.get("/api-public/v1/me/reviews") { with(other) }.andExpect {
                 jsonPath("$.content[0].hidden") { value(true) }
                 jsonPath("$.content[0].hiddenReason") { value("배송 문의는 고객센터로") }
             }
@@ -242,7 +242,7 @@ class ReviewControllerTest
                     contentType = MediaType.APPLICATION_JSON
                     content = """{"hidden":false}"""
                 }.andExpect { jsonPath("$.hidden") { value(false) } }
-            mockMvc.get("/api/v1/products/$productId") { with(me) }.andExpect {
+            mockMvc.get("/api-public/v1/products/$productId") { with(me) }.andExpect {
                 jsonPath("$.reviewCount") { value(1) }
                 jsonPath("$.ratingAverage") { value(2.0) }
             }
@@ -250,6 +250,6 @@ class ReviewControllerTest
             mockMvc.get("/api-admin/v1/reviews/$id") { with(admin) }.andExpect { jsonPath("$.content") { value("배송이 느리고 포장이 찢어져 왔어요") } }
             mockMvc.delete("/api-admin/v1/reviews/$id") { with(admin) }.andExpect { status { isNoContent() } }
             mockMvc.get("/api-admin/v1/reviews/$id") { with(admin) }.andExpect { status { isNotFound() } }
-            mockMvc.get("/api/v1/products/$productId") { with(me) }.andExpect { jsonPath("$.reviewCount") { value(0) } }
+            mockMvc.get("/api-public/v1/products/$productId") { with(me) }.andExpect { jsonPath("$.reviewCount") { value(0) } }
         }
     }

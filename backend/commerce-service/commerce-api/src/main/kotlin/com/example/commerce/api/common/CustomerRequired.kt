@@ -49,6 +49,6 @@ class CustomerRequiredConfig(
     private val customerRequiredInterceptor: CustomerRequiredInterceptor,
 ) : WebMvcConfigurer {
     override fun addInterceptors(registry: InterceptorRegistry) {
-        registry.addInterceptor(customerRequiredInterceptor).addPathPatterns("/api/**")
+        registry.addInterceptor(customerRequiredInterceptor).addPathPatterns("/api-public/**")
     }
 }

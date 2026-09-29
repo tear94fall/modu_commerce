@@ -73,13 +73,13 @@ class PromotionCacheTest
         @Test
         fun `banners and detail are served from the cache until the back office changes them`() {
             val id = exhibition("가을 기획전")
-            mockMvc.get("/api/v1/promotions/banners") { with(me) }.andExpect { jsonPath("$[0].title") { value("가을 기획전") } }
-            mockMvc.get("/api/v1/promotions/$id") { with(me) }.andExpect { jsonPath("$.title") { value("가을 기획전") } }
+            mockMvc.get("/api-public/v1/promotions/banners") { with(me) }.andExpect { jsonPath("$[0].title") { value("가을 기획전") } }
+            mockMvc.get("/api-public/v1/promotions/$id") { with(me) }.andExpect { jsonPath("$.title") { value("가을 기획전") } }
 
             // 백오피스를 거치지 않은 변경은 TTL 이 지날 때까지 캐시가 보여 준다(= 캐시에서 읽는다).
             jdbc.update("update promotions set title = '몰래 바꿈' where id = ?", id)
-            mockMvc.get("/api/v1/promotions/banners") { with(me) }.andExpect { jsonPath("$[0].title") { value("가을 기획전") } }
-            mockMvc.get("/api/v1/promotions/$id") { with(me) }.andExpect { jsonPath("$.title") { value("가을 기획전") } }
+            mockMvc.get("/api-public/v1/promotions/banners") { with(me) }.andExpect { jsonPath("$[0].title") { value("가을 기획전") } }
+            mockMvc.get("/api-public/v1/promotions/$id") { with(me) }.andExpect { jsonPath("$.title") { value("가을 기획전") } }
 
             // 백오피스 고치기는 배너·상세 캐시를 비운다.
             mockMvc
@@ -90,8 +90,8 @@ class PromotionCacheTest
                         """{"type":"EXHIBITION","title":"겨울 기획전","startDate":"2026-09-20","endDate":"2026-09-30","visible":true,
                            "productIds":[${support.productId("모두 스티커 팩")}]}"""
                 }.andExpect { status { isOk() } }
-            mockMvc.get("/api/v1/promotions/banners") { with(me) }.andExpect { jsonPath("$[0].title") { value("겨울 기획전") } }
-            mockMvc.get("/api/v1/promotions/$id") { with(me) }.andExpect {
+            mockMvc.get("/api-public/v1/promotions/banners") { with(me) }.andExpect { jsonPath("$[0].title") { value("겨울 기획전") } }
+            mockMvc.get("/api-public/v1/promotions/$id") { with(me) }.andExpect {
                 jsonPath("$.title") { value("겨울 기획전") }
                 jsonPath("$.products.length()") { value(1) }
             }
@@ -99,21 +99,21 @@ class PromotionCacheTest
 
         @Test
         fun `new, hidden and deleted promotions show up right away`() {
-            mockMvc.get("/api/v1/promotions/banners") { with(me) }.andExpect { jsonPath("$.length()") { value(0) } }
+            mockMvc.get("/api-public/v1/promotions/banners") { with(me) }.andExpect { jsonPath("$.length()") { value(0) } }
             val id = exhibition("새 기획전")
-            mockMvc.get("/api/v1/promotions/banners") { with(me) }.andExpect { jsonPath("$.length()") { value(1) } }
+            mockMvc.get("/api-public/v1/promotions/banners") { with(me) }.andExpect { jsonPath("$.length()") { value(1) } }
 
             mockMvc.delete("/api-admin/v1/promotions/$id") { with(admin) }.andExpect { status { isNoContent() } }
-            mockMvc.get("/api/v1/promotions/banners") { with(me) }.andExpect { jsonPath("$.length()") { value(0) } }
-            mockMvc.get("/api/v1/promotions/$id") { with(me) }.andExpect { status { isNotFound() } }
+            mockMvc.get("/api-public/v1/promotions/banners") { with(me) }.andExpect { jsonPath("$.length()") { value(0) } }
+            mockMvc.get("/api-public/v1/promotions/$id") { with(me) }.andExpect { status { isNotFound() } }
         }
 
         @Test
         fun `prices and sold-out are always fresh even when the promotion is cached`() {
             val id = exhibition("가격 기획전")
-            mockMvc.get("/api/v1/promotions/$id") { with(me) }.andExpect { jsonPath("$.products[0].price") { value(5000) } }
+            mockMvc.get("/api-public/v1/promotions/$id") { with(me) }.andExpect { jsonPath("$.products[0].price") { value(5000) } }
             jdbc.update("update products set price = 4500 where id = ?", support.productId("모두 스티커 팩"))
-            mockMvc.get("/api/v1/promotions/$id") { with(me) }.andExpect { jsonPath("$.products[0].price") { value(4500) } }
+            mockMvc.get("/api-public/v1/promotions/$id") { with(me) }.andExpect { jsonPath("$.products[0].price") { value(4500) } }
         }
 
         /** Redis 에는 JSON 으로 들어간다. 코틀린 data class·날짜·enum 이 그대로 돌아오는지(RedisCacheManager 와 같은 직렬화기). */

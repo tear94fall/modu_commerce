@@ -37,11 +37,11 @@ import java.net.URI
 @Tag(
     name = "리뷰 (앱)",
     description =
-        "커머스 웹/앱(웹뷰)이 같은 출처 /api 로 부른다(nginx → commerce-service). 모두 계정 토큰(aud modu-commerce) 필요. " +
+        "커머스 웹/앱(웹뷰)이 API 게이트웨이 /commerce-service/api-public/** 로 부른다(토큰은 게이트웨이가 보고 서비스가 다시 본다). 모두 계정 토큰(aud modu-commerce) 필요. " +
             "상품 리뷰 목록·요약은 커머스 가입 전에도 보고, 나머지는 모두의 커머스 가입(약관 동의) 필요, 아니면 403 CUSTOMER_REQUIRED.",
 )
 @RestController
-@RequestMapping("/api/v1")
+@RequestMapping("/api-public/v1")
 class ReviewController(
     private val getProductReviewsUseCase: GetProductReviewsUseCase,
     private val getReviewSummaryUseCase: GetReviewSummaryUseCase,
@@ -143,7 +143,7 @@ class ReviewController(
         @Valid @RequestBody request: WriteReviewRequest,
     ): ResponseEntity<ReviewResult> {
         val created = writeReviewUseCase.execute(jwt.userId(), request.toCommand())
-        return ResponseEntity.created(URI.create("/api/v1/reviews/${created.id}")).body(created)
+        return ResponseEntity.created(URI.create("/api-public/v1/reviews/${created.id}")).body(created)
     }
 
     @Operation(

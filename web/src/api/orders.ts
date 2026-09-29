@@ -114,18 +114,18 @@ export interface OrderLine {
 
 export const fullAddress = (a: { address1: string; address2: string | null }) => [a.address1, a.address2?.trim()].filter(Boolean).join(' ')
 
-export const getAddresses = () => api<Address[]>('/api/v1/addresses')
-export const createAddress = (input: AddressInput) => api<Address>('/api/v1/addresses', { method: 'POST', body: JSON.stringify(input) })
-export const updateAddress = (id: number, input: AddressInput) => api<Address>(`/api/v1/addresses/${id}`, { method: 'PUT', body: JSON.stringify(input) })
-export const setDefaultAddress = (id: number) => api<Address>(`/api/v1/addresses/${id}/default`, { method: 'PUT' })
-export const deleteAddress = (id: number) => api<void>(`/api/v1/addresses/${id}`, { method: 'DELETE' })
+export const getAddresses = () => api<Address[]>('/api-public/v1/addresses')
+export const createAddress = (input: AddressInput) => api<Address>('/api-public/v1/addresses', { method: 'POST', body: JSON.stringify(input) })
+export const updateAddress = (id: number, input: AddressInput) => api<Address>(`/api-public/v1/addresses/${id}`, { method: 'PUT', body: JSON.stringify(input) })
+export const setDefaultAddress = (id: number) => api<Address>(`/api-public/v1/addresses/${id}/default`, { method: 'PUT' })
+export const deleteAddress = (id: number) => api<void>(`/api-public/v1/addresses/${id}`, { method: 'DELETE' })
 
 /** userCouponId 는 내 사용 가능 쿠폰(없으면 null). 쿠폰이 안 맞으면 400 과 까닭. */
 export const createOrder = (addressId: number, items: OrderLine[], cartItemIds: number[], usePoints = 0, userCouponId: number | null = null) =>
-  api<OrderDetail>('/api/v1/orders', {
+  api<OrderDetail>('/api-public/v1/orders', {
     method: 'POST',
     body: JSON.stringify({ addressId, items, cartItemIds, usePoints, ...(userCouponId !== null ? { userCouponId } : {}) }),
   })
-export const getOrders = (page = 0, size = 20) => api<Page<OrderSummary>>(`/api/v1/orders?page=${page}&size=${size}`)
-export const getOrder = (id: number) => api<OrderDetail>(`/api/v1/orders/${id}`)
-export const cancelOrder = (id: number) => api<OrderDetail>(`/api/v1/orders/${id}/cancel`, { method: 'POST' })
+export const getOrders = (page = 0, size = 20) => api<Page<OrderSummary>>(`/api-public/v1/orders?page=${page}&size=${size}`)
+export const getOrder = (id: number) => api<OrderDetail>(`/api-public/v1/orders/${id}`)
+export const cancelOrder = (id: number) => api<OrderDetail>(`/api-public/v1/orders/${id}/cancel`, { method: 'POST' })

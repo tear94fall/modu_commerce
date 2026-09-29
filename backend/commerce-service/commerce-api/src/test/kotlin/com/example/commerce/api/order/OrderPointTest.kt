@@ -48,7 +48,7 @@ class OrderPointTest
         private fun addressId(): Int =
             JsonPath.read(
                 mockMvc
-                    .post("/api/v1/addresses") {
+                    .post("/api-public/v1/addresses") {
                         with(me)
                         contentType = MediaType.APPLICATION_JSON
                         content = """{"recipient":"임준섭","phone":"010-1234-5678","zipCode":"06236","address1":"서울 강남구","address2":null}"""
@@ -58,7 +58,7 @@ class OrderPointTest
             )
 
         private fun order(usePoints: Long) =
-            mockMvc.post("/api/v1/orders") {
+            mockMvc.post("/api-public/v1/orders") {
                 with(me)
                 contentType = MediaType.APPLICATION_JSON
                 content =
@@ -80,12 +80,12 @@ class OrderPointTest
             val orderNo = JsonPath.read<String>(body, "$.orderNo")
             verify(pointGateway).spend(eq("11"), eq(3_000L), eq("order:$orderNo"), eq("주문 결제 $orderNo"))
 
-            mockMvc.get("/api/v1/orders") { with(me) }.andExpect {
+            mockMvc.get("/api-public/v1/orders") { with(me) }.andExpect {
                 jsonPath("$.content[0].pointAmount") { value(3_000) }
                 jsonPath("$.content[0].paymentAmount") { value(15_000) }
             }
 
-            mockMvc.post("/api/v1/orders/$orderId/cancel") { with(me) }.andExpect { status { isOk() } }
+            mockMvc.post("/api-public/v1/orders/$orderId/cancel") { with(me) }.andExpect { status { isOk() } }
             verify(pointGateway).refund(eq("11"), eq(3_000L), eq("refund:order:$orderNo"), eq("주문 취소 $orderNo"))
         }
 
@@ -126,7 +126,7 @@ class OrderPointTest
                 status { isBadRequest() }
                 jsonPath("$.message") { value("포인트가 부족합니다. 잔액을 확인해 주세요.") }
             }
-            mockMvc.get("/api/v1/orders") { with(me) }.andExpect { jsonPath("$.totalElements") { value(0) } }
+            mockMvc.get("/api-public/v1/orders") { with(me) }.andExpect { jsonPath("$.totalElements") { value(0) } }
             org.junit.jupiter.api.Assertions
                 .assertEquals(support.stockOf("모두 머그컵 세트"), support.stockOf("모두 머그컵 세트"))
         }

@@ -26,7 +26,7 @@ class MyPointControllerTest
         fun `토큰의 사용자로 잔액을 조회한다`() {
             given(pointClient.balance("11")).willReturn(PointBalance("11", 580))
 
-            mockMvc.get("/api/v1/me/points") { with(me) }.andExpect {
+            mockMvc.get("/api-public/v1/me/points") { with(me) }.andExpect {
                 status { isOk() }
                 jsonPath("$.balance") { value(580) }
             }
@@ -36,7 +36,7 @@ class MyPointControllerTest
         fun `원장은 페이지 크기를 1~100 으로 자른다`() {
             given(pointClient.history("11", 0, 100)).willReturn(PointHistoryPage(emptyList(), 0, 0, 0, 100))
 
-            mockMvc.get("/api/v1/me/points/history?page=-3&size=500") { with(me) }.andExpect {
+            mockMvc.get("/api-public/v1/me/points/history?page=-3&size=500") { with(me) }.andExpect {
                 status { isOk() }
                 jsonPath("$.totalElements") { value(0) }
             }
@@ -46,7 +46,7 @@ class MyPointControllerTest
         fun `포인트 서비스를 못 부르면 503`() {
             given(pointClient.balance("11")).willThrow(PointUnavailableException())
 
-            mockMvc.get("/api/v1/me/points") { with(me) }.andExpect {
+            mockMvc.get("/api-public/v1/me/points") { with(me) }.andExpect {
                 status { isServiceUnavailable() }
                 jsonPath("$.message") { value("포인트 서비스에 연결할 수 없습니다.") }
             }
@@ -54,6 +54,6 @@ class MyPointControllerTest
 
         @Test
         fun `토큰이 없으면 401`() {
-            mockMvc.get("/api/v1/me/points").andExpect { status { isUnauthorized() } }
+            mockMvc.get("/api-public/v1/me/points").andExpect { status { isUnauthorized() } }
         }
     }

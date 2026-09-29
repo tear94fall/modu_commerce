@@ -46,7 +46,7 @@ class AdminCategoryControllerTest
                     }.andReturn()
                     .response.contentAsString
             val id = JsonPath.read<Int>(body, "$.id")
-            mockMvc.get("/api/v1/categories") { with(jwt().jwt { it.subject("11") }) }.andExpect {
+            mockMvc.get("/api-public/v1/categories") { with(jwt().jwt { it.subject("11") }) }.andExpect {
                 jsonPath("$[?(@.id == $id)].icon") { value("⛺") }
                 jsonPath("$[?(@.name == '문구')].icon") { value("✏️") }
             }

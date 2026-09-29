@@ -69,7 +69,7 @@ class PurchaseEarnTest
             val addressId =
                 JsonPath.read<Int>(
                     mockMvc
-                        .post("/api/v1/addresses") {
+                        .post("/api-public/v1/addresses") {
                             with(me)
                             contentType = MediaType.APPLICATION_JSON
                             content = """{"recipient":"임준섭","phone":"010-1234-5678","zipCode":"06236","address1":"서울 강남구"}"""
@@ -79,7 +79,7 @@ class PurchaseEarnTest
                 )
             val body =
                 mockMvc
-                    .post("/api/v1/orders") {
+                    .post("/api-public/v1/orders") {
                         with(me)
                         contentType = MediaType.APPLICATION_JSON
                         content =
@@ -106,25 +106,25 @@ class PurchaseEarnTest
         fun `배송 완료되면 지금 등급 적립률로 적립하고 주문에 남긴다`() {
             tier("GOLD")
             val (id, no) = order()
-            mockMvc.get("/api/v1/orders/$id") { with(me) }.andExpect {
+            mockMvc.get("/api-public/v1/orders/$id") { with(me) }.andExpect {
                 jsonPath("$.expectedEarn.points") { value(540) }
                 jsonPath("$.expectedEarn.rate") { value(3) }
                 jsonPath("$.earn") { doesNotExist() }
             }
             status(id, "SHIPPING")
-            mockMvc.get("/api/v1/orders") { with(me) }.andExpect { jsonPath("$.content[0].expectedEarn.points") { value(540) } }
+            mockMvc.get("/api-public/v1/orders") { with(me) }.andExpect { jsonPath("$.content[0].expectedEarn.points") { value(540) } }
             verify(pointGateway, never()).earnAmount(any(), any(), any(), anyOrNull())
 
             status(id, "DELIVERED")
             verify(pointGateway).earnAmount(eq("11"), eq(540L), eq("purchase:order:$id"), eq("구매 적립 · 주문 $no (골드 3%)"))
-            mockMvc.get("/api/v1/orders/$id") { with(me) }.andExpect {
+            mockMvc.get("/api-public/v1/orders/$id") { with(me) }.andExpect {
                 jsonPath("$.earn.status") { value("DONE") }
                 jsonPath("$.earn.points") { value(540) }
                 jsonPath("$.earn.rate") { value(3) }
                 jsonPath("$.expectedEarn") { doesNotExist() }
                 jsonPath("$.deliveredAt") { exists() }
             }
-            mockMvc.get("/api/v1/orders") { with(me) }.andExpect { jsonPath("$.content[0].earn.status") { value("DONE") } }
+            mockMvc.get("/api-public/v1/orders") { with(me) }.andExpect { jsonPath("$.content[0].earn.status") { value("DONE") } }
 
             // 다시 불려도(같은 주문) 또 적립하지 않는다.
             purchaseEarnService.earn(id.toLong())
@@ -149,7 +149,7 @@ class PurchaseEarnTest
 
             tier("VIP")
             val (vip, _) = order()
-            mockMvc.get("/api/v1/orders/$vip") { with(me) }.andExpect { jsonPath("$.expectedEarn.points") { value(900) } }
+            mockMvc.get("/api-public/v1/orders/$vip") { with(me) }.andExpect { jsonPath("$.expectedEarn.points") { value(900) } }
         }
 
         @Test
@@ -158,7 +158,7 @@ class PurchaseEarnTest
             val (id, _) = order()
             status(id, "SHIPPING")
             status(id, "DELIVERED")
-            mockMvc.get("/api/v1/orders/$id") { with(me) }.andExpect {
+            mockMvc.get("/api-public/v1/orders/$id") { with(me) }.andExpect {
                 jsonPath("$.earn.status") { value("PENDING") }
                 jsonPath("$.earn.points") { value(180) }
             }
@@ -168,7 +168,7 @@ class PurchaseEarnTest
             whenever(pointGateway.earnAmount(any(), any(), any(), anyOrNull())).thenReturn(PointEarnResult(applied = true, amount = 180))
             assertThat(purchaseEarnService.retryPending()).isEqualTo(1)
             verify(pointGateway, times(3)).earnAmount(eq("11"), eq(180L), eq("purchase:order:$id"), anyOrNull())
-            mockMvc.get("/api/v1/orders/$id") { with(me) }.andExpect { jsonPath("$.earn.status") { value("DONE") } }
+            mockMvc.get("/api-public/v1/orders/$id") { with(me) }.andExpect { jsonPath("$.earn.status") { value("DONE") } }
             assertThat(purchaseEarnService.retryPending()).isZero()
         }
 
@@ -179,13 +179,13 @@ class PurchaseEarnTest
             val (dup, _) = order()
             status(dup, "SHIPPING")
             status(dup, "DELIVERED")
-            mockMvc.get("/api/v1/orders/$dup") { with(me) }.andExpect { jsonPath("$.earn.status") { value("DONE") } }
+            mockMvc.get("/api-public/v1/orders/$dup") { with(me) }.andExpect { jsonPath("$.earn.status") { value("DONE") } }
 
             whenever(pointGateway.earnAmount(any(), any(), any(), anyOrNull())).thenThrow(PointEarnRejectedException("bad"))
             val (bad, _) = order()
             status(bad, "SHIPPING")
             status(bad, "DELIVERED")
-            mockMvc.get("/api/v1/orders/$bad") { with(me) }.andExpect { jsonPath("$.earn.status") { value("FAILED") } }
+            mockMvc.get("/api-public/v1/orders/$bad") { with(me) }.andExpect { jsonPath("$.earn.status") { value("FAILED") } }
             assertThat(purchaseEarnService.retryPending()).isZero()
         }
 

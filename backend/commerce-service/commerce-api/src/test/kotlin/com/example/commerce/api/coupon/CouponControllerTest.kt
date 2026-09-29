@@ -80,7 +80,7 @@ class CouponControllerTest
         private fun myCouponId(user: RequestPostProcessor = me): Int =
             JsonPath.read(
                 mockMvc
-                    .get("/api/v1/me/coupons") { with(user) }
+                    .get("/api-public/v1/me/coupons") { with(user) }
                     .andReturn()
                     .response.contentAsString,
                 "$[0].id",
@@ -94,7 +94,7 @@ class CouponControllerTest
             val addressId =
                 JsonPath.read<Int>(
                     postJson(
-                        "/api/v1/addresses",
+                        "/api-public/v1/addresses",
                         me,
                         """{"recipient":"임준섭","phone":"010-1234-5678","zipCode":"06236","address1":"서울 강남구","address2":null}""",
                     ).andReturn().response.contentAsString,
@@ -102,7 +102,7 @@ class CouponControllerTest
                 )
             val items = names.joinToString(",") { """{"skuId":${support.skuId(it)},"quantity":1}""" }
             return postJson(
-                "/api/v1/orders",
+                "/api-public/v1/orders",
                 me,
                 """{"addressId":$addressId,"items":[$items],"usePoints":$usePoints,"userCouponId":${couponId ?: "null"}}""",
             )
@@ -111,30 +111,30 @@ class CouponControllerTest
         @Test
         fun `download, duplicate, count and code redeem`() {
             val id = welcome()
-            mockMvc.get("/api/v1/coupons/downloadable") { with(me) }.andExpect {
+            mockMvc.get("/api-public/v1/coupons/downloadable") { with(me) }.andExpect {
                 jsonPath("$[0].couponId") { value(id) }
                 jsonPath("$[0].scopeLabel") { value("전체 상품") }
                 jsonPath("$[0].expiryLabel") { value("받은 날부터 7일") }
                 jsonPath("$[0].downloaded") { value(false) }
             }
-            mockMvc.post("/api/v1/coupons/$id/download") { with(me) }.andExpect {
+            mockMvc.post("/api-public/v1/coupons/$id/download") { with(me) }.andExpect {
                 status { isOk() }
                 jsonPath("$.status") { value("AVAILABLE") }
                 jsonPath("$.source") { value("DOWNLOAD") }
                 jsonPath("$.expiresOn") { value("2026-10-01") }
             }
-            mockMvc.post("/api/v1/coupons/$id/download") { with(me) }.andExpect {
+            mockMvc.post("/api-public/v1/coupons/$id/download") { with(me) }.andExpect {
                 status { isConflict() }
                 jsonPath("$.message") { value("이미 받은 쿠폰입니다.") }
             }
-            mockMvc.get("/api/v1/me/coupons/count") { with(me) }.andExpect { jsonPath("$.available") { value(1) } }
-            mockMvc.get("/api/v1/coupons/downloadable") { with(me) }.andExpect { jsonPath("$[0].downloaded") { value(true) } }
+            mockMvc.get("/api-public/v1/me/coupons/count") { with(me) }.andExpect { jsonPath("$.available") { value(1) } }
+            mockMvc.get("/api-public/v1/coupons/downloadable") { with(me) }.andExpect { jsonPath("$[0].downloaded") { value(true) } }
 
-            postJson("/api/v1/coupons/redeem", other, """{"code":" welcome3000 "}""").andExpect {
+            postJson("/api-public/v1/coupons/redeem", other, """{"code":" welcome3000 "}""").andExpect {
                 status { isOk() }
                 jsonPath("$.source") { value("CODE") }
             }
-            postJson("/api/v1/coupons/redeem", other, """{"code":"NOPE1234"}""").andExpect {
+            postJson("/api-public/v1/coupons/redeem", other, """{"code":"NOPE1234"}""").andExpect {
                 status { isNotFound() }
                 jsonPath("$.message") { value("쿠폰 코드를 확인해 주세요.") }
             }
@@ -143,22 +143,22 @@ class CouponControllerTest
         @Test
         fun `quantity, issue period and downloadable are enforced`() {
             val id = welcome(quantity = "1")
-            mockMvc.post("/api/v1/coupons/$id/download") { with(me) }.andExpect { status { isOk() } }
-            mockMvc.post("/api/v1/coupons/$id/download") { with(other) }.andExpect {
+            mockMvc.post("/api-public/v1/coupons/$id/download") { with(me) }.andExpect { status { isOk() } }
+            mockMvc.post("/api-public/v1/coupons/$id/download") { with(other) }.andExpect {
                 status { isBadRequest() }
                 jsonPath("$.message") { value("쿠폰이 모두 소진되었습니다.") }
             }
-            mockMvc.get("/api/v1/coupons/downloadable") { with(other) }.andExpect { jsonPath("$[0].soldOut") { value(true) } }
+            mockMvc.get("/api-public/v1/coupons/downloadable") { with(other) }.andExpect { jsonPath("$[0].soldOut") { value(true) } }
 
             val later = welcome(code = "LATER3000")
             clock.today = LocalDate.of(2026, 10, 1)
-            mockMvc.post("/api/v1/coupons/$later/download") { with(other) }.andExpect {
+            mockMvc.post("/api-public/v1/coupons/$later/download") { with(other) }.andExpect {
                 status { isBadRequest() }
                 jsonPath("$.message") { value("쿠폰을 받을 수 있는 기간이 아닙니다.") }
             }
             // 7일짜리를 9/25 에 받았으니 10/2 부터 만료
             clock.today = LocalDate.of(2026, 10, 2)
-            mockMvc.get("/api/v1/me/coupons?status=EXPIRED") { with(me) }.andExpect { jsonPath("$.length()") { value(1) } }
+            mockMvc.get("/api-public/v1/me/coupons?status=EXPIRED") { with(me) }.andExpect { jsonPath("$.length()") { value(1) } }
         }
 
         @Test
@@ -170,11 +170,11 @@ class CouponControllerTest
                        "scopeIds":[${support.categoryId("문구")}],"issueStart":"2026-09-01","issueEnd":"2026-09-30",
                        "validUntil":"2026-10-31","downloadable":true,"active":true}""",
                 )
-            mockMvc.post("/api/v1/coupons/$fixed/download") { with(me) }
-            mockMvc.post("/api/v1/coupons/$stationery/download") { with(me) }
+            mockMvc.post("/api-public/v1/coupons/$fixed/download") { with(me) }
+            mockMvc.post("/api-public/v1/coupons/$stationery/download") { with(me) }
 
             val sticker = support.skuId("모두 스티커 팩")
-            postJson("/api/v1/coupons/applicable", me, """{"items":[{"skuId":$sticker,"quantity":1}]}""").andExpect {
+            postJson("/api-public/v1/coupons/applicable", me, """{"items":[{"skuId":$sticker,"quantity":1}]}""").andExpect {
                 status { isOk() }
                 jsonPath("$[0].name") { value("문구 10%") }
                 jsonPath("$[0].discount") { value(500) }
@@ -184,7 +184,7 @@ class CouponControllerTest
             }
 
             val applicable =
-                postJson("/api/v1/coupons/applicable", me, """{"items":[{"skuId":${support.skuId("모두 다이어리 2027")},"quantity":1}]}""")
+                postJson("/api-public/v1/coupons/applicable", me, """{"items":[{"skuId":${support.skuId("모두 다이어리 2027")},"quantity":1}]}""")
                     .andReturn()
                     .response.contentAsString
             val fixedUserCoupon = JsonPath.read<List<Int>>(applicable, "$[?(@.name == '웰컴 3천원')].id")[0]
@@ -204,15 +204,19 @@ class CouponControllerTest
                         jsonPath("$.paymentAmount") { value(10000) }
                     }.andReturn()
                     .response.contentAsString
-            mockMvc.get("/api/v1/me/coupons?status=USED") { with(me) }.andExpect { jsonPath("$[0].name") { value("웰컴 3천원") } }
+            mockMvc.get("/api-public/v1/me/coupons?status=USED") { with(me) }.andExpect { jsonPath("$[0].name") { value("웰컴 3천원") } }
             order(fixedUserCoupon, "모두 다이어리 2027").andExpect {
                 status { isBadRequest() }
                 jsonPath("$.message") { value("이미 사용했거나 기한이 지난 쿠폰입니다.") }
             }
 
             val orderId = JsonPath.read<Int>(body, "$.id")
-            mockMvc.post("/api/v1/orders/$orderId/cancel") { with(me) }.andExpect { status { isOk() } }
-            mockMvc.get("/api/v1/me/coupons") { with(me) }.andExpect { jsonPath("$[?(@.name == '웰컴 3천원')].status") { value("AVAILABLE") } }
+            mockMvc.post("/api-public/v1/orders/$orderId/cancel") { with(me) }.andExpect { status { isOk() } }
+            mockMvc
+                .get(
+                    "/api-public/v1/me/coupons",
+                ) { with(me) }
+                .andExpect { jsonPath("$[?(@.name == '웰컴 3천원')].status") { value("AVAILABLE") } }
 
             // 다른 사람 쿠폰은 못 쓴다
             order(myCouponId(me), "모두 다이어리 2027").andExpect { status { isCreated() } }
@@ -238,22 +242,22 @@ class CouponControllerTest
                         .response.contentAsString,
                     "$.id",
                 )
-            mockMvc.get("/api/v1/promotions/$event") { with(me) }.andExpect {
+            mockMvc.get("/api-public/v1/promotions/$event") { with(me) }.andExpect {
                 jsonPath("$.eventKind") { value("COUPON") }
                 jsonPath("$.attendance") { doesNotExist() }
                 jsonPath("$.coupons.length()") { value(2) }
                 jsonPath("$.coupons[1].downloaded") { value(false) }
             }
-            mockMvc.post("/api/v1/coupons/$b/download") { with(me) }.andExpect { status { isBadRequest() } }
+            mockMvc.post("/api-public/v1/coupons/$b/download") { with(me) }.andExpect { status { isBadRequest() } }
 
-            mockMvc.post("/api/v1/promotions/$event/coupons") { with(me) }.andExpect {
+            mockMvc.post("/api-public/v1/promotions/$event/coupons") { with(me) }.andExpect {
                 status { isOk() }
                 jsonPath("$.issued.length()") { value(2) }
                 jsonPath("$.issued[1].source") { value("EVENT") }
                 jsonPath("$.alreadyHad") { value(0) }
             }
-            mockMvc.post("/api/v1/promotions/$event/coupons") { with(me) }.andExpect { status { isConflict() } }
-            mockMvc.post("/api/v1/promotions/$event/attendance") { with(me) }.andExpect { status { isBadRequest() } }
+            mockMvc.post("/api-public/v1/promotions/$event/coupons") { with(me) }.andExpect { status { isConflict() } }
+            mockMvc.post("/api-public/v1/promotions/$event/attendance") { with(me) }.andExpect { status { isBadRequest() } }
 
             mockMvc.get("/api-admin/v1/promotions/$event") { with(admin) }.andExpect {
                 jsonPath("$.eventKind") { value("COUPON") }

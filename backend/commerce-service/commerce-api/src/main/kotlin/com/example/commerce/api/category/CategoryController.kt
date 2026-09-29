@@ -11,10 +11,12 @@ import org.springframework.web.bind.annotation.RestController
 
 @Tag(
     name = "카테고리 (앱)",
-    description = "커머스 웹/앱(웹뷰)이 같은 출처 /api 로 부른다(nginx → commerce-service). 모두 계정 토큰(aud modu-commerce) 필요. 둘러보기라 커머스 가입 전에도 부를 수 있다.",
+    description =
+        "커머스 웹/앱(웹뷰)이 API 게이트웨이 /commerce-service/api-public/** 로 부른다(토큰은 게이트웨이가 보고 서비스가 다시 본다). " +
+            "모두 계정 토큰(aud modu-commerce) 필요. 둘러보기라 커머스 가입 전에도 부를 수 있다.",
 )
 @RestController
-@RequestMapping("/api/v1/categories")
+@RequestMapping("/api-public/v1/categories")
 class CategoryController(
     private val getCategoriesUseCase: GetCategoriesUseCase,
 ) {

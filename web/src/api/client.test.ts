@@ -25,7 +25,7 @@ describe('api', () => {
     window.ModuApp = fakeBridge()
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(json(200, { ok: 1 }))
 
-    await expect(api<{ ok: number }>('/api/v1/cart')).resolves.toEqual({ ok: 1 })
+    await expect(api<{ ok: number }>('/api-public/v1/cart')).resolves.toEqual({ ok: 1 })
     const headers = fetchMock.mock.calls[0][1]?.headers as Headers
     expect(headers.get('Authorization')).toBe('Bearer app-token')
   })
@@ -34,7 +34,7 @@ describe('api', () => {
     setToken('web-token')
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(json(200, []))
 
-    await api('/api/v1/categories')
+    await api('/api-public/v1/categories')
     expect((fetchMock.mock.calls[0][1]?.headers as Headers).get('Authorization')).toBe('Bearer web-token')
   })
 
@@ -45,7 +45,7 @@ describe('api', () => {
       .mockResolvedValueOnce(new Response('', { status: 401 }))
       .mockResolvedValueOnce(json(200, { ok: true }))
 
-    await expect(api('/api/v1/cart')).resolves.toEqual({ ok: true })
+    await expect(api('/api-public/v1/cart')).resolves.toEqual({ ok: true })
     expect(fetchMock).toHaveBeenCalledTimes(2)
     expect((fetchMock.mock.calls[1][1]?.headers as Headers).get('Authorization')).toBe('Bearer fresh-token')
   })
@@ -55,14 +55,14 @@ describe('api', () => {
     window.ModuApp = fakeBridge({ refreshAccessToken: () => '', onSessionExpired })
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: 401 }))
 
-    await expect(api('/api/v1/cart')).rejects.toMatchObject({ status: 401 })
+    await expect(api('/api-public/v1/cart')).rejects.toMatchObject({ status: 401 })
     expect(onSessionExpired).toHaveBeenCalledTimes(1)
   })
 
   it('exposes the server message of a 400 body', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(json(400, { message: '수량은 1 이상이어야 합니다' }))
 
-    const err = await api('/api/v1/cart/items', { method: 'POST', body: '{}' }).catch((e: unknown) => e)
+    const err = await api('/api-public/v1/cart/items', { method: 'POST', body: '{}' }).catch((e: unknown) => e)
     expect(err).toBeInstanceOf(ApiError)
     expect((err as ApiError).message).toBe('수량은 1 이상이어야 합니다')
     expect(serverMessage('not json')).toBeUndefined()
@@ -70,7 +70,7 @@ describe('api', () => {
 
   it('returns undefined for an empty 204', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }))
-    await expect(api('/api/v1/wishlist/3', { method: 'DELETE' })).resolves.toBeUndefined()
+    await expect(api('/api-public/v1/wishlist/3', { method: 'DELETE' })).resolves.toBeUndefined()
   })
 
   it('calls the customer-required handler only for 403 CUSTOMER_REQUIRED', async () => {
@@ -79,14 +79,14 @@ describe('api', () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch')
     try {
       fetchMock.mockResolvedValueOnce(json(403, { message: '모두의 커머스 가입이 필요합니다', code: 'CUSTOMER_REQUIRED' }))
-      const err = await api('/api/v1/cart').catch((e: unknown) => e)
+      const err = await api('/api-public/v1/cart').catch((e: unknown) => e)
       expect(err).toMatchObject({ status: 403, message: '모두의 커머스 가입이 필요합니다' })
       expect(handler).toHaveBeenCalledOnce()
 
       fetchMock.mockResolvedValueOnce(json(403, { message: '권한이 없습니다' }))
-      await api('/api/v1/cart').catch(() => {})
+      await api('/api-public/v1/cart').catch(() => {})
       fetchMock.mockResolvedValueOnce(json(403, { code: 'CUSTOMER_REQUIRED' }))
-      await api('/api/v1/cart', { quiet: true }).catch(() => {})
+      await api('/api-public/v1/cart', { quiet: true }).catch(() => {})
       expect(handler).toHaveBeenCalledOnce()
     } finally {
       off()

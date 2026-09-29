@@ -91,7 +91,7 @@ class AdminProductControllerTest
 
             mockMvc.delete("/api-admin/v1/products/$id") { with(admin) }.andExpect { status { isNoContent() } }
             mockMvc.get("/api-admin/v1/products/$id") { with(admin) }.andExpect { status { isNotFound() } }
-            mockMvc.get("/api/v1/products/$id") { with(jwt()) }.andExpect { status { isNotFound() } }
+            mockMvc.get("/api-public/v1/products/$id") { with(jwt()) }.andExpect { status { isNotFound() } }
             mockMvc.delete("/api-admin/v1/products/$id") { with(admin) }.andExpect { status { isNotFound() } }
         }
 
@@ -145,7 +145,7 @@ class AdminProductControllerTest
 
             // 앱 상세에서도 같은 구조로 보인다
             mockMvc
-                .get("/api/v1/products/$id") { with(jwt()) }
+                .get("/api-public/v1/products/$id") { with(jwt()) }
                 .andExpect {
                     status { isOk() }
                     jsonPath("$.skus.length()") { value(3) }

@@ -55,6 +55,16 @@ spring:
       repositories:
         enabled: false
 
+# modu_platform 의 discovery-service 에 등록한다. defaultZone(http://discovery-service:8761/eureka/)은 config-service 공통 설정이 내려준다.
+# 메신저 서비스와 같게 instance-id 만 서비스 이름으로 두고 호스트는 기본값(컨테이너 호스트 이름, modu-infra 에서 풀린다)을 쓴다.
+# 게이트웨이가 lb://COMMERCE-SERVICE 로 /commerce-service/api-public/** 와 /commerce-service/api-admin/** 를 넘긴다.
+eureka:
+  instance:
+    instance-id: commerce-service
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+
 modu:
   oauth:
     # 모두의 채팅 auth-service. 커머스 앱이 SSO 로 받은 modu-commerce 토큰을 여기 JWKS 로 검증한다.

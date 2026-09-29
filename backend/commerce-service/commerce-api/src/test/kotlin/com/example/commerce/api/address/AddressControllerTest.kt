@@ -31,7 +31,7 @@ class AddressControllerTest
         fun reseed() = support.reseed()
 
         private fun create(body: String) =
-            mockMvc.post("/api/v1/addresses") {
+            mockMvc.post("/api-public/v1/addresses") {
                 with(me)
                 contentType = MediaType.APPLICATION_JSON
                 content = body
@@ -58,15 +58,15 @@ class AddressControllerTest
                     "$.id",
                 )
 
-            mockMvc.put("/api/v1/addresses/$office/default") { with(me) }.andExpect { jsonPath("$.isDefault") { value(true) } }
-            mockMvc.get("/api/v1/addresses") { with(me) }.andExpect {
+            mockMvc.put("/api-public/v1/addresses/$office/default") { with(me) }.andExpect { jsonPath("$.isDefault") { value(true) } }
+            mockMvc.get("/api-public/v1/addresses") { with(me) }.andExpect {
                 jsonPath("$.length()") { value(2) }
                 jsonPath("$[0].id") { value(office) }
                 jsonPath("$[1].isDefault") { value(false) }
             }
 
             mockMvc
-                .put("/api/v1/addresses/$home") {
+                .put("/api-public/v1/addresses/$home") {
                     with(me)
                     contentType = MediaType.APPLICATION_JSON
                     content = """{"recipient":"임","phone":"010-1234-5678","zipCode":"06236","address1":"서울 강남구 테헤란로","isDefault":true}"""
@@ -76,12 +76,12 @@ class AddressControllerTest
                 }
 
             // 기본을 지우면 남은 것 중 최근 것이 기본이 된다
-            mockMvc.delete("/api/v1/addresses/$home") { with(me) }.andExpect { status { isNoContent() } }
-            mockMvc.get("/api/v1/addresses") { with(me) }.andExpect {
+            mockMvc.delete("/api-public/v1/addresses/$home") { with(me) }.andExpect { status { isNoContent() } }
+            mockMvc.get("/api-public/v1/addresses") { with(me) }.andExpect {
                 jsonPath("$.length()") { value(1) }
                 jsonPath("$[0].isDefault") { value(true) }
             }
-            mockMvc.delete("/api/v1/addresses/$home") { with(me) }.andExpect { status { isNotFound() } }
+            mockMvc.delete("/api-public/v1/addresses/$home") { with(me) }.andExpect { status { isNotFound() } }
         }
 
         @Test

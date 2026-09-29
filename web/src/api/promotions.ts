@@ -56,12 +56,12 @@ export interface AttendanceResult {
   checkedDates: string[]
 }
 
-export const getPromotionBanners = () => api<PromotionBanner[]>('/api/v1/promotions/banners')
+export const getPromotionBanners = () => api<PromotionBanner[]>('/api-public/v1/promotions/banners')
 
-export const getPromotion = (id: number) => api<PromotionDetail>(`/api/v1/promotions/${id}`)
+export const getPromotion = (id: number) => api<PromotionDetail>(`/api-public/v1/promotions/${id}`)
 
 /** 409 = 오늘 이미 출석, 503 = 포인트 서비스 장애(출석도 기록되지 않음). */
-export const checkAttendance = (id: number) => api<AttendanceResult>(`/api/v1/promotions/${id}/attendance`, { method: 'POST' })
+export const checkAttendance = (id: number) => api<AttendanceResult>(`/api-public/v1/promotions/${id}/attendance`, { method: 'POST' })
 
 export const TYPE_LABELS: Record<PromotionType, string> = { EXHIBITION: '기획전', EVENT: '이벤트' }
 

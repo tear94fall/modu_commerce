@@ -56,6 +56,10 @@ class SecurityConfig {
                 }
             }.build()
 
+    /**
+     * 앱 API(`/api-public/` 아래)와 나머지. 앱은 API 게이트웨이 `/commerce-service/api-public/` 로 부르고
+     * 게이트웨이가 토큰(ROLE_USER, aud=modu-commerce)을 본 뒤 넘긴다. 여기서도 같은 토큰을 JWKS 로 다시 검증한다.
+     */
     @Bean
     @Order(2)
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain =
@@ -64,7 +68,7 @@ class SecurityConfig {
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .authorizeHttpRequests {
                 // 등급 안내는 로그인 전에도 볼 수 있다.
-                it.requestMatchers(HttpMethod.GET, "/api/v1/tiers").permitAll()
+                it.requestMatchers(HttpMethod.GET, "/api-public/v1/tiers").permitAll()
                 // API 문서. 서비스 포트는 도커 네트워크 안에서만 열리고 외부 접근은 게이트웨이가 막는다.
                 it.requestMatchers(*API_DOCS_PATHS).permitAll()
                 it.anyRequest().authenticated()

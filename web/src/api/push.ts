@@ -10,11 +10,11 @@ export interface PushConsent {
   nightUpdatedAt: string | null
 }
 
-export const getPushConsent = () => api<PushConsent>('/api/v1/me/push/consent')
+export const getPushConsent = () => api<PushConsent>('/api-public/v1/me/push/consent')
 
 /** 바뀐 항목의 updatedAt 만 새로 찍힌다. */
 export const updatePushConsent = (body: { marketing: boolean; night: boolean }) =>
-  api<PushConsent>('/api/v1/me/push/consent', { method: 'PUT', body: JSON.stringify(body) })
+  api<PushConsent>('/api-public/v1/me/push/consent', { method: 'PUT', body: JSON.stringify(body) })
 
 /** 알림함 한 줄. 받은 푸시(광고) 한 건. receivedAt 은 UTC 이고 시간대 표시가 없다. */
 export interface NotificationItem {
@@ -30,11 +30,11 @@ export interface NotificationItem {
 }
 
 /** 최근 30일, 최신순. */
-export const getNotifications = (page = 0, size = 20) => api<Page<NotificationItem> & { size: number }>(`/api/v1/me/notifications?page=${page}&size=${size}`)
+export const getNotifications = (page = 0, size = 20) => api<Page<NotificationItem> & { size: number }>(`/api-public/v1/me/notifications?page=${page}&size=${size}`)
 
 /** 상단바 뱃지용. 가입 전(403)이어도 가입 화면으로 보내지 않는다. */
-export const getUnreadNotificationCount = () => api<{ unread: number }>('/api/v1/me/notifications/unread-count', { quiet: true }).then((r) => r.unread)
+export const getUnreadNotificationCount = () => api<{ unread: number }>('/api-public/v1/me/notifications/unread-count', { quiet: true }).then((r) => r.unread)
 
-export const markNotificationRead = (id: number) => api<void>(`/api/v1/me/notifications/${id}/read`, { method: 'POST' })
+export const markNotificationRead = (id: number) => api<void>(`/api-public/v1/me/notifications/${id}/read`, { method: 'POST' })
 
-export const markAllNotificationsRead = () => api<void>('/api/v1/me/notifications/read-all', { method: 'POST' })
+export const markAllNotificationsRead = () => api<void>('/api-public/v1/me/notifications/read-all', { method: 'POST' })

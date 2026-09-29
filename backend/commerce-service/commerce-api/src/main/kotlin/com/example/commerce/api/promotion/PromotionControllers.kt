@@ -46,11 +46,11 @@ import java.time.LocalDate
 @Tag(
     name = "기획전·이벤트 (앱)",
     description =
-        "커머스 웹/앱(웹뷰)이 같은 출처 /api 로 부른다(nginx → commerce-service). 모두 계정 토큰(aud modu-commerce) 필요. " +
+        "커머스 웹/앱(웹뷰)이 API 게이트웨이 /commerce-service/api-public/** 로 부른다(토큰은 게이트웨이가 보고 서비스가 다시 본다). 모두 계정 토큰(aud modu-commerce) 필요. " +
             "배너·상세는 커머스 가입 전에도 보고, 출석 체크는 모두의 커머스 가입(약관 동의) 필요, 아니면 403 CUSTOMER_REQUIRED.",
 )
 @RestController
-@RequestMapping("/api/v1/promotions")
+@RequestMapping("/api-public/v1/promotions")
 class PromotionController(
     private val getPromotionBannersUseCase: GetPromotionBannersUseCase,
     private val getPromotionUseCase: GetPromotionUseCase,
