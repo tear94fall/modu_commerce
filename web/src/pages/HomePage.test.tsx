@@ -102,7 +102,7 @@ describe('HomePage', () => {
 
     const button = await screen.findByRole('button', { name: '찜' })
     await userEvent.click(button)
-    expect(setWish).toHaveBeenCalledWith(1, true)
+    expect(setWish).toHaveBeenCalledWith(1, true, expect.objectContaining({ id: 1 }))
     expect(await screen.findByText('찜을 바꾸지 못했습니다.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '찜' })).toHaveAttribute('aria-pressed', 'false')
   })

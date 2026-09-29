@@ -4,9 +4,10 @@ import com.example.commerce.application.domain.entity.EventKind
 import com.example.commerce.application.domain.entity.Promotion
 import com.example.commerce.application.domain.entity.PromotionStatus
 import com.example.commerce.application.domain.entity.PromotionType
-import com.example.commerce.application.domain.repository.ro.PromotionRoRepository
+import com.example.commerce.application.domain.repository.rw.PromotionRwRepository
 import com.example.commerce.application.usecase.result.PromotionBannerResult
 import org.springframework.cache.annotation.Cacheable
+import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
@@ -76,14 +77,17 @@ data class PromotionSnapshot(
  * 키 식은 파라미터 이름 대신 위치(#p0)를 쓴다. 코틀린은 기본으로 파라미터 이름을 클래스 파일에 남기지 않는다.
  */
 @Service
-@Transactional(transactionManager = "roTransactionManager", readOnly = true)
+@Transactional(transactionManager = "rwTransactionManager", readOnly = true)
 class PromotionCacheService(
-    private val promotionRoRepository: PromotionRoRepository,
+    private val promotionRwRepository: PromotionRwRepository,
 ) {
+    // 캐시를 채우는 읽기는 master 로 한다. 백오피스 변경 직후 캐시가 비워졌을 때 레플리카(아직 옛값)에서 채우면
+    // 그 옛값이 TTL 내내 남는다. 캐시 미스 때만 부르니 master 부담은 작다.
+
     @Cacheable(cacheNames = [PromotionCaches.BANNERS], key = "#p0.toString()")
-    fun banners(today: LocalDate): List<PromotionBannerResult> = promotionRoRepository.findBanners(today).map(PromotionBannerResult::from)
+    fun banners(today: LocalDate): List<PromotionBannerResult> = promotionRwRepository.findBanners(today).map(PromotionBannerResult::from)
 
     /** 없거나 지운 것은 null(캐시하지 않는다). 노출 여부는 호출하는 쪽이 본다. */
     @Cacheable(cacheNames = [PromotionCaches.PROMOTION], key = "#p0", unless = "#result == null")
-    fun snapshot(id: Long): PromotionSnapshot? = promotionRoRepository.findById(id)?.let(PromotionSnapshot::from)
+    fun snapshot(id: Long): PromotionSnapshot? = promotionRwRepository.findByIdOrNull(id)?.let(PromotionSnapshot::from)
 }

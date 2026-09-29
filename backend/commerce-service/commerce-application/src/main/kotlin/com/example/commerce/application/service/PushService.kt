@@ -43,6 +43,7 @@ import java.sql.Timestamp
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDateTime
 import javax.sql.DataSource
 
 /** 예약 상태가 아니라 취소할 수 없다(409). */
@@ -94,13 +95,17 @@ class PushDeviceService(
     fun deleteTokens(tokens: Collection<String>): Int = if (tokens.isEmpty()) 0 else pushDeviceRwRepository.deleteTokens(tokens)
 }
 
+/**
+ * 내 수신 동의 조회는 master 에서 한다(읽기 전용 트랜잭션). 가입(혜택 알림 동의)·설정 변경 직후 알림 설정 화면이 다시 읽는데,
+ * 레플리카 지연 동안 옛 동의(꺼짐)가 보이면 사용자가 다시 켜려다 두 번 바꾸게 된다. 한 사람의 한 줄 조회라 부담은 작다.
+ */
 @Service
-@Transactional(transactionManager = "roTransactionManager", readOnly = true)
+@Transactional(transactionManager = "rwTransactionManager", readOnly = true)
 class PushConsentQueryService(
-    private val pushConsentRoRepository: PushConsentRoRepository,
+    private val pushConsentRwRepository: PushConsentRwRepository,
 ) {
     fun get(userId: String): PushConsentResult =
-        pushConsentRoRepository.findByUserId(userId)?.let(PushConsentResult::from) ?: PushConsentResult.DEFAULT
+        pushConsentRwRepository.findByIdOrNull(userId)?.let(PushConsentResult::from) ?: PushConsentResult.DEFAULT
 }
 
 @Service
@@ -229,6 +234,8 @@ class PushCampaignCommandService(
 
     fun claim(id: Long): Boolean = pushCampaignRwRepository.claim(id) == 1
 
+    /** master 에서 읽는다(보내기 단계, 만들기·취소 응답). */
+    @Transactional(transactionManager = "rwTransactionManager", readOnly = true)
     fun find(id: Long): PushCampaign = pushCampaignRwRepository.findByIdOrNull(id) ?: throw PushCampaignQueryService.notFound(id)
 
     fun started(
@@ -408,6 +415,14 @@ class PushInboxCommandService(
         pushInboxItemRwRepository.markAllRead(userId, PushRules.utc(clock.instant()))
     }
 
+    /**
+     * 상단바 뱃지의 안 읽은 수. master 에서 센다 — 알림을 눌러 읽음으로 바꾼 직후(또는 새 푸시를 받은 직후) 뱃지가 다시 세는데
+     * 레플리카 지연 동안 옛 수가 보이면 읽은 알림이 그대로 남아 보인다. 한 사람의 30일치 count 라 부담은 작다.
+     */
+    @Transactional(transactionManager = "rwTransactionManager", readOnly = true)
+    fun unread(userId: String): Long =
+        pushInboxItemRwRepository.countByUserIdAndCreatedAtGreaterThanEqualAndReadAtIsNull(userId, PushInboxQueryService.since(clock))
+
     /** 알림을 눌러 열었으면 그 캠페인의 내 줄도 읽음으로(없으면 그만). */
     fun markCampaignRead(
         userId: String,
@@ -452,12 +467,13 @@ class PushInboxQueryService(
         return PageImpl(content, pageable, items.totalElements)
     }
 
-    fun unread(userId: String): Long = pushInboxItemRoRepository.countByUserIdAndCreatedAtGreaterThanEqualAndReadAtIsNull(userId, since())
-
-    private fun since() = PushRules.utc(clock.instant().minus(KEEP))
+    private fun since() = since(clock)
 
     companion object {
         const val MAX_SIZE = 50
         private val KEEP: Duration = Duration.ofDays(30)
+
+        /** 알림함에 보이는 가장 오래된 받은 시각(UTC). */
+        fun since(clock: Clock): LocalDateTime = PushRules.utc(clock.instant().minus(KEEP))
     }
 }

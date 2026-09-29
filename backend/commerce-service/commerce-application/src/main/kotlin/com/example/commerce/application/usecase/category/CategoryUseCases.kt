@@ -1,6 +1,7 @@
 package com.example.commerce.application.usecase.category
 
 import com.example.commerce.application.domain.entity.Category
+import com.example.commerce.application.domain.repository.rw.CategoryRwRepository
 import com.example.commerce.application.domain.repository.rw.ProductRwRepository
 import com.example.commerce.application.service.CategoryCommandService
 import com.example.commerce.application.service.CategoryQueryService
@@ -17,15 +18,20 @@ class GetCategoriesUseCase(
     fun execute(): List<CategoryResult> = CategoryResult.tree(categoryQueryService.findAll())
 }
 
-/** 어드민 트리. 상품 수는 master 에서 센다(방금 등록한 상품이 바로 보이게). */
+/**
+ * 어드민 트리. 카테고리도 상품 수도 master 에서 읽는다 — 백오피스는 카테고리·상품을 바꾼 직후 이 트리를 다시 읽으므로
+ * (방금 만든 카테고리·등록한 상품이 바로 보이게). 백오피스만 부르는 조회라 master 부담은 작다.
+ */
 @Component
 class GetAdminCategoriesUseCase(
-    private val categoryQueryService: CategoryQueryService,
+    private val categoryRwRepository: CategoryRwRepository,
     private val productRwRepository: ProductRwRepository,
 ) {
-    @Transactional(transactionManager = "roTransactionManager", readOnly = true)
+    @Transactional(transactionManager = "rwTransactionManager", readOnly = true)
     fun execute(): List<CategoryResult> =
-        CategoryResult.tree(categoryQueryService.findAll()) { productRwRepository.countByCategory(requireNotNull(it.id)) }
+        CategoryResult.tree(categoryRwRepository.findAllByOrderBySortOrderAscIdAsc()) {
+            productRwRepository.countByCategory(requireNotNull(it.id))
+        }
 }
 
 /** 등록·수정 응답은 자식 없는 노드 하나다. */

@@ -1,5 +1,7 @@
 import type { Page } from './catalog'
 import { api } from './client'
+import { forgetCouponsOfOrder, rememberCouponUsed } from './coupons'
+import { withRecentReviewState } from './reviews'
 
 export interface Address {
   id: number
@@ -125,7 +127,17 @@ export const createOrder = (addressId: number, items: OrderLine[], cartItemIds: 
   api<OrderDetail>('/api-public/v1/orders', {
     method: 'POST',
     body: JSON.stringify({ addressId, items, cartItemIds, usePoints, ...(userCouponId !== null ? { userCouponId } : {}) }),
+  }).then((o) => {
+    if (userCouponId !== null) rememberCouponUsed(userCouponId, o.id)
+    return o
   })
 export const getOrders = (page = 0, size = 20) => api<Page<OrderSummary>>(`/api-public/v1/orders?page=${page}&size=${size}`)
-export const getOrder = (id: number) => api<OrderDetail>(`/api-public/v1/orders/${id}`)
-export const cancelOrder = (id: number) => api<OrderDetail>(`/api-public/v1/orders/${id}/cancel`, { method: 'POST' })
+/** 줄마다 방금 쓴·지운 리뷰를 반영한다(레플리카가 늦어도 '리뷰 쓰기'가 다시 뜨지 않는다). */
+export const getOrder = (id: number) => api<OrderDetail>(`/api-public/v1/orders/${id}`).then(withRecentReviews)
+export const cancelOrder = (id: number) =>
+  api<OrderDetail>(`/api-public/v1/orders/${id}/cancel`, { method: 'POST' }).then((o) => {
+    forgetCouponsOfOrder(id)
+    return withRecentReviews(o)
+  })
+
+const withRecentReviews = (o: OrderDetail): OrderDetail => ({ ...o, items: o.items.map((i) => withRecentReviewState(i, o.status === 'CANCELLED')) })

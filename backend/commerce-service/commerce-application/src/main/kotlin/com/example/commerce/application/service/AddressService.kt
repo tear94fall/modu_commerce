@@ -1,19 +1,22 @@
 package com.example.commerce.application.service
 
 import com.example.commerce.application.domain.entity.Address
-import com.example.commerce.application.domain.repository.ro.AddressRoRepository
 import com.example.commerce.application.domain.repository.rw.AddressRwRepository
 import com.example.commerce.application.usecase.command.AddressCommand
 import jakarta.persistence.EntityNotFoundException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
+/**
+ * 배송지 목록은 master 에서 읽는다(읽기 전용 트랜잭션). 앱이 배송지를 등록·수정·삭제한 직후 목록을 다시 읽고,
+ * 결제 화면은 방금 등록한 배송지를 그 목록에서 고른다 — 레플리카 지연으로 빠지면 결제를 못 한다. 한 사람의 몇 줄이다.
+ */
 @Service
-@Transactional(transactionManager = "roTransactionManager", readOnly = true)
+@Transactional(transactionManager = "rwTransactionManager", readOnly = true)
 class AddressQueryService(
-    private val addressRoRepository: AddressRoRepository,
+    private val addressRwRepository: AddressRwRepository,
 ) {
-    fun all(userId: String): List<Address> = addressRoRepository.findAllByUserIdOrderByIsDefaultDescIdDesc(userId)
+    fun all(userId: String): List<Address> = addressRwRepository.findAllByUserIdOrderByIsDefaultDescIdDesc(userId)
 }
 
 /** 기본 배송지는 항상 하나다. 첫 배송지는 자동으로 기본이 되고, 기본을 지우면 가장 최근 것이 기본이 된다. */

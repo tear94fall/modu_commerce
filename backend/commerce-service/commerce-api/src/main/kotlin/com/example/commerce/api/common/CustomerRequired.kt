@@ -1,6 +1,6 @@
 package com.example.commerce.api.common
 
-import com.example.commerce.application.service.CustomerQueryService
+import com.example.commerce.application.service.CustomerCommandService
 import com.example.commerce.application.service.CustomerRequiredException
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -23,10 +23,13 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 @Retention(AnnotationRetention.RUNTIME)
 annotation class CustomerRequired
 
-/** [CustomerRequired] 검사. 예외는 GlobalExceptionHandler 가 403 으로 바꾼다. */
+/**
+ * [CustomerRequired] 검사. 예외는 GlobalExceptionHandler 가 403 으로 바꾼다.
+ * 가입 여부는 master 에서 본다 — 가입 직후 바로 부르는 API 가 레플리카 지연으로 403 을 받으면 앱이 가입 화면을 다시 띄운다.
+ */
 @Component
 class CustomerRequiredInterceptor(
-    private val customerQueryService: CustomerQueryService,
+    private val customerCommandService: CustomerCommandService,
 ) : HandlerInterceptor {
     override fun preHandle(
         request: HttpServletRequest,
@@ -35,7 +38,7 @@ class CustomerRequiredInterceptor(
     ): Boolean {
         if (handler !is HandlerMethod || !required(handler)) return true
         val jwt = SecurityContextHolder.getContext().authentication?.principal as? Jwt ?: throw CustomerRequiredException()
-        if (!customerQueryService.isAgreed(jwt.userId())) throw CustomerRequiredException()
+        if (!customerCommandService.isAgreed(jwt.userId())) throw CustomerRequiredException()
         return true
     }
 

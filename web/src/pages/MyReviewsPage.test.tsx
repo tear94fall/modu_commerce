@@ -30,7 +30,7 @@ describe('MyReviewsPage', () => {
 
     await userEvent.click(screen.getAllByRole('button', { name: '삭제' })[1])
     await userEvent.click(screen.getByRole('dialog').querySelector('.actions button:last-child')!)
-    expect(del).toHaveBeenCalledWith(2)
+    expect(del).toHaveBeenCalledWith(2, expect.objectContaining({ id: 2 }))
     expect(screen.queryByText('숨겨진 두 번째 리뷰입니다')).not.toBeInTheDocument()
     expect(await screen.findByText('리뷰를 삭제했습니다')).toBeInTheDocument()
   })

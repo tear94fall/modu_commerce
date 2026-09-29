@@ -133,6 +133,14 @@ class PromotionCommandService(
         promotion.delete(LocalDateTime.now(clock))
     }
 
+    /** master 에서 읽는다. 방금 만든·고친 것을 응답할 때, 쓰기 전에 조건을 볼 때. 지운 것은 없는 것으로 본다. */
+    @Transactional(transactionManager = "rwTransactionManager", readOnly = true)
+    fun find(id: Long): Promotion = promotionRwRepository.findByIdOrNull(id) ?: throw PromotionQueryService.notFound(id)
+
+    /** 앱에 노출 중인 것(master). 노출이 꺼졌으면 없는 것으로 본다. */
+    @Transactional(transactionManager = "rwTransactionManager", readOnly = true)
+    fun visible(id: Long): Promotion = find(id).takeIf { it.visible } ?: throw PromotionQueryService.notFound(id)
+
     private fun apply(
         promotion: Promotion,
         c: PromotionCommand,

@@ -99,7 +99,7 @@ describe('ProductDetailPage', () => {
     renderPage()
 
     await userEvent.click(await screen.findByRole('button', { name: '찜' }))
-    expect(setWish).toHaveBeenCalledWith(5, true)
+    expect(setWish).toHaveBeenCalledWith(5, true, expect.objectContaining({ id: 5, wished: true }))
     expect(screen.getByRole('button', { name: '찜 해제' })).toHaveTextContent('3')
   })
 

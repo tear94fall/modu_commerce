@@ -72,10 +72,7 @@ class CustomerQueryService(
         return tiers.firstOrNull { it.code == customer.tierCode } ?: tiers.minByOrNull { it.minAmount }
     }
 
-    fun isAgreed(userId: String): Boolean = find(userId)?.isAgreed() ?: false
-
-    /** 가입(동의)한 고객. 아니면 [CustomerRequiredException]. */
-    fun agreed(userId: String): Customer = find(userId)?.takeIf { it.isAgreed() } ?: throw CustomerRequiredException()
+    // 가입 여부 확인(가드·GET /me/customer)은 레플리카 지연에 흔들리면 안 돼 CustomerCommandService(master)에 있다.
 
     fun findAll(userIds: Collection<String>): List<Customer> =
         if (userIds.isEmpty()) emptyList() else customerRoRepository.findAllByUserIdIn(userIds)
@@ -174,6 +171,18 @@ class CustomerCommandService(
         logger.info { "commerce customer $userId joined (tier ${tier.code}, basis $basis, migrated=${customer.migrated})" }
         return saved
     }
+
+    /**
+     * 가입(동의) 여부를 master 에서 본다. 가입 직후 부르는 API 의 가입 확인([CustomerRequiredException] 가드)이
+     * 레플리카 지연 때문에 "가입 필요"로 튕기지 않게 한다. PK 한 건 조회라 master 부담은 작다.
+     */
+    @Transactional(transactionManager = "rwTransactionManager", readOnly = true)
+    fun isAgreed(userId: String): Boolean = customerRwRepository.findByIdOrNull(userId)?.isAgreed() ?: false
+
+    /** 가입(동의)한 고객(master). 아니면 [CustomerRequiredException]. 앱이 가입 여부로 화면을 가르는 조회에 쓴다. */
+    @Transactional(transactionManager = "rwTransactionManager", readOnly = true)
+    fun agreed(userId: String): Customer =
+        customerRwRepository.findByIdOrNull(userId)?.takeIf { it.isAgreed() } ?: throw CustomerRequiredException()
 
     /** 모두 계정 탈퇴. 고객은 WITHDRAWN 으로 두고(주문 등은 남는다) 푸시 기기·동의를 지운다. 없는 고객이어도 그만. */
     fun withdraw(userId: String) {

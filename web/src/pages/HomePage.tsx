@@ -51,7 +51,7 @@ export default function HomePage() {
       pager.toggleWish(productId).then(() => {})
       return
     }
-    setWish(productId, next).catch(() => {
+    setWish(productId, next, current).catch(() => {
       patch(!next)
       setMessage('찜을 바꾸지 못했습니다.')
     })

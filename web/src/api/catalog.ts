@@ -1,4 +1,5 @@
 import { api } from './client'
+import { CountHint, insertMissing, RecentMap } from './recent'
 
 export interface Category {
   id: number
@@ -105,17 +106,57 @@ export function categoryPath(roots: Category[], id: number): Category[] {
 
 export const getCategories = () => api<Category[]>('/api-public/v1/categories')
 
+// ---- 방금 누른 찜(복제 지연 덮개, recent.ts) ----
+
+/** 상품 id → 찜 여부와(찜했으면) 그때 본 카드. 요청을 보낼 때 기억하고, 실패하면 지운다. */
+const wishes = new RecentMap<number, { wished: boolean; product: ProductSummary | null }>()
+/** 마이 탭 '찜 N'. */
+const wishTotal = new CountHint()
+
+/** 목록·상세의 찜 표시를 방금 누른 값으로. */
+export function withRecentWish<T extends { id: number; wished: boolean }>(p: T): T {
+  const w = wishes.get(p.id)
+  return w === undefined || w.wished === p.wished ? p : { ...p, wished: w.wished }
+}
+
+const withRecentWishes = <T extends { id: number; wished: boolean }>(page: Page<T>): Page<T> => ({ ...page, content: page.content.map(withRecentWish) })
+
 export function getProducts({ categoryId, q, sort, page = 0, size = PAGE_SIZE }: ProductQuery) {
   const params = new URLSearchParams({ page: String(page), size: String(size) })
   if (categoryId !== undefined) params.set('categoryId', String(categoryId))
   if (q) params.set('q', q)
   if (sort) params.set('sort', sort)
-  return api<Page<ProductSummary>>(`/api-public/v1/products?${params}`)
+  return api<Page<ProductSummary>>(`/api-public/v1/products?${params}`).then(withRecentWishes)
 }
 
-export const getProduct = (id: number) => api<ProductDetail>(`/api-public/v1/products/${id}`)
+export const getProduct = (id: number) =>
+  api<ProductDetail>(`/api-public/v1/products/${id}`).then((d) => {
+    const next = withRecentWish(d)
+    return next === d ? d : { ...next, wishCount: Math.max(0, d.wishCount + (next.wished ? 1 : -1)) }
+  })
 
-export const getWishlist = (page = 0, size = PAGE_SIZE) => api<Page<ProductSummary>>(`/api-public/v1/wishlist?page=${page}&size=${size}`)
+/** 방금 뺀 찜은 빼고, 방금 한 찜이 첫 장에 없으면 맨 앞에 끼운다(찜한 순서 최신 순). */
+export const getWishlist = (page = 0, size = PAGE_SIZE) =>
+  api<Page<ProductSummary>>(`/api-public/v1/wishlist?page=${page}&size=${size}`).then((res) => {
+    const kept = res.content.filter((p) => wishes.get(p.id)?.wished !== false)
+    const added = wishes
+      .entries()
+      .reverse()
+      .flatMap(([, w]) => (w.wished && w.product ? [{ ...w.product, wished: true }] : []))
+    const merged = insertMissing({ ...res, content: kept }, added, () => true, (p) => p.id)
+    const total = res.totalElements - (res.content.length - kept.length) + merged.inserted
+    return { ...res, content: merged.content.map((p) => ({ ...p, wished: true })), totalElements: wishTotal.observe(Math.max(0, total)) }
+  })
 
-export const setWish = (productId: number, wished: boolean) =>
-  api<void>(`/api-public/v1/wishlist/${productId}`, { method: wished ? 'POST' : 'DELETE' })
+/** [product] 는 찜 목록에 바로 보일 카드(레플리카가 늦어도 찜 목록 첫 장에 끼운다). */
+export function setWish(productId: number, wished: boolean, product: ProductSummary | null = null) {
+  const before = wishes.get(productId)
+  wishes.set(productId, { wished, product })
+  wishTotal.write(wished ? 1 : -1)
+  return api<void>(`/api-public/v1/wishlist/${productId}`, { method: wished ? 'POST' : 'DELETE' }).catch((e: unknown) => {
+    if (before) wishes.set(productId, before)
+    else wishes.delete(productId)
+    wishTotal.write(wished ? -1 : 1)
+    throw e
+  })
+}

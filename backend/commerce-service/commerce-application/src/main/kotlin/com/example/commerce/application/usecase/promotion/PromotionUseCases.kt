@@ -1,6 +1,7 @@
 package com.example.commerce.application.usecase.promotion
 
 import com.example.commerce.application.domain.entity.EventKind
+import com.example.commerce.application.domain.entity.Promotion
 import com.example.commerce.application.domain.entity.PromotionType
 import com.example.commerce.application.service.AttendanceService
 import com.example.commerce.application.service.CouponQueryService
@@ -118,11 +119,21 @@ class SearchAdminPromotionsUseCase(
 @Component
 class GetAdminPromotionUseCase(
     private val promotionQueryService: PromotionQueryService,
+    private val promotionCommandService: PromotionCommandService,
     private val couponQueryService: CouponQueryService,
 ) {
     @Transactional(transactionManager = "roTransactionManager", readOnly = true)
-    fun execute(id: Long): AdminPromotionDetailResult {
-        val p = promotionQueryService.find(id)
+    fun execute(id: Long): AdminPromotionDetailResult = resultOf(promotionQueryService.find(id))
+
+    /**
+     * 만들기·고치기 응답. 기획전 자체는 master 에서 읽는다(레플리카에는 지연 동안 없거나 옛값이다).
+     * 트랜잭션 안에서 매핑해야 기획전 상품(지연 로딩)을 읽을 수 있다. 출석 수·상품·쿠폰은 쓰기와 상관없어 레플리카에서.
+     */
+    @Transactional(transactionManager = "rwTransactionManager", readOnly = true)
+    fun executeOnMaster(id: Long): AdminPromotionDetailResult = resultOf(promotionCommandService.find(id))
+
+    private fun resultOf(p: Promotion): AdminPromotionDetailResult {
+        val id = requireNotNull(p.id)
         val coupons = couponQueryService.adminSummaries(couponQueryService.live(p.couponIds))
         return AdminPromotionDetailResult.from(
             p,
@@ -146,7 +157,7 @@ class SavePromotionUseCase(
     @CacheEvict(cacheNames = [PromotionCaches.BANNERS], allEntries = true)
     fun create(command: PromotionCommand): AdminPromotionDetailResult {
         val id = requireNotNull(promotionCommandService.create(command).id)
-        return getAdminPromotionUseCase.execute(id)
+        return getAdminPromotionUseCase.executeOnMaster(id)
     }
 
     @Caching(
@@ -160,7 +171,7 @@ class SavePromotionUseCase(
         command: PromotionCommand,
     ): AdminPromotionDetailResult {
         promotionCommandService.update(id, command)
-        return getAdminPromotionUseCase.execute(id)
+        return getAdminPromotionUseCase.executeOnMaster(id)
     }
 
     @Caching(

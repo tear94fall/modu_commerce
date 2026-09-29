@@ -94,7 +94,7 @@ class PushInboxUseCase(
         size: Int,
     ): PageResult<NotificationItemResult> = PageResult.from(pushInboxQueryService.page(userId, page, size)) { it }
 
-    fun unread(userId: String): Long = pushInboxQueryService.unread(userId)
+    fun unread(userId: String): Long = pushInboxCommandService.unread(userId)
 
     fun markRead(
         userId: String,
@@ -123,19 +123,25 @@ class AdminPushCampaignUseCase(
 
     fun get(id: Long): AdminPushCampaignResult = AdminPushCampaignResult.from(pushCampaignQueryService.find(id))
 
-    /** 만든다. 지금 보내기(예약 시각 없음)면 커밋된 뒤 따로 보낸다(선점 규칙이 같아 스케줄러와 겹쳐도 한 번만 나간다). */
+    /**
+     * 만든다. 지금 보내기(예약 시각 없음)면 커밋된 뒤 따로 보낸다(선점 규칙이 같아 스케줄러와 겹쳐도 한 번만 나간다).
+     * 응답은 master 에서 읽는다 — 레플리카에는 방금 만든 캠페인이 아직 없을 수 있다.
+     */
     fun create(command: PushCampaignCommand): AdminPushCampaignResult {
         val id = requireNotNull(pushCampaignCommandService.create(command).id)
         if (command.scheduledAt == null) {
             pushAsyncRunner.run { pushCampaignSendService.send(id) }
         }
-        return get(id)
+        return onMaster(id)
     }
 
+    /** 응답은 master 에서(레플리카는 지연 동안 아직 SCHEDULED 다). */
     fun cancel(id: Long): AdminPushCampaignResult {
         pushCampaignCommandService.cancel(id)
-        return get(id)
+        return onMaster(id)
     }
+
+    private fun onMaster(id: Long): AdminPushCampaignResult = AdminPushCampaignResult.from(pushCampaignCommandService.find(id))
 
     fun audience(at: Instant?): PushAudienceResult = pushCampaignQueryService.audience(at)
 

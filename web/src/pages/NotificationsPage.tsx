@@ -52,6 +52,7 @@ export default function NotificationsPage() {
   const setRead = (match: (n: NotificationItem) => boolean, read: boolean) =>
     setItems((cur) => cur && cur.map((n) => (match(n) ? { ...n, read } : n)))
 
+  /** 읽음 요청은 기다리지 않고 넘어간다 — 다음 화면의 뱃지·목록이 요청이 끝난 뒤에 읽는다(api/push.ts). */
   const open = (item: NotificationItem) => {
     if (!item.read) {
       setRead((n) => n.id === item.id, true)
@@ -64,7 +65,7 @@ export default function NotificationsPage() {
     const unreadIds = new Set((items ?? []).filter((n) => !n.read).map((n) => n.id))
     if (unreadIds.size === 0) return
     setRead((n) => unreadIds.has(n.id), true)
-    markAllNotificationsRead().catch(() => {
+    markAllNotificationsRead(Math.max(...(items ?? []).map((n) => n.id))).catch(() => {
       setRead((n) => unreadIds.has(n.id), false)
       setToast('읽음 처리하지 못했습니다.')
     })
