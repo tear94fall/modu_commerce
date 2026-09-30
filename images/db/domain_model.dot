@@ -1,0 +1,62 @@
+digraph domain {
+  graph [bgcolor="white", fontname="Helvetica", label="주요 도메인 모델 관계도", labelloc=t, labeljust=l, fontsize=18, pad=0.5, nodesep=0.5, ranksep=0.7, dpi=160, rankdir=TB];
+  node [shape=box, style="filled,rounded", fontname="Helvetica", fontsize=12, width=1.5, height=0.55, color="#9aa4b1"];
+  edge [fontname="Helvetica", fontsize=13, color="#333333", arrowhead=none, labelfontsize=13];
+
+  cat  [label="카테고리\n(트리)", fillcolor="#d5e8d4"];
+  prod [label="상품", fillcolor="#dae8fc"];
+  sku  [label="옵션 조합(SKU)", fillcolor="#dae8fc"];
+  img  [label="상품 사진", fillcolor="#dae8fc"];
+  opt  [label="옵션 그룹·값", fillcolor="#dae8fc"];
+
+  cust [label="커머스 고객\n(모두 계정 user_id)", fillcolor="#fff2cc"];
+  tier [label="회원 등급", fillcolor="#fff2cc"];
+  cart [label="장바구니", fillcolor="#f8cecc"];
+  addr [label="배송지", fillcolor="#f8cecc"];
+  order[label="주문", fillcolor="#f8cecc"];
+  oitem[label="주문 상품", fillcolor="#f8cecc"];
+  review[label="리뷰", fillcolor="#f8cecc"];
+  wish [label="찜", fillcolor="#f8cecc"];
+
+  coupon[label="쿠폰", fillcolor="#e1d5e7"];
+  ucoupon[label="보유 쿠폰", fillcolor="#e1d5e7"];
+  promo[label="기획전·이벤트", fillcolor="#b0e3e6"];
+  attend[label="출석 체크", fillcolor="#b0e3e6"];
+  camp [label="푸시 캠페인", fillcolor="#d0cee2"];
+  inbox[label="알림함", fillcolor="#d0cee2"];
+  device[label="푸시 기기·동의", fillcolor="#d0cee2"];
+  point[label="포인트\n(point-service, 외부)", fillcolor="#f5f5f5", style="filled,rounded,dashed"];
+
+  cat -> cat   [taillabel="1", headlabel="N", label=" 상위 "];
+  cat -> prod  [taillabel="1", headlabel="N"];
+  prod -> sku  [taillabel="1", headlabel="N"];
+  prod -> img  [taillabel="1", headlabel="N"];
+  prod -> opt  [taillabel="1", headlabel="N"];
+  opt -> sku   [taillabel="N", headlabel="N", label=" sku_option_values "];
+
+  tier -> cust [taillabel="1", headlabel="N"];
+  cust -> cart [taillabel="1", headlabel="N"];
+  cust -> addr [taillabel="1", headlabel="N"];
+  cust -> order[taillabel="1", headlabel="N"];
+  cust -> wish [taillabel="1", headlabel="N"];
+  sku -> cart  [taillabel="1", headlabel="N"];
+  order -> oitem [taillabel="1", headlabel="N"];
+  sku -> oitem [taillabel="1", headlabel="N"];
+  oitem -> review [taillabel="1", headlabel="1"];
+  prod -> wish [taillabel="1", headlabel="N"];
+
+  coupon -> ucoupon [taillabel="1", headlabel="N"];
+  cust -> ucoupon   [taillabel="1", headlabel="N"];
+  ucoupon -> order  [taillabel="1", headlabel="1", label=" 사용 "];
+  promo -> prod   [taillabel="N", headlabel="N", label=" promotion_products "];
+  promo -> coupon [taillabel="N", headlabel="N", label=" promotion_coupons "];
+  promo -> attend [taillabel="1", headlabel="N"];
+  cust -> attend  [taillabel="1", headlabel="N"];
+  tier -> coupon  [taillabel="N", headlabel="N", label=" 매월 등급 쿠폰 "];
+
+  camp -> inbox  [taillabel="1", headlabel="N"];
+  cust -> inbox  [taillabel="1", headlabel="N"];
+  cust -> device [taillabel="1", headlabel="1..N"];
+  order -> point [style=dashed, label=" 구매 적립·포인트 결제 "];
+  attend -> point [style=dashed, label=" 출석 적립 "];
+}
