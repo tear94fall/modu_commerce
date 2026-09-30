@@ -50,7 +50,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 `~/Downloads/demo` 프로젝트 구조를 따른 Kotlin/Spring Boot 3.5 멀티모듈 서비스입니다.
 
 - `commerce-api`: 실행 모듈.
-  - 앱(`aud=modu-commerce`): `GET /api/v1/products`(`?q=` 검색), `GET /api/v1/products/{id}`.
+  - 앱(`aud=modu-commerce`): `/api-public/v1/**` (상품·카테고리·장바구니·주문·리뷰·쿠폰·기획전·포인트·알림 등). 커머스 웹/앱은 같은 출처 `/api-public/` 으로 부르고, nginx·Vite 가 게이트웨이 `/commerce-service/api-public/**` 로 넘깁니다(게이트웨이가 토큰을 확인하고 commerce 도 다시 검증).
   - 백오피스(`aud=modu-admin` + `roles` 에 `ROLE_ADMIN`): `GET /api-admin/v1/products?q=&page=&size=`, `GET·PUT·DELETE /api-admin/v1/products/{id}`, `POST /api-admin/v1/products`. 게이트웨이의 `/commerce-service/api-admin/**` 로 들어오며, commerce 도 토큰을 다시 검증합니다. 삭제는 `deleted_at` 만 채우는 소프트 삭제입니다.
   - 모든 토큰은 모두의 채팅 auth-service 가 발급한 RS256 토큰을 JWKS 로 검증합니다.
 - `commerce-application`: 도메인/저장소/서비스. master(RW)·replica(RO) 데이터소스 분리, RO 는 DDL 을 실행하지 않음, QueryDSL(RO/RW 쿼리 팩토리). 시작 시 `products` 가 비어 있으면 샘플 카테고리·상품을 넣습니다. 상품 사진은 상품에 맞는 퍼블릭 도메인 사진(아래 "상품 사진 출처")이고, 목록에 없는 상품만 `picsum.photos` 의 seed 주소를 씁니다. 이미 상품이 들어 있는 DB 는 건드리지 않습니다.
@@ -62,6 +62,99 @@ cd .. && docker compose up -d --build   # commerce-service(8200) + modu-commerce
 ```
 
 접속 정보는 `DB_MASTER_URL`/`DB_MASTER_USERNAME`/`DB_MASTER_PASSWORD`(선택 `DB_REPLICA_*`), 토큰 검증은 `MODU_OAUTH_ISSUER`/`MODU_OAUTH_JWKS_URI` 환경변수로 바꿉니다. 커머스 앱은 로그인 후 `COMMERCE_API_URL`(`app/build.gradle`) 로 상품 목록을 불러옵니다.
+
+## 주요 도메인 모델
+
+### 커머스 도메인 모델 구조
+
+![domain_model](./images/db/domain_model.png)
+
+- **커머스 고객**은 모두 계정(`user_id`)으로 식별합니다. 회원 정보(이름·이메일·프로필)는 모두의 채팅 member-service 가 갖고, 커머스는 가입(약관 동의)·등급·주문 같은 커머스 쪽 데이터만 둡니다.
+- **포인트**는 커머스 DB 에 없습니다. modu_chat 의 point-service(`modu-point` 스키마)가 원장을 갖고, 커머스는 내부 API 로 적립·사용·환불만 요청합니다.
+- 다대다 관계(기획전–상품, 기획전–쿠폰, 옵션 값–SKU)는 모두의 채팅과 같은 원칙으로 연관 테이블(`promotion_products`, `promotion_coupons`, `sku_option_values`)을 두어 1대다·1대다로 풀었습니다. `@ManyToMany` 는 쓰지 않습니다.
+
+### 설계 메모
+
+- **외래 키를 거는 곳과 안 거는 곳**: 상품·주문·리뷰·쿠폰처럼 같은 도메인 안의 관계(21개)는 외래 키 제약을 겁니다. 고객(`user_id`), 등급 코드, 쿠폰·상품 id 를 다른 도메인에서 참조하는 곳은 id 만 저장하고 제약을 걸지 않습니다(ERD 의 점선). 무결성은 애플리케이션(유스케이스)이 지킵니다.
+- **소프트 삭제**: `products`, `reviews`, `coupons`, `promotions` 는 `deleted_at` 만 채우고 행을 남깁니다(`@SQLRestriction`). 리뷰는 주문 상품당 한 건(`order_item_id` 유니크)입니다.
+- **스냅샷 컬럼**: 주문 상품(`product_name`, `option_label`, `unit_price`), 리뷰(`product_name`, `author_name`), 주문(`recipient`, `address1`…)은 주문 시점 값을 복사해 둡니다. 원본이 바뀌어도 주문 내역은 그대로입니다.
+- **시각**: 서버는 UTC `datetime(6)` 로 저장하고 앱이 한국 시간으로 바꿉니다. 기획전 기간·쿠폰 유효 기간·등급 산정 기간은 한국 달력 날짜(`date`)입니다.
+- **읽기·쓰기 분리**: 쓰기는 `mysql-commerce`(소스), 읽기는 GTID 복제 레플리카 `mysql-commerce-replica` 에 SELECT 전용 계정(`commerce_ro`)으로 붙습니다. 쓰기 직후 다시 읽는 조회(장바구니·배송지·결제 직후 주문·가입 확인 등)는 소스에서 읽습니다.
+- **스키마 변경**: 아직 `ddl-auto: update` 로 앱이 테이블을 만듭니다(운영 전환 전에 DBA 주도 변경으로 옮길 예정).
+
+### ERD
+
+실제 dev DB(`commerce` 스키마, MySQL 8.0)에서 뽑은 30개 테이블입니다. 실선은 외래 키, 점선은 id 만 저장하는 논리 관계, `*` 는 NOT NULL 입니다. 도메인별로 나눠 그렸고 다른 도메인의 테이블은 회색 상자로 표시했습니다.
+
+#### 상품·카테고리
+
+![erd_products](./images/db/erd_products.png)
+
+| 테이블 | 내용 |
+|---|---|
+| `categories` | 카테고리 트리(`parent_id` 자기 참조), 이모지 아이콘·색, 정렬 순서 |
+| `products` | 상품. 판매가·정가·상태(SELLING/HIDDEN), 찜 수·리뷰 수·평점 합 캐시, 소프트 삭제(재고는 SKU 에) |
+| `product_images` | 상품 사진 URL, 정렬 순서 |
+| `product_option_groups` / `product_option_values` | 옵션 그룹(색상 등)과 값 |
+| `product_skus` | 옵션 조합별 재고·추가 금액. 장바구니·주문은 SKU 단위 |
+| `sku_option_values` | SKU–옵션 값 연관 테이블 |
+
+#### 고객·회원 등급
+
+![erd_customers_tiers](./images/db/erd_customers_tiers.png)
+
+| 테이블 | 내용 |
+|---|---|
+| `commerce_customers` | 커머스 고객(PK `user_id` = 모두 계정). 가입·약관/개인정보 동의 시각·버전, 상태(ACTIVE/WITHDRAWN), 현재 등급과 산정 기준 금액, 이전 이용자 여부(`migrated`) |
+| `commerce_tiers` | 등급 4단계(웰컴·실버·골드·VIP): 기준 금액, 적립률, 색 (어드민에서 수정) |
+| `commerce_tier_coupons` | 등급별 매월 자동 발급 쿠폰 |
+| `commerce_tier_histories` | 고객별 등급 변경 이력(가입/월 산정/수동, 기준 기간·금액) |
+| `commerce_tier_runs` | 산정 실행 기록(월 1일 자동·수동): 고객 수, 변경 수, 등급별 인원, 쿠폰 발급/건너뜀 |
+
+#### 장바구니·배송지·주문·리뷰·찜
+
+![erd_orders](./images/db/erd_orders.png)
+
+| 테이블 | 내용 |
+|---|---|
+| `cart_items` | 고객별 장바구니(SKU + 수량) |
+| `addresses` | 배송지, 기본 배송지 표시 |
+| `orders` | 주문. 상태(PAID→SHIPPING→DELIVERED / CANCELLED), 결제 금액·포인트 사용·쿠폰 할인, 배송 완료 시각, 구매 적립 상태(`earn_*`), 배송지 스냅샷 |
+| `order_items` | 주문 상품(SKU·수량·단가 스냅샷) |
+| `reviews` | 리뷰(주문 상품당 1건, 별점 1~5, 작성자 이름 스냅샷, 숨김/소프트 삭제) |
+| `wishlists` | 찜(고객–상품) |
+
+#### 쿠폰
+
+![erd_coupons](./images/db/erd_coupons.png)
+
+| 테이블 | 내용 |
+|---|---|
+| `coupons` | 쿠폰 정의: 정액/정률·최대 할인·최소 주문 금액, 적용 범위(전체/카테고리/상품), 발급 기간·유효 기간, 수량, 코드, 앱 노출 여부, 소프트 삭제 |
+| `coupon_scope_targets` | 적용 범위가 카테고리/상품일 때 대상 id |
+| `user_coupons` | 보유 쿠폰: 발급 경로(DOWNLOAD/CODE/ADMIN/EVENT/TIER), 만료일, 사용 주문, 발급 키(`issue_key` — 등급 쿠폰은 `tier:YYYY-MM` 으로 매월 새로 받음) |
+
+#### 기획전·이벤트
+
+![erd_promotions](./images/db/erd_promotions.png)
+
+| 테이블 | 내용 |
+|---|---|
+| `promotions` | 기획전(EXHIBITION) 또는 이벤트(EVENT: 출석/쿠폰). 기간(한국 날짜), 배너 이미지·색, 노출 여부, 정렬, 출석 보상 포인트 규칙 |
+| `promotion_products` / `promotion_coupons` | 기획전에 붙는 상품·쿠폰(연관 테이블, 순서 있음) |
+| `attendance_checks` | 출석 체크(고객·이벤트·날짜 유니크), 적립 결과 |
+
+#### 푸시
+
+![erd_push](./images/db/erd_push.png)
+
+| 테이블 | 내용 |
+|---|---|
+| `push_devices` | 커머스 앱 기기 토큰(FCM, 토큰 유니크, 한 사람이 여러 기기) |
+| `push_consents` | 혜택·이벤트 알림 동의, 야간 수신 동의와 각 변경 시각 |
+| `push_campaigns` | 관리자 발송 캠페인: 내용·이미지·이동할 곳, 예약 시각, 상태(SCHEDULED/SENDING/SENT/CANCELED/FAILED), 발송·성공·실패·열어 봄 수 |
+| `push_campaign_opens` | 캠페인을 눌러 들어온 기록(고객당 1회) |
+| `push_inbox_items` | 앱 알림함(실제로 받은 사람마다 1건, 읽음 시각) |
 
 ## 상품 사진 출처
 
