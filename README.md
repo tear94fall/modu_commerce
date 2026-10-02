@@ -38,6 +38,7 @@
 - **시각**: 서버는 UTC `datetime(6)` 로 저장하고 앱이 한국 시간으로 바꿉니다. 기획전 기간·쿠폰 유효 기간·등급 산정 기간은 한국 달력 날짜(`date`)입니다.
 - **읽기·쓰기 분리**: 쓰기는 `mysql-commerce`(소스), 읽기는 GTID 복제 레플리카 `mysql-commerce-replica` 에 SELECT 전용 계정(`commerce_ro`)으로 붙습니다. 쓰기 직후 다시 읽는 조회(장바구니·배송지·결제 직후 주문·가입 확인 등)는 소스에서 읽습니다.
 - **스케줄러 잠금**: 월 등급 산정·구매 적립 재시도·푸시 캠페인 발송은 ShedLock(`shedlock` 테이블, rw 풀)으로 잠가 파드가 여러 개여도 한 곳에서만 돕니다.
+- **서비스 주소**: 서비스 디스커버리(Eureka)는 쓰지 않습니다. 게이트웨이가 commerce-service 를 부르는 주소와 commerce-service 가 부르는 point-service·member-service 주소는 모두 modu_platform config-repo 의 `modu.services.*`(`http://<컨테이너 이름>:<포트>`)에서 받습니다. 쿠버네티스에선 같은 이름·포트의 Service 로 맞춥니다.
 
 ### 스키마 관리
 
