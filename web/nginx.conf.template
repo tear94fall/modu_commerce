@@ -27,7 +27,7 @@ server {
     index index.html;
 
     # 카탈로그·장바구니·주문: 게이트웨이의 commerce-service 경로(/commerce-service/api-public/**)로.
-    # 게이트웨이가 토큰(ROLE_USER, aud modu-commerce)을 확인하고 Eureka 로 commerce-service 를 찾는다. Authorization 은 그대로 넘어가고,
+    # 게이트웨이가 토큰(ROLE_USER, aud modu-commerce)을 확인하고 modu.services.commerce-service 주소로 넘긴다. Authorization 은 그대로 넘어가고,
     # 게이트웨이 CORS 가 다른 출처를 막으므로(POST·PUT 등은 같은 출처여도 Origin 이 붙는다) Origin 은 지운다.
     location /api-public/ {
         proxy_pass http://gateway/commerce-service/api-public/;

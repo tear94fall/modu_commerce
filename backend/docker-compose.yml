@@ -4,7 +4,8 @@ name: modu-commerce
 # commerce-service 는 external 네트워크 modu-infra 에서 컨테이너 이름으로 인프라·플랫폼(config-service)·auth-service 에 접근한다.
 # 기동 순서: modu_infra → modu_platform → modu_chat backend(gateway) → 이 스택. 설정을 못 받으면 기동에 실패하고 restart 가 다시 띄운다.
 # 커머스 웹(../web)도 여기서 같이 뜬다: nginx 가 정적 빌드를 서빙하고 /api-public → gateway-service /commerce-service/api-public, /auth-service → gateway-service 로 프록시한다.
-# commerce-service 는 discovery-service(modu_platform, 같은 modu-infra 네트워크)에 commerce-service 로 등록되고 게이트웨이가 lb://COMMERCE-SERVICE 로 부른다.
+# 서비스 디스커버리는 없다. 게이트웨이는 config-repo 의 modu.services.commerce-service(http://commerce-service:8200, 컨테이너 이름)로 이 서비스를 부르고,
+# 이 서비스도 point-service·member-service 를 modu.services.* 의 고정 주소로 부른다. 쿠버네티스에선 같은 이름·포트의 Service 로 맞춘다.
 
 services:
   commerce-service:
@@ -27,7 +28,7 @@ services:
       - ./secrets:/secrets:ro
     networks:
       - modu-infra
-    # 준비 검사: readiness(readinessState + master DB). amazoncorretto:21 에 curl 이 있다. 설정 서버·Eureka·JPA 기동을 기다리므로 start_period 를 길게.
+    # 준비 검사: readiness(readinessState + master DB). amazoncorretto:21 에 curl 이 있다. 설정 서버·JPA 기동을 기다리므로 start_period 를 길게.
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8200/actuator/health/readiness | grep -q '\"UP\"' || exit 1"]
       interval: 10s

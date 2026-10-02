@@ -81,17 +81,14 @@ management:
         liveness:
           include: livenessState
 
-# modu_platform 의 discovery-service 에 등록한다. defaultZone(http://discovery-service:8761/eureka/)은 config-service 공통 설정이 내려준다.
-# 메신저 서비스와 같게 instance-id 만 서비스 이름으로 두고 호스트는 기본값(컨테이너 호스트 이름, modu-infra 에서 풀린다)을 쓴다.
-# 게이트웨이가 lb://COMMERCE-SERVICE 로 /commerce-service/api-public/** 와 /commerce-service/api-admin/** 를 넘긴다.
-eureka:
-  instance:
-    instance-id: commerce-service
-  client:
-    register-with-eureka: true
-    fetch-registry: true
-
+# 서비스 디스커버리는 쓰지 않는다. 게이트웨이는 config-service 공통 설정의 modu.services.commerce-service(http://commerce-service:8200)로
+# /commerce-service/api-public/** 와 /commerce-service/api-admin/** 를 넘긴다. compose 에선 컨테이너 이름, k8s 에선 같은 이름·포트의 Service.
 modu:
+  # 다른 서비스 주소. 실제 값은 config-service 공통 설정(config-repo application.yml 의 modu.services.*)이 내려준다.
+  # 아래는 설정 서버 없이 띄울 때의 기본값(같은 modu-infra 네트워크의 컨테이너 이름).
+  services:
+    point-service: http://point-service:9600
+    member-service: http://member-service:8080
   oauth:
     # 모두의 채팅 auth-service. 커머스 앱이 SSO 로 받은 modu-commerce 토큰을 여기 JWKS 로 검증한다.
     issuer: ${MODU_OAUTH_ISSUER:http://192.168.0.3:8000/auth-service}
@@ -102,12 +99,12 @@ modu:
   # 서비스 간 호출 토큰. 실제 값은 config-service 공통 설정(application.yml)이 내려주고, 챗 스택의 INTERNAL_API_TOKEN 과 같아야 한다.
   internal-api:
     token: ${INTERNAL_API_TOKEN:modu-internal-dev-token}
-  # 마이 탭 포인트 조회가 부르는 point-service(모두 챗 백엔드). 같은 modu-infra 네트워크의 컨테이너 이름.
+  # 마이 탭 포인트 조회가 부르는 point-service(모두 챗 백엔드). 기본은 modu.services.point-service, 환경 변수로 덮어쓸 수 있다.
   point:
-    url: ${MODU_POINT_URL:http://point-service:9600}
-  # 리뷰 작성자 이름·이메일을 받는 member-service(모두 챗 백엔드).
+    url: ${MODU_POINT_URL:${modu.services.point-service}}
+  # 리뷰 작성자 이름·이메일을 받는 member-service(모두 챗 백엔드). 기본은 modu.services.member-service.
   member:
-    url: ${MODU_MEMBER_URL:http://member-service:8080}
+    url: ${MODU_MEMBER_URL:${modu.services.member-service}}
 
   # 기획전·이벤트 캐시. 개발·운영은 config-service 가 redis-enabled=true 와 클러스터 노드를 내려준다. 기본(IDE·테스트)은 메모리 캐시.
   cache:

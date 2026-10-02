@@ -8,8 +8,6 @@ dependencies {
     // 컨테이너 준비·생존 검사(/actuator/health/readiness, /liveness). 서비스 포트(도커 네트워크 안)에서만 열린다.
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.cloud:spring-cloud-starter-config")
-    // modu_platform 의 discovery-service(Eureka)에 commerce-service 로 등록한다. 게이트웨이가 lb://COMMERCE-SERVICE 로 부른다.
-    implementation("org.springframework.cloud:spring-cloud-starter-netflix-eureka-client")
     // admin 상품 등록·수정 요청 검증(@Valid)
     implementation("org.springframework.boot:spring-boot-starter-validation")
     // API 문서(GET /v3/api-docs, JSON 만). 화면은 시스템 콘솔(modu-system)이 게이트웨이를 거쳐 그린다. Boot 3.5 ↔ springdoc 2.8.x

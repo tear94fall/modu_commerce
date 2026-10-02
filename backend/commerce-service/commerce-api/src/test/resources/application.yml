@@ -49,12 +49,11 @@ management:
         liveness:
           include: livenessState
 
-# 테스트는 discovery-service 에 등록하지 않는다.
-eureka:
-  client:
-    enabled: false
-
 modu:
+  # 다른 서비스 주소(config-repo 의 modu.services.*). 테스트는 실제로 부르지 않는다.
+  services:
+    point-service: http://point.test
+    member-service: http://member.test
   oauth:
     issuer: http://auth.test/auth-service
     jwks-uri: http://auth.test/auth-service/oauth2/jwks
@@ -62,9 +61,9 @@ modu:
   internal-api:
     token: test-internal-token
   point:
-    url: http://point.test
+    url: ${modu.services.point-service}
   member:
-    url: http://member.test
+    url: ${modu.services.member-service}
   # 푸시: 스케줄러는 끄고(테스트가 runDue 를 직접 부른다) 지금 보내기는 요청 스레드에서 바로 보낸다.
   push:
     firebase-credentials: ""
