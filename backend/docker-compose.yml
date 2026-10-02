@@ -27,6 +27,15 @@ services:
       - ./secrets:/secrets:ro
     networks:
       - modu-infra
+    # 준비 검사: readiness(readinessState + master DB). amazoncorretto:21 에 curl 이 있다. 설정 서버·Eureka·JPA 기동을 기다리므로 start_period 를 길게.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8200/actuator/health/readiness | grep -q '\"UP\"' || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 90s
+    # SIGTERM 뒤 처리 중인 요청을 끝낼 시간(spring.lifecycle.timeout-per-shutdown-phase 20s 보다 길게).
+    stop_grace_period: 30s
     restart: always
 
   modu-commerce-web:
@@ -40,6 +49,14 @@ services:
       - commerce-service
     networks:
       - modu-infra
+    # nginx 가 정적 파일을 내주는지만 본다(게이트웨이 상태와 무관). nginx:1.27-alpine 에 curl 이 있다.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost/ -o /dev/null || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    stop_grace_period: 30s
     restart: always
 
 networks:

@@ -71,6 +71,8 @@ class SecurityConfig {
                 it.requestMatchers(HttpMethod.GET, "/api-public/v1/tiers").permitAll()
                 // API 문서. 서비스 포트는 도커 네트워크 안에서만 열리고 외부 접근은 게이트웨이가 막는다.
                 it.requestMatchers(*API_DOCS_PATHS).permitAll()
+                // 컨테이너 준비·생존 검사(compose healthcheck, k8s probe). 상태만 보이고(show-details: never) 서비스 포트 안에서만 열린다.
+                it.requestMatchers(*HEALTH_PATHS).permitAll()
                 it.anyRequest().authenticated()
             }.oauth2ResourceServer { it.jwt {} }
             .build()
@@ -82,6 +84,7 @@ class SecurityConfig {
     companion object {
         const val ADMIN_ROLE = "ROLE_ADMIN"
         val API_DOCS_PATHS = arrayOf("/v3/api-docs", "/v3/api-docs/**")
+        val HEALTH_PATHS = arrayOf("/actuator/health", "/actuator/health/**")
 
         fun tokenValidator(
             issuer: String,
