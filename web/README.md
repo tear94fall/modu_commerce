@@ -15,7 +15,7 @@ npm run build        # tsc + vite build → dist/
 ```
 
 - API 는 같은 출처의 `/api-public/v1/**`(게이트웨이 :8000 의 `/commerce-service/api-public/**`)와 `/auth-service/**`(게이트웨이 :8000)를 부르고
-  Vite 가 프록시합니다(`vite.config.ts`, `GATEWAY_URL` 환경변수로 대상을 바꿈). 옛 `/api/v1/**` 도 같은 곳으로 넘깁니다. 그래서 서버에 CORS 설정이 없어도 됩니다.
+  Vite 가 프록시합니다(`vite.config.ts`, `GATEWAY_URL` 환경변수로 대상을 바꿈).그래서 서버에 CORS 설정이 없어도 됩니다.
 - **앱에서 열기**: Android 디버그 빌드의 `WEB_URL`(`app/build.gradle.kts`)이 `http://192.168.0.3:5174/` 입니다. Mac 에서 `npm run dev` 를
   띄워 두면 폰의 앱이 그 화면을 열고, 파일을 저장하면 폰 화면이 바로 바뀝니다. `chrome://inspect` 로 WebView 를 디버깅할 수 있습니다.
 - **브라우저에서 열기**: `/login` 의 **Google 계정으로 로그인** → Google ID 토큰을 auth-service `/oauth2/token`(`google_id_token` grant,
@@ -31,7 +31,7 @@ npm run build        # tsc + vite build → dist/
 cd backend && docker compose up -d --build modu-commerce-web     # modu-commerce-web → http://<Mac IP>:8082
 ```
 
-커머스 백엔드 compose(`backend/docker-compose.yml`)의 서비스 하나라 commerce-service 와 같이 뜬다. `Dockerfile` 이 정적 빌드를 만들고 `nginx.conf.template` 이 `/api-public/`(과 호환용 `/api/v1/`) → gateway-service:8000 `/commerce-service/api-public/`, `/auth-service/` → gateway-service:8000,
+커머스 백엔드 compose(`backend/docker-compose.yml`)의 서비스 하나라 commerce-service 와 같이 뜬다. `Dockerfile` 이 정적 빌드를 만들고 `nginx.conf.template` 이 `/api-public/` → gateway-service:8000 `/commerce-service/api-public/`, `/auth-service/` → gateway-service:8000,
 `/storage-service/` → storage-service:9999 로 프록시합니다(모두 external 네트워크 `modu-infra`). Android **릴리스** 빌드의 `WEB_URL` 이 이 주소이고,
 **디버그** 빌드는 Vite dev 서버(:5174)를 봅니다.
 

@@ -3,6 +3,7 @@ package com.example.commerce.api.config
 import com.example.commerce.application.common.logger
 import com.example.commerce.application.service.PurchaseEarnService
 import com.example.commerce.application.service.TierRunService
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.context.annotation.Configuration
@@ -26,7 +27,9 @@ data class ModuTierProperties(
 class TierSchedulingConfig(
     private val tierRunService: TierRunService,
 ) {
+    // 파드가 여러 개여도 한 곳에서만 돈다(SchedulerLockConfig). 월 산정은 길 수 있어 최대 30분까지 잠근다.
     @Scheduled(cron = "0 10 0 1 * *", zone = "Asia/Seoul")
+    @SchedulerLock(name = "commerce:tier-monthly-run", lockAtLeastFor = "PT30S", lockAtMostFor = "PT30M")
     fun monthlyTierRun() {
         try {
             tierRunService.runMonthly()
@@ -42,7 +45,9 @@ class TierSchedulingConfig(
 class PurchaseEarnRetryConfig(
     private val purchaseEarnService: PurchaseEarnService,
 ) {
+    // 파드가 여러 개여도 한 곳에서만 돈다(SchedulerLockConfig). 재시도는 짧으니 최대 5분.
     @Scheduled(fixedDelay = 600_000, initialDelay = 120_000)
+    @SchedulerLock(name = "commerce:purchase-earn-retry", lockAtLeastFor = "PT30S", lockAtMostFor = "PT5M")
     fun retryPendingEarns() {
         try {
             val done = purchaseEarnService.retryPending()
