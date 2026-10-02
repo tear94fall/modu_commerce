@@ -10,6 +10,7 @@ import com.google.auth.oauth2.ServiceAccountCredentials
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.messaging.FirebaseMessaging
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -73,7 +74,9 @@ class PushConfig {
 class PushSchedulingConfig(
     private val pushCampaignSendService: PushCampaignSendService,
 ) {
+    // 파드가 여러 개여도 같은 캠페인을 두 번 보내지 않게 한 곳에서만 돈다(SchedulerLockConfig). 한 번의 발송은 최대 5분.
     @Scheduled(fixedDelay = 60_000, initialDelay = 30_000)
+    @SchedulerLock(name = "commerce:push-campaigns", lockAtLeastFor = "PT30S", lockAtMostFor = "PT5M")
     fun sendDueCampaigns() {
         try {
             val sent = pushCampaignSendService.runDue()

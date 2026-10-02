@@ -25,8 +25,6 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       '/api-public': commerceViaGateway(/^\/api-public/, '/commerce-service/api-public'),
-      // 호환: 옛 /api/v1/** 도 같은 게이트웨이 경로로.
-      '/api/v1': commerceViaGateway(/^\/api\/v1/, '/commerce-service/api-public/v1'),
       '/auth-service': { target: gateway, changeOrigin: true },
       // 프로필 사진(공개 다운로드). 게이트웨이를 거치면 토큰을 요구하므로 storage-service 로 바로 간다.
       '/storage-service': { target: process.env.STORAGE_URL ?? 'http://localhost:9999', changeOrigin: true, rewrite: (path) => path.replace(/^\/storage-service/, '') },

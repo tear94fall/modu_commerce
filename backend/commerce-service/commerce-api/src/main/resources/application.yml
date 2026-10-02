@@ -44,7 +44,9 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: ${JPA_DDL_AUTO:update}
+      # 스키마는 DBA 가 gh-ost 로 바꾼다(modu_infra/data/mysql/schema). 코드와 어긋나면 기동 실패로 드러나게 validate.
+      # 로컬 일회용 MySQL 에서는 JPA_DDL_AUTO=update 로 띄운다. 테스트(H2)는 src/test/resources 가 update 를 둔다.
+      ddl-auto: ${JPA_DDL_AUTO:validate}
     properties:
       hibernate:
         format_sql: true
