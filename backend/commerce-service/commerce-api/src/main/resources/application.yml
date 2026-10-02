@@ -1,5 +1,7 @@
 server:
   port: 8200
+  # SIGTERM 뒤 새 요청은 거절하고 처리 중인 요청은 끝까지 보낸다(compose stop_grace_period 30s 안).
+  shutdown: graceful
 
 spring:
   application:
@@ -54,6 +56,28 @@ spring:
     redis:
       repositories:
         enabled: false
+
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+# 컨테이너 준비·생존 검사. compose healthcheck 와 쿠버네티스 probe 가 /actuator/health/readiness, /liveness 를 본다.
+# readiness 는 rw(master) 데이터소스만 본다(masterDb, HealthConfig). 레플리카가 죽어도 unready 가 되면 안 되므로 자동 db 는 넣지 않는다.
+# Redis 는 캐시라 꺼져도 DB 로 동작하므로 readiness 에 넣지 않는다.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+      group:
+        readiness:
+          include: readinessState, masterDb
+        liveness:
+          include: livenessState
 
 # modu_platform 의 discovery-service 에 등록한다. defaultZone(http://discovery-service:8761/eureka/)은 config-service 공통 설정이 내려준다.
 # 메신저 서비스와 같게 instance-id 만 서비스 이름으로 두고 호스트는 기본값(컨테이너 호스트 이름, modu-infra 에서 풀린다)을 쓴다.

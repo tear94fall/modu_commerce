@@ -25,6 +25,23 @@ spring:
         default_batch_fetch_size: 1000
     open-in-view: false
 
+# 준비·생존 검사. 이 파일이 main 의 application.yml 을 통째로 대신하므로 같은 값을 둔다(HealthProbeTest).
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+      group:
+        readiness:
+          include: readinessState, masterDb
+        liveness:
+          include: livenessState
+
 # 테스트는 discovery-service 에 등록하지 않는다.
 eureka:
   client:
