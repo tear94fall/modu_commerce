@@ -96,9 +96,10 @@ modu:
     audience: modu-commerce
     # 백오피스(/api-admin/**) 토큰의 aud. 게이트웨이 AuthorizationHeaderFilter=ROLE_ADMIN,modu-admin 과 같은 값.
     admin-audience: modu-admin
-  # 서비스 간 호출 토큰. 실제 값은 config-service 공통 설정(application.yml)이 내려주고, 챗 스택의 INTERNAL_API_TOKEN 과 같아야 한다.
+  # 서비스 간 호출 토큰. config-service 공통 설정(application.yml)의 modu.internal-api.token({cipher})이 내려준다.
+  # 아래는 설정 서버 없이 로컬에서 띄울 때의 기본값.
   internal-api:
-    token: ${INTERNAL_API_TOKEN:modu-internal-dev-token}
+    token: modu-internal-dev-token
   # 마이 탭 포인트 조회가 부르는 point-service(모두 챗 백엔드). 기본은 modu.services.point-service, 환경 변수로 덮어쓸 수 있다.
   point:
     url: ${MODU_POINT_URL:${modu.services.point-service}}
@@ -112,7 +113,8 @@ modu:
     banners-ttl: 5m
     promotion-ttl: 10m
 
-  # 푸시 캠페인. 키 파일 경로가 비었거나 파일이 없으면 보내지 않고 로그만 남긴다(compose 가 /secrets 에 키를 마운트한다).
+  # 푸시 캠페인. Firebase 키는 config-repo(commerce-service.yml)의 modu.push.firebase-credentials-base64({cipher})로 받는다.
+  # 설정 서버 없이 로컬에서 띄울 때는 키 파일 경로(MODU_PUSH_FIREBASE_CREDENTIALS)로 대신한다. 둘 다 없으면 보내지 않고 로그만 남긴다.
   push:
     firebase-credentials: ${MODU_PUSH_FIREBASE_CREDENTIALS:}
     # 1분마다 예약 캠페인을 보낸다. 테스트는 끈다.
