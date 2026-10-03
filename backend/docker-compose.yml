@@ -7,12 +7,21 @@ name: modu-commerce
 # 서비스 디스커버리는 없다. 게이트웨이는 config-repo 의 modu.services.commerce-service(http://commerce-service:8200, 컨테이너 이름)로 이 서비스를 부르고,
 # 이 서비스도 point-service·member-service 를 modu.services.* 의 고정 주소로 부른다. 쿠버네티스에선 같은 이름·포트의 Service 로 맞춘다.
 
+# 모든 컨테이너 로그 줄에 compose 서비스·프로젝트 이름을 붙인다(json-file attrs). OTel Collector 가 container 필드와 앱/인프라 인덱스 구분에 쓴다(modu_infra monitoring).
+x-logging: &logging
+  driver: json-file
+  options:
+    labels: com.docker.compose.service,com.docker.compose.project
+    max-size: "50m"
+    max-file: "3"
+
 services:
   commerce-service:
     build:
       context: ./commerce-service
       dockerfile: ./Dockerfile
     container_name: commerce-service
+    logging: *logging
     ports:
       - 8200:8200
     environment:
@@ -37,6 +46,7 @@ services:
       context: ../web
       dockerfile: ./Dockerfile
     container_name: modu-commerce-web
+    logging: *logging
     ports:
       - "${COMMERCE_WEB_PORT:-8082}:80"
     depends_on:
