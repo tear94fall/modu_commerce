@@ -12,3 +12,6 @@ build/
 # Firebase 앱 설정(프로젝트 키 포함). 로컬에만 둔다. 없어도 빌드되고 푸시만 꺼진다.
 android/modu_commerce/app/google-services.json
 # 푸시용 Firebase 서비스 계정 키 등. .gitkeep 만 커밋한다.
+
+# 설계 메모(brainstorming 산출물)는 커밋하지 않는다
+docs/superpowers/
