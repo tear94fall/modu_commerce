@@ -7,6 +7,10 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     // 컨테이너 준비·생존 검사(/actuator/health/readiness, /liveness). 서비스 포트(도커 네트워크 안)에서만 열린다.
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    // /actuator/prometheus. Prometheus 가 서비스 포트에서 긁어 간다(SecurityConfig 가 토큰 없이 연다).
+    implementation("io.micrometer:micrometer-registry-prometheus")
+    // 로그를 한 줄 JSON 으로 stdout 에 쓴다(logback-spring.xml). OTel Collector 가 모아 OpenSearch 로 보낸다.
+    implementation("net.logstash.logback:logstash-logback-encoder:8.1")
     implementation("org.springframework.cloud:spring-cloud-starter-config")
     // admin 상품 등록·수정 요청 검증(@Valid)
     implementation("org.springframework.boot:spring-boot-starter-validation")

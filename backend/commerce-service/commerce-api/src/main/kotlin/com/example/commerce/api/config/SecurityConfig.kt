@@ -73,6 +73,8 @@ class SecurityConfig {
                 it.requestMatchers(*API_DOCS_PATHS).permitAll()
                 // 컨테이너 준비·생존 검사(compose healthcheck, k8s probe). 상태만 보이고(show-details: never) 서비스 포트 안에서만 열린다.
                 it.requestMatchers(*HEALTH_PATHS).permitAll()
+                // Prometheus 수집(/actuator/prometheus). 서비스 포트 안에서만 열리고 외부는 게이트웨이가 막는다.
+                it.requestMatchers(*METRICS_PATHS).permitAll()
                 it.anyRequest().authenticated()
             }.oauth2ResourceServer { it.jwt {} }
             .build()
@@ -85,6 +87,7 @@ class SecurityConfig {
         const val ADMIN_ROLE = "ROLE_ADMIN"
         val API_DOCS_PATHS = arrayOf("/v3/api-docs", "/v3/api-docs/**")
         val HEALTH_PATHS = arrayOf("/actuator/health", "/actuator/health/**")
+        val METRICS_PATHS = arrayOf("/actuator/prometheus")
 
         fun tokenValidator(
             issuer: String,

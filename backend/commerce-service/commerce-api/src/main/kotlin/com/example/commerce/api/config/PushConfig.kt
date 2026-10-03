@@ -1,5 +1,6 @@
 package com.example.commerce.api.config
 
+import com.example.commerce.api.logging.JobMdc
 import com.example.commerce.api.push.FirebasePushSender
 import com.example.commerce.api.push.LoggingPushSender
 import com.example.commerce.application.common.logger
@@ -98,11 +99,13 @@ class PushSchedulingConfig(
     @Scheduled(fixedDelay = 60_000, initialDelay = 30_000)
     @SchedulerLock(name = "commerce:push-campaigns", lockAtLeastFor = "PT30S", lockAtMostFor = "PT5M")
     fun sendDueCampaigns() {
-        try {
-            val sent = pushCampaignSendService.runDue()
-            if (sent > 0) logger.info { "push scheduler sent $sent campaign(s)" }
-        } catch (e: Exception) {
-            logger.error(e) { "push scheduler failed" }
+        JobMdc.run("push-campaigns") {
+            try {
+                val sent = pushCampaignSendService.runDue()
+                if (sent > 0) logger.info { "push scheduler sent $sent campaign(s)" }
+            } catch (e: Exception) {
+                logger.error(e) { "push scheduler failed" }
+            }
         }
     }
 }

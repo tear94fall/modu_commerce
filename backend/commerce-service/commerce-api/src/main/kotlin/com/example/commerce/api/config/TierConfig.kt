@@ -1,5 +1,6 @@
 package com.example.commerce.api.config
 
+import com.example.commerce.api.logging.JobMdc
 import com.example.commerce.application.common.logger
 import com.example.commerce.application.service.PurchaseEarnService
 import com.example.commerce.application.service.TierRunService
@@ -31,10 +32,12 @@ class TierSchedulingConfig(
     @Scheduled(cron = "0 10 0 1 * *", zone = "Asia/Seoul")
     @SchedulerLock(name = "commerce:tier-monthly-run", lockAtLeastFor = "PT30S", lockAtMostFor = "PT30M")
     fun monthlyTierRun() {
-        try {
-            tierRunService.runMonthly()
-        } catch (e: Exception) {
-            logger.error(e) { "monthly tier run failed" }
+        JobMdc.run("tier-monthly-run") {
+            try {
+                tierRunService.runMonthly()
+            } catch (e: Exception) {
+                logger.error(e) { "monthly tier run failed" }
+            }
         }
     }
 }
@@ -49,11 +52,13 @@ class PurchaseEarnRetryConfig(
     @Scheduled(fixedDelay = 600_000, initialDelay = 120_000)
     @SchedulerLock(name = "commerce:purchase-earn-retry", lockAtLeastFor = "PT30S", lockAtMostFor = "PT5M")
     fun retryPendingEarns() {
-        try {
-            val done = purchaseEarnService.retryPending()
-            if (done > 0) logger.info { "purchase earn retry: $done order(s) credited" }
-        } catch (e: Exception) {
-            logger.error(e) { "purchase earn retry failed" }
+        JobMdc.run("purchase-earn-retry") {
+            try {
+                val done = purchaseEarnService.retryPending()
+                if (done > 0) logger.info { "purchase earn retry: $done order(s) credited" }
+            } catch (e: Exception) {
+                logger.error(e) { "purchase earn retry failed" }
+            }
         }
     }
 }
