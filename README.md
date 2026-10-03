@@ -53,8 +53,7 @@
 - 공식 이미지는 GitHub Actions(`.github/workflows/images.yml`)가 만들어 GHCR 에 올립니다. PR 은 바뀐 서비스의 테스트(ktlint·Gradle test / vitest)와 이미지 빌드만 하고, `develop`·`master` 푸시 때만 푸시합니다.
 - 이미지 이름: `ghcr.io/tear94fall/modu-commerce/commerce-service`, `ghcr.io/tear94fall/modu-commerce/web`. 태그: `develop` 푸시 → `develop-<sha7>` + `develop`, `master` 푸시 → `master-<sha7>` + `latest`.
 - Dockerfile 은 멀티스테이지(소스 → jar → 실행 이미지)라 CI 와 로컬이 같은 파일로 같은 이미지를 만듭니다. 테스트는 Dockerfile 안에서 돌지 않습니다(`-x test`).
-- 배포: `cd backend && docker compose pull && docker compose up -d` (CI 이미지). 특정 커밋은 `IMAGE_TAG=develop-abc1234 docker compose pull && …`. 로컬 소스로 띄우려면 `docker compose up -d --build` (같은 Dockerfile).
-- GHCR 패키지는 처음 푸시될 때 **비공개**로 만들어집니다. 저장소가 공개라도 한 번은 GitHub UI(프로필 → Packages → 패키지 → Package settings → Change visibility)에서 public 으로 바꿔야 `docker compose pull` 이 로그인 없이 됩니다.
+- 배포: dev 는 **k8s**(modu_infra `k8s/`, 네임스페이스 `modu`)에서 돕니다. CI 가 GHCR 에 올린 태그를 `modu_infra/k8s/overlays/dev/kustomization.yaml` 의 `images[].newTag` 에 적고 `kubectl apply -k overlays/dev` 하면 그 Deployment 만 롤링됩니다(빠르게는 `kubectl -n modu set image deploy/<svc> <svc>=<이미지>:<태그>`). 로컬에서 빌드한 이미지를 쓰려면 `docker build -t <이미지>:local <디렉터리>` → `docker save <이미지>:local | docker exec -i desktop-control-plane ctr -n k8s.io images import -` 뒤 태그를 `local` 로 적습니다(Dockerfile 은 CI 와 같은 파일). GHCR 패키지는 저장소가 public 이라 처음 푸시 때부터 public 으로 생깁니다(로그인 없이 pull).
 
 ### ERD
 
