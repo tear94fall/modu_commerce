@@ -7,6 +7,10 @@ name: modu-commerce
 # 서비스 디스커버리는 없다. 게이트웨이는 config-repo 의 modu.services.commerce-service(http://commerce-service:8200, 컨테이너 이름)로 이 서비스를 부르고,
 # 이 서비스도 point-service·member-service 를 modu.services.* 의 고정 주소로 부른다. 쿠버네티스에선 같은 이름·포트의 Service 로 맞춘다.
 
+# 이미지: GitHub Actions(.github/workflows/images.yml)가 develop/master 푸시마다 빌드해 GHCR 에 올린다.
+#   docker compose pull && docker compose up -d   → CI 이미지(IMAGE_TAG 기본 develop, 예: IMAGE_TAG=develop-abc1234)
+#   docker compose up -d --build                  → 로컬 빌드(같은 Dockerfile, 소스에서 jar 까지 만든다)
+
 # 모든 컨테이너 로그 줄에 compose 서비스·프로젝트 이름을 붙인다(json-file attrs). OTel Collector 가 container 필드와 앱/인프라 인덱스 구분에 쓴다(modu_infra monitoring).
 x-logging: &logging
   driver: json-file
@@ -15,13 +19,25 @@ x-logging: &logging
     max-size: "50m"
     max-file: "3"
 
+# 컨테이너 메모리 제한. JVM 은 -XX:MaxRAMPercentage=75 로 이 안에서 힙을 잡는다(1g → 힙 최대 768MiB).
+# k8s 의 resources.requests(mem_reservation)/limits(mem_limit) 와 같은 값으로 매니페스트에 옮긴다.
+x-jvm-resources: &jvm-resources
+  mem_limit: 1g
+  mem_reservation: 512m
+x-small-resources: &small-resources
+  mem_limit: 64m
+  mem_reservation: 16m
+
 services:
   commerce-service:
+    image: ghcr.io/tear94fall/modu-commerce/commerce-service:${IMAGE_TAG:-develop}
     build:
       context: ./commerce-service
       dockerfile: ./Dockerfile
     container_name: commerce-service
     logging: *logging
+    <<: *jvm-resources
+    mem_limit: 1280m
     ports:
       - 8200:8200
     environment:
@@ -42,11 +58,13 @@ services:
     restart: always
 
   modu-commerce-web:
+    image: ghcr.io/tear94fall/modu-commerce/web:${IMAGE_TAG:-develop}
     build:
       context: ../web
       dockerfile: ./Dockerfile
     container_name: modu-commerce-web
     logging: *logging
+    <<: *small-resources
     ports:
       - "${COMMERCE_WEB_PORT:-8082}:80"
     depends_on:
