@@ -48,6 +48,14 @@
 - 외래 키는 두지 않습니다. 정합성은 UseCase(삭제 순서·존재 검증)와 고아 행 점검 쿼리로 지킵니다.
 - 테스트(H2)는 `update` 그대로라 Hibernate 가 외래 키를 만듭니다. `shedlock` 테이블만 `src/test/resources/schema-shedlock.sql` 로 만듭니다.
 
+### 이미지와 배포
+
+- 공식 이미지는 GitHub Actions(`.github/workflows/images.yml`)가 만들어 GHCR 에 올립니다. PR 은 바뀐 서비스의 테스트(ktlint·Gradle test / vitest)와 이미지 빌드만 하고, `develop`·`master` 푸시 때만 푸시합니다.
+- 이미지 이름: `ghcr.io/tear94fall/modu-commerce/commerce-service`, `ghcr.io/tear94fall/modu-commerce/web`. 태그: `develop` 푸시 → `develop-<sha7>` + `develop`, `master` 푸시 → `master-<sha7>` + `latest`.
+- Dockerfile 은 멀티스테이지(소스 → jar → 실행 이미지)라 CI 와 로컬이 같은 파일로 같은 이미지를 만듭니다. 테스트는 Dockerfile 안에서 돌지 않습니다(`-x test`).
+- 배포: `cd backend && docker compose pull && docker compose up -d` (CI 이미지). 특정 커밋은 `IMAGE_TAG=develop-abc1234 docker compose pull && …`. 로컬 소스로 띄우려면 `docker compose up -d --build` (같은 Dockerfile).
+- GHCR 패키지는 처음 푸시될 때 **비공개**로 만들어집니다. 저장소가 공개라도 한 번은 GitHub UI(프로필 → Packages → 패키지 → Package settings → Change visibility)에서 public 으로 바꿔야 `docker compose pull` 이 로그인 없이 됩니다.
+
 ### ERD
 
 실제 dev DB(`commerce` 스키마, MySQL 8.0)에서 뽑은 30개 테이블입니다. 실선은 같은 도메인 안의 관계, 점선은 다른 도메인의 id 를 저장하는 논리 관계이며 둘 다 DB 제약(외래 키)은 없습니다. `*` 는 NOT NULL 입니다. 도메인별로 나눠 그렸고 다른 도메인의 테이블은 회색 상자로 표시했습니다.
