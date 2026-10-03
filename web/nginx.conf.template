@@ -12,12 +12,13 @@ resolver ${NGINX_LOCAL_RESOLVERS} valid=10s ipv6=off;
 
 upstream gateway {
     zone gateway 64k;
-    server gateway-service:8000 resolve;
+    # GATEWAY_HOST/STORAGE_HOST: nginx resolver 는 search 도메인을 안 써서 k8s 에선 FQDN 을 env 로 준다(기본값은 Dockerfile).
+    server ${GATEWAY_HOST}:8000 resolve;
 }
 
 upstream storage {
     zone storage 64k;
-    server storage-service:9999 resolve;
+    server ${STORAGE_HOST}:9999 resolve;
 }
 
 server {
