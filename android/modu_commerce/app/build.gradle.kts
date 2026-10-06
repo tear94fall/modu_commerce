@@ -36,8 +36,8 @@ android {
     }
 
     buildTypes {
-        // 커머스 화면(web/) 주소. 디버그는 Mac 의 Vite dev 서버(LAN, HMR)를 열어 저장 즉시 반영되고,
-        // 릴리스는 nginx 로 띄운 정적 빌드(web/docker-compose.yml, :8082)를 연다.
+        // 커머스 화면(web/) 주소. 디버그는 Mac 의 Vite dev 서버(LAN, HMR — `cd web && npm run dev -- --host`)를 열어 저장 즉시 반영되고,
+        // 릴리스는 dev k8s 의 nginx 정적 빌드(modu_infra k8s, :8082)를 연다. 평소 폰에는 릴리스를 깐다(dev 서버 없이도 돈다).
         debug {
             buildConfigField("String", "WEB_URL", "\"http://192.168.0.3:5174/\"")
         }
@@ -45,6 +45,8 @@ android {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             buildConfigField("String", "WEB_URL", "\"http://192.168.0.3:8082/\"")
+            // 배포용 키가 없어 디버그 키로 서명한다(개인 dev). 스토어 배포 때는 signingConfigs 를 따로 둔다.
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
