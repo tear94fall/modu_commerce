@@ -17,7 +17,7 @@ import java.time.LocalDateTime
 
 enum class DiscountType { FIXED, PERCENT }
 
-/** CATEGORY 는 하위 카테고리까지 포함한다. */
+/** CATEGORY 는 하위 카테고리까지(깊이 무관) 포함한다. */
 enum class CouponScope { ALL, CATEGORY, PRODUCT }
 
 /** TIER = 매월 1일 회원 등급 쿠폰. */
@@ -193,8 +193,7 @@ class Coupon(
             CouponScope.ALL -> true
             CouponScope.PRODUCT -> product.id in scopeIds
             CouponScope.CATEGORY -> {
-                val c = product.category
-                c != null && (c.id in scopeIds || c.parent?.id in scopeIds)
+                generateSequence(product.category) { it.parent }.any { it.id in scopeIds }
             }
         }
 

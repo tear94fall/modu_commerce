@@ -90,7 +90,7 @@ class AdminCategoryControllerTest
         }
 
         @Test
-        fun `등록 수정 삭제와 2단계 규칙`() {
+        fun `등록 수정 삭제와 3단계 규칙`() {
             val fashion = support.categoryId("패션")
             val clothes = support.categoryId("의류")
 
@@ -106,15 +106,27 @@ class AdminCategoryControllerTest
                     }.andReturn()
             val shoes = JsonPath.read<Int>(created.response.contentAsString, "$.id")
 
-            // 하위 아래에는 만들 수 없다
+            // 3단계까지는 만들고, 그 아래(4단계)는 못 만든다
+            val sneakers =
+                JsonPath.read<Int>(
+                    mockMvc
+                        .post("/api-admin/v1/categories") {
+                            with(admin)
+                            contentType = MediaType.APPLICATION_JSON
+                            content = """{"name":"운동화","parentId":$shoes}"""
+                        }.andExpect { status { isCreated() } }
+                        .andReturn()
+                        .response.contentAsString,
+                    "$.id",
+                )
             mockMvc
                 .post("/api-admin/v1/categories") {
                     with(admin)
                     contentType = MediaType.APPLICATION_JSON
-                    content = """{"name":"운동화","parentId":$shoes}"""
+                    content = """{"name":"러닝화","parentId":$sneakers}"""
                 }.andExpect {
                     status { isBadRequest() }
-                    jsonPath("$.message") { value("카테고리는 2단계까지만 만들 수 있습니다.") }
+                    jsonPath("$.message") { value("카테고리는 3단계까지만 만들 수 있습니다.") }
                 }
 
             mockMvc
@@ -135,6 +147,8 @@ class AdminCategoryControllerTest
             // 하위가 있는 카테고리도 못 지운다
             mockMvc.delete("/api-admin/v1/categories/$fashion") { with(admin) }.andExpect { status { isBadRequest() } }
 
+            mockMvc.delete("/api-admin/v1/categories/$shoes") { with(admin) }.andExpect { status { isBadRequest() } }
+            mockMvc.delete("/api-admin/v1/categories/$sneakers") { with(admin) }.andExpect { status { isNoContent() } }
             mockMvc.delete("/api-admin/v1/categories/$shoes") { with(admin) }.andExpect { status { isNoContent() } }
             mockMvc.delete("/api-admin/v1/categories/$shoes") { with(admin) }.andExpect { status { isNotFound() } }
 

@@ -61,7 +61,8 @@ class CatalogTestSupport(
             "wishlists",
             "products",
         ).forEach { jdbc.update("delete from $it") }
-        jdbc.update("delete from categories where parent_id is not null")
+        // 3단계라 하위부터 지우는 순서가 안 맞을 수 있다 — 부모 링크를 먼저 끊는다(테스트 H2 에는 FK 가 있다).
+        jdbc.update("update categories set parent_id = null")
         jdbc.update("delete from categories")
         val categories = categoryRwRepository.saveAll(ProductSeeder.sampleCategories()).associateBy { it.name }
         productRwRepository.saveAll(ProductSeeder.sampleProducts(categories))
@@ -99,6 +100,14 @@ class CatalogTestSupport(
     fun productId(name: String): Long = requireNotNull(productRwRepository.findAll().first { it.name == name }.id)
 
     fun categoryId(name: String): Long = requireNotNull(categoryRwRepository.findAll().first { it.name == name }.id)
+
+    /** 상품을 다른 카테고리로 바로 옮긴다(상품 수정 API 를 거치지 않는다). */
+    fun moveProduct(
+        productName: String,
+        categoryId: Long,
+    ) {
+        jdbc.update("update products set category_id = ? where name = ?", categoryId, productName)
+    }
 
     /** 상품의 SKU id(옵션 라벨로 고른다. 옵션 없는 상품은 라벨 ""). */
     @Transactional(transactionManager = "rwTransactionManager")

@@ -46,6 +46,7 @@ data class AdminProductSummaryResponse(
     val status: ProductStatus,
     val totalStock: Int,
     val categoryId: Long?,
+    /** 카테고리 전체 경로 "문구 > 노트·데스크 > 노트". 미분류면 null. */
     val categoryName: String?,
 ) {
     companion object {

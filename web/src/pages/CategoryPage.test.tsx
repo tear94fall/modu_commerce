@@ -86,6 +86,46 @@ describe('CategoryPage', () => {
     expect(location()).toBe('/products?categoryId=12&title=%EC%9A%95%EC%8B%A4')
   })
 
+  it('shows a depth-2 category with children as a section of "전체" + depth-3 tiles, in server order', async () => {
+    renderPage('/categories?root=3')
+
+    const pane = await screen.findByRole('region', { name: '패션' })
+    const section = within(pane).getByRole('region', { name: '의류' })
+    expect(within(section).getByRole('heading', { name: '의류' })).toBeInTheDocument()
+    // 첫 칸 "전체" 는 중분류 자신(하위 포함), 다음은 sortOrder 순(하의 → 상의, 가나다·id 순이 아니다).
+    expect(within(section).getByRole('link', { name: '의류 전체' })).toHaveAttribute('href', '/products?categoryId=32&title=%EC%9D%98%EB%A5%98')
+    expect(within(section).getByRole('link', { name: /상의/ })).toHaveAttribute('href', '/products?categoryId=321&title=%EC%83%81%EC%9D%98')
+    expect(within(section).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual([
+      '/products?categoryId=32&title=%EC%9D%98%EB%A5%98',
+      '/products?categoryId=322&title=%ED%95%98%EC%9D%98',
+      '/products?categoryId=321&title=%EC%83%81%EC%9D%98',
+    ])
+    // 소분류가 없는 중분류는 섹션 밖 격자 칸. 순서는 의류 다음.
+    const shoes = within(pane).getByRole('link', { name: /신발/ })
+    expect(section).not.toContainElement(shoes)
+    expect(section.compareDocumentPosition(shoes) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(pane).getByRole('link', { name: /전체 보기/ })).toHaveAttribute('href', '/products?categoryId=3&title=%ED%8C%A8%EC%85%98')
+    // 아이콘이 없는 소분류는 이름 첫 글자.
+    expect(within(section).getByText('상')).toBeInTheDocument()
+  })
+
+  it('keeps the rail in server order', async () => {
+    renderPage()
+    await screen.findByRole('region', { name: '생활' })
+
+    expect(within(rail()).getAllByRole('button').map((b) => b.querySelector('.label')?.textContent)).toEqual(['생활', '문구', '패션'])
+  })
+
+  it('opens a depth-3 product list from a section', async () => {
+    renderPage('/categories?root=3')
+    const section = await screen.findByRole('region', { name: '의류' })
+
+    await userEvent.click(within(section).getByRole('link', { name: /하의/ }))
+
+    expect(screen.getByText('목록 화면')).toBeInTheDocument()
+    expect(location()).toBe('/products?categoryId=322&title=%ED%95%98%EC%9D%98')
+  })
+
   it('hides the popular row when the products fail to load', async () => {
     vi.spyOn(catalog, 'getProducts').mockRejectedValue(new Error('down'))
     renderPage()

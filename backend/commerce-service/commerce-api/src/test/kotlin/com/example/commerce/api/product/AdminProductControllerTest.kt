@@ -45,7 +45,7 @@ class AdminProductControllerTest
                     jsonPath("$.content.length()") { value(2) }
                     jsonPath("$.content[0].name") { value("모두 스티커 팩") }
                     jsonPath("$.content[0].totalStock") { value(100) }
-                    jsonPath("$.content[0].categoryName") { value("노트·데스크") }
+                    jsonPath("$.content[0].categoryName") { value("문구 > 노트·데스크") }
                     jsonPath("$.totalElements") { value(ProductSeeder.SAMPLE_COUNT) }
                     jsonPath("$.totalPages") { value(12) }
                 }

@@ -13,7 +13,8 @@ const isSort = (s: string | null): s is ProductSort => s !== null && s in SORT_L
 
 /**
  * `/products?categoryId=&title=&sort=`. 정렬을 바꾸면 첫 페이지부터 다시 받는다(정렬도 주소에 둔다, replace).
- * categoryId 가 있으면 위에 대분류 알약 줄과 소분류 칩 줄을 붙여 그 자리에서 카테고리를 옮겨 다닌다.
+ * categoryId 가 있으면 위에 대분류 알약 줄, 경로(전체 › 대 › 중 › 소), 하위 분류 칩 줄을 붙여 그 자리에서 카테고리를 옮겨 다닌다.
+ * 칩은 고른 카테고리에 하위가 있으면 그 하위, 없으면 형제(같은 부모의 하위)다. 고른 카테고리는 하위까지 포함해 보인다(서버).
  */
 export default function ProductListPage() {
   const [params, setParams] = useSearchParams()
@@ -52,12 +53,12 @@ export default function ProductListPage() {
   }
 
   const root = path[0]
-  const sub = path[1]
+  const parent = path.length > 1 ? path[path.length - 2] : undefined
 
   return (
     <Screen>
       <TopBar title={title} back />
-      {root && <CategoryRows roots={roots} root={root} current={sub ?? root} onSelect={goCategory} />}
+      {root && <CategoryRows roots={roots} path={path} onSelect={goCategory} />}
       <SortChips value={sort} onChange={changeSort} />
       {pager.error ? (
         <ErrorBox message="상품을 불러오지 못했습니다." onRetry={pager.retry} />
@@ -71,9 +72,9 @@ export default function ProductListPage() {
             </div>
             <p className="title">아직 상품이 없어요</p>
             <p className="sub">곧 새로운 상품으로 채워질 거예요.</p>
-            {sub ? (
-              <button type="button" className="btn outline small" onClick={() => goCategory(root)}>
-                {root.name} 전체 보기
+            {parent ? (
+              <button type="button" className="btn outline small" onClick={() => goCategory(parent)}>
+                {parent.name} 전체 보기
               </button>
             ) : (
               <Link to={`/categories?root=${root.id}`} className="btn outline small">
@@ -102,20 +103,26 @@ export default function ProductListPage() {
 
 interface CategoryRowsProps {
   roots: Category[]
-  root: Category
-  /** 지금 보는 카테고리(대분류 자체면 "전체"). */
-  current: Category
+  /** 대분류부터 지금 보는 카테고리까지. */
+  path: Category[]
   onSelect: (c: Category) => void
 }
 
-/** 상단에 붙는 대분류 알약 줄 + 소분류 칩 줄. 고른 것은 가운데로 스크롤해 둔다. */
-function CategoryRows({ roots, root, current, onSelect }: CategoryRowsProps) {
+/** 상단에 붙는 대분류 알약 줄 + 경로 + 하위 분류 칩 줄. 고른 것은 가운데로 스크롤해 둔다. */
+function CategoryRows({ roots, path, onSelect }: CategoryRowsProps) {
   const rootRow = useRef<HTMLDivElement>(null)
   const subRow = useRef<HTMLDivElement>(null)
+  const crumbRow = useRef<HTMLElement>(null)
+  const root = path[0]
+  const current = path[path.length - 1]
+  // 칩의 부모: 하위가 있으면 지금 카테고리, 없으면 그 부모(대분류 하나뿐이면 대분류 자신 → "전체" 칩만).
+  const chipParent = (current.children ?? []).length > 0 || path.length === 1 ? current : path[path.length - 2]
 
   useLayoutEffect(() => {
     centerActive(rootRow.current)
     centerActive(subRow.current)
+    // 경로는 끝(지금 카테고리)이 보이게.
+    if (crumbRow.current) crumbRow.current.scrollLeft = crumbRow.current.scrollWidth
   }, [root.id, current.id])
 
   return (
@@ -128,11 +135,34 @@ function CategoryRows({ roots, root, current, onSelect }: CategoryRowsProps) {
           </button>
         ))}
       </div>
-      <div className="chips cat-subs" ref={subRow} role="tablist" aria-label={`${root.name} 소분류`}>
-        <button type="button" role="tab" aria-selected={current.id === root.id} className={`chip ${current.id === root.id ? 'active' : ''}`.trim()} onClick={() => onSelect(root)}>
+      <nav className="cat-crumbs" ref={crumbRow} aria-label="카테고리 경로">
+        <ol>
+          <li>
+            <Link to={`/categories?root=${root.id}`}>전체</Link>
+          </li>
+          {path.map((c, i) => (
+            <li key={c.id}>
+              <span className="sep" aria-hidden="true">
+                ›
+              </span>
+              {i === path.length - 1 ? (
+                <span className="here" aria-current="page">
+                  {c.name}
+                </span>
+              ) : (
+                <button type="button" onClick={() => onSelect(c)}>
+                  {c.name}
+                </button>
+              )}
+            </li>
+          ))}
+        </ol>
+      </nav>
+      <div className="chips cat-subs" ref={subRow} role="tablist" aria-label={`${chipParent.name} 소분류`}>
+        <button type="button" role="tab" aria-selected={current.id === chipParent.id} className={`chip ${current.id === chipParent.id ? 'active' : ''}`.trim()} onClick={() => onSelect(chipParent)}>
           전체
         </button>
-        {(root.children ?? []).map((c) => (
+        {(chipParent.children ?? []).map((c) => (
           <button key={c.id} type="button" role="tab" aria-selected={current.id === c.id} className={`chip ${current.id === c.id ? 'active' : ''}`.trim()} onClick={() => onSelect(c)}>
             {c.name}
           </button>
