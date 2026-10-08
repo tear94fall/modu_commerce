@@ -22,7 +22,9 @@ class CategoryController(
 ) {
     @Operation(
         summary = "카테고리 트리 조회",
-        description = "대분류 아래 소분류(children)를 붙인 트리를 정렬 순서(sortOrder, id)대로 돌려준다. 아이콘(이모지)·색도 함께 온다.",
+        description =
+            "최상위부터 하위(children)를 단계마다 정렬 순서(sortOrder, id)대로 붙인 트리(최대 3단계, depth 1~3)를 돌려준다. " +
+                "아이콘(이모지)·색도 함께 온다.",
     )
     @GetMapping
     fun categories(): ResponseEntity<List<CategoryResponse>> = ResponseEntity.ok(getCategoriesUseCase.execute().map(CategoryResponse::from))

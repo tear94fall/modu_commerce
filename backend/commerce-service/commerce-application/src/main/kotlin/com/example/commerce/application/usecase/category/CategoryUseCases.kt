@@ -34,6 +34,22 @@ class GetAdminCategoriesUseCase(
         }
 }
 
+/** 형제 순서 바꾸기. 바꾼 뒤 어드민 트리(같은 트랜잭션, master)를 그대로 돌려준다. */
+@Component
+class ReorderCategoriesUseCase(
+    private val categoryCommandService: CategoryCommandService,
+    private val getAdminCategoriesUseCase: GetAdminCategoriesUseCase,
+) {
+    @Transactional(transactionManager = "rwTransactionManager")
+    fun execute(
+        parentId: Long?,
+        ids: List<Long>,
+    ): List<CategoryResult> {
+        categoryCommandService.reorder(parentId, ids)
+        return getAdminCategoriesUseCase.execute()
+    }
+}
+
 /** 등록·수정 응답은 자식 없는 노드 하나다. */
 data class CategoryNodeResult(
     val id: Long,

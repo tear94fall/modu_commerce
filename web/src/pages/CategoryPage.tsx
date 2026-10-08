@@ -11,7 +11,8 @@ import Toast from '../components/Toast'
 const POPULAR_SIZE = 8
 
 /**
- * 카테고리 탭. 왼쪽 레일에 대분류, 오른쪽에 고른 대분류의 소분류 격자와 인기 상품 줄.
+ * 카테고리 탭. 왼쪽 레일에 대분류, 오른쪽에 고른 대분류의 중분류와 인기 상품 줄.
+ * 소분류가 있는 중분류는 제목 + "전체"·소분류 격자로, 없는 중분류는 이웃끼리 한 격자로 그린다(순서는 서버 sortOrder 그대로).
  * 고른 대분류는 `?root=` 에 둔다(replace). 상품 목록에서 뒤로 오면 같은 대분류가 열려 있다.
  */
 export default function CategoryPage() {
@@ -109,21 +110,26 @@ function RootPane({ root }: { root: Category }) {
           전체 보기 <span aria-hidden="true">›</span>
         </Link>
       </div>
-      <div className="cat-sub-grid">
-        {children.length === 0 ? (
+      {children.length === 0 ? (
+        <div className="cat-sub-grid">
           <Link to={categoryLink(root)} className="cat-sub">
             <CategoryTile category={root} />
             <span className="label">전체 상품 보기</span>
           </Link>
-        ) : (
-          children.map((child) => (
-            <Link key={child.id} to={categoryLink(child)} className="cat-sub">
-              <CategoryTile category={child} />
-              <span className="label">{child.name}</span>
-            </Link>
-          ))
-        )}
-      </div>
+        </div>
+      ) : (
+        groupChildren(children).map((group) =>
+          group.kind === 'section' ? (
+            <SubSection key={group.category.id} category={group.category} />
+          ) : (
+            <div key={group.items[0].id} className="cat-sub-grid">
+              {group.items.map((child) => (
+                <SubTile key={child.id} category={child} />
+              ))}
+            </div>
+          ),
+        )
+      )}
       {popular.length > 0 && (
         <div className="cat-popular">
           <div className="cat-popular-head">
@@ -134,6 +140,50 @@ function RootPane({ root }: { root: Category }) {
         </div>
       )}
       <Toast message={message} onDone={clearMessage} />
+    </section>
+  )
+}
+
+type ChildGroup = { kind: 'section'; category: Category } | { kind: 'tiles'; items: Category[] }
+
+/** 서버 순서를 지키며 소분류가 있는 중분류는 따로, 없는 중분류는 이웃끼리 한 격자로 묶는다. */
+function groupChildren(children: Category[]): ChildGroup[] {
+  const groups: ChildGroup[] = []
+  for (const child of children) {
+    const last = groups[groups.length - 1]
+    if ((child.children ?? []).length > 0) groups.push({ kind: 'section', category: child })
+    else if (last?.kind === 'tiles') last.items.push(child)
+    else groups.push({ kind: 'tiles', items: [child] })
+  }
+  return groups
+}
+
+function SubTile({ category }: { category: Category }) {
+  return (
+    <Link to={categoryLink(category)} className="cat-sub">
+      <CategoryTile category={category} />
+      <span className="label">{category.name}</span>
+    </Link>
+  )
+}
+
+/** 소분류가 있는 중분류: 제목 줄 + 첫 칸 "전체"(중분류 아이콘, 소분류까지 전부) + 소분류 격자. */
+function SubSection({ category }: { category: Category }) {
+  return (
+    <section className="cat-group" aria-label={category.name}>
+      <h3 className="cat-group-head">
+        <CategoryTile category={category} size="xs" />
+        <span>{category.name}</span>
+      </h3>
+      <div className="cat-sub-grid">
+        <Link to={categoryLink(category)} className="cat-sub all" aria-label={`${category.name} 전체`}>
+          <CategoryTile category={category} />
+          <span className="label">전체</span>
+        </Link>
+        {category.children.map((child) => (
+          <SubTile key={child.id} category={child} />
+        ))}
+      </div>
     </section>
   )
 }

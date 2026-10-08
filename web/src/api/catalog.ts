@@ -1,11 +1,14 @@
 import { api } from './client'
 import { CountHint, insertMissing, RecentMap } from './recent'
 
+/** 카테고리 트리 한 칸. 깊이는 최대 3(대 › 중 › 소), 상품 목록은 하위 카테고리 상품까지 포함한다. */
 export interface Category {
   id: number
   name: string
   children: Category[]
   sortOrder?: number
+  /** 대분류 1, 중분류 2, 소분류 3. 옛 응답엔 없을 수 있다(트리 위치로 알 수 있다). 형제는 서버가 (sortOrder, id) 순으로 준다. */
+  depth?: number
   productCount?: number | null
   /** 이모지 하나("🍳"). 없으면 이름 첫 글자를 쓴다. */
   icon?: string | null

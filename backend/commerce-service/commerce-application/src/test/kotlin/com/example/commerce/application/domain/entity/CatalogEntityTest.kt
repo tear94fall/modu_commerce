@@ -123,6 +123,20 @@ class CatalogEntityTest {
     }
 
     @Test
+    fun `3단계 경로·깊이·조상 판별`() {
+        val root = Category.create("문구")
+        val child = Category.create("노트·데스크", root)
+        val grandchild = Category.create("노트", child)
+        assertEquals(listOf("문구", "노트·데스크", "노트"), grandchild.path().map { it.name })
+        assertEquals("문구 > 노트·데스크 > 노트", grandchild.pathName())
+        assertEquals("문구", root.pathName())
+        assertEquals(listOf(1, 2, 3), listOf(root, child, grandchild).map { it.depth() })
+        assertEquals(3, Category.MAX_DEPTH)
+        // 영속화 전이라 id 가 없다 — id 비교는 컨트롤러 테스트(CategoryDepthTest)가 본다.
+        assertFalse(grandchild.isSelfOrDescendantOf(1L))
+    }
+
+    @Test
     fun `찜 수는 0 아래로 내려가지 않는다`() {
         val product = tshirt()
         product.decreaseWishCount()
