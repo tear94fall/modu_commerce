@@ -72,6 +72,16 @@ interface OrderRoRepository :
         @Param("userId") userId: String,
     ): List<OrderStatusStat>
 
+    /** 포인트 대사 대상: 포인트를 쓴 주문 중 [from, to)(UTC)에 만들었거나 취소한 것. */
+    @Query(
+        "select o from Order o where o.pointAmount > 0 and " +
+            "((o.createdAt >= :from and o.createdAt < :to) or (o.cancelledAt >= :from and o.cancelledAt < :to)) order by o.id",
+    )
+    fun findPointOrdersBetween(
+        @Param("from") from: LocalDateTime,
+        @Param("to") to: LocalDateTime,
+    ): List<Order>
+
     /** 주문 줄 id 로 내 주문을 찾는다(리뷰 대상 확인). */
     @Query("select o from Order o join o.items i where i.id = :itemId and o.userId = :userId")
     fun findByItemIdAndUserId(

@@ -68,6 +68,36 @@ describe('OrderDetailPage', () => {
     expect(screen.getByText('7,000원')).toBeInTheDocument()
   })
 
+  it('says the point refund is still being processed while the refund is pending', async () => {
+    vi.spyOn(orders, 'getOrder').mockResolvedValue(
+      order({ status: 'CANCELLED', cancelledAt: '2026-09-19T14:30:00', pointAmount: 3000, paymentAmount: 7200, pointRefundStatus: 'PENDING' }),
+    )
+    render(
+      <MemoryRouter initialEntries={['/orders/77']}>
+        <Routes>
+          <Route path="/orders/:id" element={<OrderDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText('포인트 사용 · 포인트 환불 처리 중')).toBeInTheDocument()
+  })
+
+  it('says the points were refunded once done (or for an older server without the field)', async () => {
+    vi.spyOn(orders, 'getOrder')
+      .mockResolvedValueOnce(order({ status: 'CANCELLED', cancelledAt: '2026-09-19T14:30:00', pointAmount: 3000, pointRefundStatus: 'DONE' }))
+    render(
+      <MemoryRouter initialEntries={['/orders/77']}>
+        <Routes>
+          <Route path="/orders/:id" element={<OrderDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText('포인트 사용 (환불됨)')).toBeInTheDocument()
+    expect(screen.queryByText(/환불 처리 중/)).not.toBeInTheDocument()
+  })
+
   describe('purchase earn line', () => {
     const renderOrder = () =>
       render(

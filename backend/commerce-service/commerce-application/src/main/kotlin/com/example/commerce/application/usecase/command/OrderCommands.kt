@@ -23,4 +23,8 @@ data class CreateOrderCommand(
     val usePoints: Long = 0,
     /** 쓸 쿠폰(user_coupons.id). 없으면 null. */
     val userCouponId: Long? = null,
+    /** 앱이 보낸 Idempotency-Key(64자 이하). 같은 키로 다시 오면 처음 주문을 돌려준다. */
+    val idempotencyKey: String? = null,
+    /** 앱이 보여 준 결제 금액. 서버 계산과 다르면 409 PRICE_CHANGED. 없으면 확인하지 않는다. */
+    val expectedPaymentAmount: Long? = null,
 )

@@ -2,6 +2,7 @@ package com.example.commerce.application.service
 
 import com.example.commerce.application.common.logger
 import com.example.commerce.application.domain.entity.OrderItem
+import com.example.commerce.application.domain.entity.Product
 import com.example.commerce.application.domain.entity.Review
 import com.example.commerce.application.domain.entity.ReviewSort
 import com.example.commerce.application.domain.repository.ro.OrderRoRepository
@@ -135,7 +136,7 @@ class ReviewCommandService(
                 content = command.content,
             )
         val saved = reviewRwRepository.saveAndFlush(review)
-        product.addRating(saved.rating)
+        addRating(product, saved.rating)
         logger.info { "review ${saved.id} written by $userId on product ${product.id}: ${saved.rating}점" }
         return saved
     }
@@ -148,7 +149,10 @@ class ReviewCommandService(
         val review = reviewRwRepository.findByIdAndUserId(id, userId) ?: throw ReviewQueryService.notFound(id)
         val before = review.rating
         review.edit(command.rating, command.content)
-        if (review.isVisible()) review.product.replaceRating(before, review.rating)
+        if (review.isVisible() && before != review.rating) {
+            productRwRepository.addRatingDelta(requireNotNull(review.product.id), (review.rating - before).toLong())
+            review.product.replaceRating(before, review.rating)
+        }
         return review
     }
 
@@ -174,17 +178,34 @@ class ReviewCommandService(
         if (hidden == review.hidden) return review
         if (hidden) {
             review.hide(reason)
-            review.product.removeRating(review.rating)
+            removeRating(review.product, review.rating)
         } else {
             review.unhide()
-            review.product.addRating(review.rating)
+            addRating(review.product, review.rating)
         }
         return review
     }
 
     private fun remove(review: Review) {
-        if (review.isVisible()) review.product.removeRating(review.rating)
+        if (review.isVisible()) removeRating(review.product, review.rating)
         review.delete()
+    }
+
+    // 리뷰 수·별점 합은 원자적 UPDATE 로 바꾸고(동시 작성에도 잃지 않는다), 응답에 쓸 메모리 값도 같이 맞춘다.
+    private fun addRating(
+        product: Product,
+        rating: Int,
+    ) {
+        productRwRepository.addRating(requireNotNull(product.id), rating.toLong())
+        product.addRating(rating)
+    }
+
+    private fun removeRating(
+        product: Product,
+        rating: Int,
+    ) {
+        productRwRepository.removeRating(requireNotNull(product.id), rating.toLong())
+        product.removeRating(rating)
     }
 
     private fun ownItem(

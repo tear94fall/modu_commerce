@@ -41,7 +41,7 @@ export default function OrderDetailPage() {
       setOrder(await cancelOrder(orderId))
       setMessage('주문을 취소했습니다')
     } catch (e) {
-      setMessage(e instanceof ApiError && e.status === 400 ? e.message : '주문을 취소하지 못했습니다')
+      setMessage(e instanceof ApiError && (e.status === 400 || e.status === 503) && !e.message.startsWith('HTTP ') ? e.message : '주문을 취소하지 못했습니다')
     } finally {
       setWorking(false)
     }
@@ -57,6 +57,8 @@ export default function OrderDetailPage() {
   }
 
   const cancellable = order.status === 'PAID'
+  /** 포인트 환불이 아직 포인트 서비스에 닿지 않았다(서버가 다시 보낸다). FAILED 도 사용자에겐 처리 중이다. */
+  const refundPending = order.pointRefundStatus === 'PENDING' || order.pointRefundStatus === 'FAILED'
   return (
     <Screen className={cancellable ? 'with-bottom-bar' : ''}>
       <TopBar title="주문 상세" back />
@@ -121,7 +123,7 @@ export default function OrderDetailPage() {
         )}
         {order.pointAmount > 0 && (
           <div className="kv muted">
-            <span>포인트 사용{order.status === 'CANCELLED' ? ' (환불됨)' : ''}</span>
+            <span>포인트 사용{order.status === 'CANCELLED' ? (refundPending ? ' · 포인트 환불 처리 중' : ' (환불됨)') : ''}</span>
             <span>-{formatPrice(order.pointAmount)}</span>
           </div>
         )}

@@ -32,6 +32,11 @@ export function serverCode(body: string): string | undefined {
   }
 }
 
+/** 결제 금액이 바뀌어 주문을 막았다(409). 본문의 paymentAmount 가 서버가 다시 계산한 금액이다. */
+export const PRICE_CHANGED = 'PRICE_CHANGED'
+
+export const isPriceChanged = (e: unknown): e is ApiError => e instanceof ApiError && e.status === 409 && serverCode(e.body) === PRICE_CHANGED
+
 /** 커머스 가입(약관 동의) 전이라 막힌 요청. 서버는 403(가드) 또는 404(GET /me/customer) 에 이 코드를 준다. */
 export const CUSTOMER_REQUIRED = 'CUSTOMER_REQUIRED'
 

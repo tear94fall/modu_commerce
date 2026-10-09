@@ -5,6 +5,7 @@ import com.example.commerce.application.domain.entity.CartItem
 import com.example.commerce.application.domain.entity.Order
 import com.example.commerce.application.domain.entity.OrderItem
 import com.example.commerce.application.domain.entity.OrderStatus
+import com.example.commerce.application.domain.entity.PointRefundStatus
 import com.example.commerce.application.domain.entity.Review
 import com.example.commerce.application.domain.entity.Tier
 import java.time.LocalDateTime
@@ -177,16 +178,20 @@ data class OrderDetailResult(
     val items: List<OrderItemResult>,
     val earn: OrderEarnResult?,
     val expectedEarn: ExpectedEarnResult?,
+    /** 취소 주문의 포인트 환불 상태(아웃박스). 포인트를 안 썼거나 취소가 아니면 NONE. */
+    val pointRefundStatus: PointRefundStatus = PointRefundStatus.NONE,
 ) {
     companion object {
         /**
          * [reviewIds] 는 orderItemId → reviewId. 앱 주문 상세만 넘기고 어드민·생성 응답은 비워 둔다.
          * [tier] 는 주문한 고객의 지금 등급(앱). 결제완료·배송중 주문의 적립 예정에 쓴다.
+         * [pointRefundStatus] 는 [com.example.commerce.application.service.PointRefundStatusQueryService] 가 읽은 값.
          */
         fun from(
             o: Order,
             reviewIds: Map<Long, Long> = emptyMap(),
             tier: Tier? = null,
+            pointRefundStatus: PointRefundStatus = PointRefundStatus.NONE,
         ) = OrderDetailResult(
             id = requireNotNull(o.id),
             orderNo = o.orderNo,
@@ -210,9 +215,16 @@ data class OrderDetailResult(
             items = o.items.map { OrderItemResult.from(it, reviewIds[it.id]) },
             earn = earnOf(o),
             expectedEarn = expectedEarnOf(o, tier),
+            pointRefundStatus = pointRefundStatus,
         )
     }
 }
+
+/** 주문 생성 결과. [created] = 새로 만듦(201), false = 같은 Idempotency-Key 의 기존 주문(200). */
+data class CreateOrderOutcome(
+    val order: OrderDetailResult,
+    val created: Boolean,
+)
 
 /** 적립이 정해진 주문만(배송 완료 뒤). */
 fun earnOf(o: Order): OrderEarnResult? = o.earnPoints?.let { OrderEarnResult(o.earnStatus, it, o.earnRate ?: 0) }

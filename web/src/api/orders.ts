@@ -85,6 +85,9 @@ export interface OrderSummary {
   expectedEarn?: ExpectedEarn | null
 }
 
+/** 취소 주문의 포인트 환불 상태. PENDING = 포인트 서비스로 보내는 중(재시도 포함), FAILED = 운영 확인 중. */
+export type PointRefundStatus = 'NONE' | 'PENDING' | 'DONE' | 'FAILED'
+
 export interface OrderDetail {
   id: number
   orderNo: string
@@ -107,6 +110,8 @@ export interface OrderDetail {
   earn?: OrderEarn | null
   /** 결제완료·배송중일 때 예상 적립. 그 밖에는 null. */
   expectedEarn?: ExpectedEarn | null
+  /** 취소 주문의 포인트 환불 상태. 포인트를 안 썼거나 취소가 아니면 NONE(옛 서버는 없음). */
+  pointRefundStatus?: PointRefundStatus
 }
 
 export interface OrderLine {
@@ -122,11 +127,28 @@ export const updateAddress = (id: number, input: AddressInput) => api<Address>(`
 export const setDefaultAddress = (id: number) => api<Address>(`/api-public/v1/addresses/${id}/default`, { method: 'PUT' })
 export const deleteAddress = (id: number) => api<void>(`/api-public/v1/addresses/${id}`, { method: 'DELETE' })
 
+/**
+ * 주문 요청의 덧붙임. idempotencyKey 는 주문서 한 번(같은 입력)마다 하나 — 네트워크 오류로 다시 보낼 때 같은 키를 쓰면
+ * 서버는 주문을 새로 만들지 않고 처음 주문을 돌려준다. expectedPaymentAmount 는 화면에 보인 결제 금액(다르면 409 PRICE_CHANGED).
+ */
+export interface CreateOrderOptions {
+  idempotencyKey?: string
+  expectedPaymentAmount?: number
+}
+
 /** userCouponId 는 내 사용 가능 쿠폰(없으면 null). 쿠폰이 안 맞으면 400 과 까닭. */
-export const createOrder = (addressId: number, items: OrderLine[], cartItemIds: number[], usePoints = 0, userCouponId: number | null = null) =>
+export const createOrder = (addressId: number, items: OrderLine[], cartItemIds: number[], usePoints = 0, userCouponId: number | null = null, options: CreateOrderOptions = {}) =>
   api<OrderDetail>('/api-public/v1/orders', {
     method: 'POST',
-    body: JSON.stringify({ addressId, items, cartItemIds, usePoints, ...(userCouponId !== null ? { userCouponId } : {}) }),
+    headers: options.idempotencyKey ? { 'Idempotency-Key': options.idempotencyKey } : undefined,
+    body: JSON.stringify({
+      addressId,
+      items,
+      cartItemIds,
+      usePoints,
+      ...(userCouponId !== null ? { userCouponId } : {}),
+      ...(options.expectedPaymentAmount !== undefined ? { expectedPaymentAmount: options.expectedPaymentAmount } : {}),
+    }),
   }).then((o) => {
     if (userCouponId !== null) rememberCouponUsed(userCouponId, o.id)
     return o

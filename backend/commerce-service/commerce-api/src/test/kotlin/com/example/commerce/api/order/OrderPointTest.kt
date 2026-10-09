@@ -2,6 +2,7 @@ package com.example.commerce.api.order
 
 import com.example.commerce.api.support.CatalogTestSupport
 import com.example.commerce.application.point.InsufficientPointException
+import com.example.commerce.application.point.PointCancelResult
 import com.example.commerce.application.point.PointGateway
 import com.jayway.jsonpath.JsonPath
 import org.junit.jupiter.api.AfterEach
@@ -45,6 +46,13 @@ class OrderPointTest
         @AfterEach
         fun reseed() = support.reseed()
 
+        @BeforeEach
+        fun cancelOk() {
+            whenever(pointGateway.cancelSpend(any(), any(), anyOrNull())).thenAnswer {
+                PointCancelResult(cancelled = true, reason = null, amount = 0, balance = 0)
+            }
+        }
+
         private fun addressId(): Int =
             JsonPath.read(
                 mockMvc
@@ -85,8 +93,13 @@ class OrderPointTest
                 jsonPath("$.content[0].paymentAmount") { value(15_000) }
             }
 
-            mockMvc.post("/api-public/v1/orders/$orderId/cancel") { with(me) }.andExpect { status { isOk() } }
-            verify(pointGateway).refund(eq("11"), eq(3_000L), eq("refund:order:$orderNo"), eq("주문 취소 $orderNo"))
+            // 환불은 취소 커밋 뒤 spend/cancel(원래 차감 키)로 보낸다. point-service 는 refund:order:번호 로 돌려준다.
+            mockMvc.post("/api-public/v1/orders/$orderId/cancel") { with(me) }.andExpect {
+                status { isOk() }
+                jsonPath("$.pointRefundStatus") { value("DONE") }
+            }
+            verify(pointGateway).cancelSpend(eq("11"), eq("order:$orderNo"), eq("주문 취소 $orderNo"))
+            verify(pointGateway, never()).refund(any(), any(), any(), anyOrNull())
         }
 
         @Test
@@ -100,8 +113,11 @@ class OrderPointTest
                     with(admin)
                     contentType = MediaType.APPLICATION_JSON
                     content = """{"status":"CANCELLED"}"""
-                }.andExpect { status { isOk() } }
-            verify(pointGateway).refund(eq("11"), eq(500L), eq("refund:order:$orderNo"), anyOrNull())
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.pointRefundStatus") { value("DONE") }
+                }
+            verify(pointGateway).cancelSpend(eq("11"), eq("order:$orderNo"), anyOrNull())
         }
 
         @Test

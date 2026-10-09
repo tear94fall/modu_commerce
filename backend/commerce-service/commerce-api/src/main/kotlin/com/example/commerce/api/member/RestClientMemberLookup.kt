@@ -5,17 +5,17 @@ import com.example.commerce.api.point.PointClient
 import com.example.commerce.application.common.logger
 import com.example.commerce.application.member.MemberLookup
 import com.example.commerce.application.member.MemberProfile
-import org.springframework.beans.factory.annotation.Value
-import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.body
 
-/** member-service `/api-internal/member/members?userIds=` 로 한 명을 찾는다. 못 찾거나 실패하면 null(리뷰는 이름 없이 저장된다). */
-@Component
+/**
+ * member-service `/api-internal/member/members?userIds=` 로 한 명을 찾는다. 못 찾거나 실패하면 null(리뷰는 이름 없이 저장된다).
+ * 빈은 RemoteClientConfig 가 연결·응답 한도(modu.member.connect-timeout / read-timeout)를 건 빌더로 만든다.
+ */
 class RestClientMemberLookup(
     builder: RestClient.Builder,
     props: ModuMemberProperties,
-    @Value("\${modu.internal-api.token}") internalToken: String,
+    internalToken: String,
 ) : MemberLookup {
     private val client =
         builder

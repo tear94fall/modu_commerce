@@ -48,7 +48,7 @@ class MyPointControllerTest
 
             mockMvc.get("/api-public/v1/me/points") { with(me) }.andExpect {
                 status { isServiceUnavailable() }
-                jsonPath("$.message") { value("포인트 서비스에 연결할 수 없습니다.") }
+                jsonPath("$.message") { value("지금은 포인트를 쓸 수 없어요. 포인트 없이 주문하거나 잠시 후 다시 시도해 주세요.") }
             }
         }
 

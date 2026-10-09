@@ -1,9 +1,12 @@
 package com.example.commerce.api.point
 
 import com.example.commerce.application.common.logger
+import com.example.commerce.application.point.PointCancelResult
 import com.example.commerce.application.point.PointEarnResult
 import com.example.commerce.application.point.PointGateway
 import com.example.commerce.application.point.PointGatewayException
+import com.example.commerce.application.point.PointRef
+import com.example.commerce.application.point.PointRefTransaction
 import org.springframework.stereotype.Component
 
 /** 주문 서비스가 쓰는 포인트 포트 구현. 연결 실패는 [PointGatewayException](503)으로 바꿔 주문을 만들지 않는다. */
@@ -29,6 +32,23 @@ class RestClientPointGateway(
     ) {
         val result = wrap { pointClient.refund(userId, amount, refId, memo) }
         logger.info { "point refund $refId: applied=${result.applied} balance=${result.balance}" }
+    }
+
+    override fun cancelSpend(
+        userId: String,
+        spendRefId: String,
+        memo: String?,
+    ): PointCancelResult {
+        val result = wrap { pointClient.cancelSpend(userId, spendRefId, memo) }
+        logger.info { "point spend cancel $spendRefId: cancelled=${result.cancelled} reason=${result.reason} amount=${result.amount}" }
+        return PointCancelResult(result.cancelled, result.reason, result.amount, result.balance)
+    }
+
+    override fun findTransactions(refs: List<PointRef>): List<PointRefTransaction> {
+        require(refs.size <= PointGateway.MAX_REFS) { "refs 는 한 번에 ${PointGateway.MAX_REFS}개까지입니다." }
+        if (refs.isEmpty()) return emptyList()
+        val result = wrap { pointClient.refs(refs.map { PointRefKey(it.userId, it.refId) }) }
+        return result.transactions.map { PointRefTransaction(it.userId, it.refId, it.type, it.amount, it.createdDate) }
     }
 
     override fun earn(

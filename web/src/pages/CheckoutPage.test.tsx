@@ -57,7 +57,7 @@ describe('CheckoutPage', () => {
     expect(screen.getAllByText('10,200원').length).toBeGreaterThanOrEqual(2)
 
     await userEvent.click(screen.getByRole('button', { name: '결제하기' }))
-    expect(create).toHaveBeenCalledWith(1, [{ skuId: 50, quantity: 2 }], [9], 0, null)
+    expect(create).toHaveBeenCalledWith(1, [{ skuId: 50, quantity: 2 }], [9], 0, null, expect.objectContaining({ idempotencyKey: expect.any(String) }))
     expect(await screen.findByText('주문 상세 화면')).toBeInTheDocument()
   })
 
@@ -103,7 +103,7 @@ describe('CheckoutPage', () => {
     await userEvent.clear(screen.getByLabelText('사용 포인트'))
     await userEvent.type(screen.getByLabelText('사용 포인트'), '1200')
     await userEvent.click(screen.getByRole('button', { name: '결제하기' }))
-    expect(create).toHaveBeenCalledWith(1, [{ skuId: 50, quantity: 2 }], [9], 1200, null)
+    expect(create).toHaveBeenCalledWith(1, [{ skuId: 50, quantity: 2 }], [9], 1200, null, expect.objectContaining({ idempotencyKey: expect.any(String) }))
   })
 
   it('전액 사용 caps at the order total when the balance is bigger', async () => {
@@ -117,7 +117,7 @@ describe('CheckoutPage', () => {
     expect(screen.getByLabelText('사용 포인트')).toHaveValue(10200)
     expect(screen.getAllByText('0원').length).toBeGreaterThan(0)
     await userEvent.click(screen.getByRole('button', { name: '결제하기' }))
-    expect(create).toHaveBeenCalledWith(1, [{ skuId: 50, quantity: 2 }], [9], 10200, null)
+    expect(create).toHaveBeenCalledWith(1, [{ skuId: 50, quantity: 2 }], [9], 10200, null, expect.objectContaining({ idempotencyKey: expect.any(String) }))
   })
 
   it('applies a coupon before points, re-clamps the points and sends userCouponId', async () => {
@@ -154,7 +154,7 @@ describe('CheckoutPage', () => {
     expect(screen.getAllByText('0원').length).toBeGreaterThan(0)
 
     await userEvent.click(screen.getByRole('button', { name: '결제하기' }))
-    expect(create).toHaveBeenCalledWith(1, [{ skuId: 50, quantity: 2 }], [9], 7200, 31)
+    expect(create).toHaveBeenCalledWith(1, [{ skuId: 50, quantity: 2 }], [9], 7200, 31, expect.objectContaining({ idempotencyKey: expect.any(String) }))
   })
 
   it('drops the coupon when choosing 선택 안 함', async () => {
@@ -171,7 +171,7 @@ describe('CheckoutPage', () => {
     await userEvent.click(screen.getByRole('button', { name: '선택 안 함' }))
     expect(screen.queryByText('쿠폰 할인')).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '결제하기' }))
-    expect(create).toHaveBeenCalledWith(1, [{ skuId: 50, quantity: 2 }], [9], 0, null)
+    expect(create).toHaveBeenCalledWith(1, [{ skuId: 50, quantity: 2 }], [9], 0, null, expect.objectContaining({ idempotencyKey: expect.any(String) }))
   })
 
   it('clears the coupon when the order is refused because of it', async () => {
@@ -220,5 +220,68 @@ describe('CheckoutPage', () => {
 
     expect(await screen.findByText('모두 스티커 팩')).toBeInTheDocument()
     expect(screen.queryByText(/적립 예정/)).not.toBeInTheDocument()
+  })
+
+  it('sends the shown payment amount and reuses the same Idempotency-Key when retrying after a network error', async () => {
+    vi.spyOn(cart, 'getCart').mockResolvedValue({ items: [cartItem], totalAmount: 0, itemCount: 1 })
+    vi.spyOn(orders, 'getAddresses').mockResolvedValue([address()])
+    const create = vi.spyOn(orders, 'createOrder').mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValue(orderDetail)
+    renderAt('/checkout?cartItemIds=9')
+
+    await screen.findByText('모두 스티커 팩')
+    await userEvent.click(screen.getByRole('button', { name: '결제하기' }))
+    expect(await screen.findByText('주문하지 못했습니다')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '결제하기' }))
+    expect(await screen.findByText('주문 상세 화면')).toBeInTheDocument()
+
+    expect(create).toHaveBeenCalledTimes(2)
+    const first = create.mock.calls[0][5]
+    const second = create.mock.calls[1][5]
+    expect(first).toEqual({ idempotencyKey: expect.any(String), expectedPaymentAmount: 10200 })
+    expect(second?.idempotencyKey).toBe(first?.idempotencyKey)
+  })
+
+  it('uses a new Idempotency-Key once the order inputs change', async () => {
+    vi.spyOn(points, 'getMyPoints').mockResolvedValue(5000)
+    vi.spyOn(cart, 'getCart').mockResolvedValue({ items: [cartItem], totalAmount: 0, itemCount: 1 })
+    vi.spyOn(orders, 'getAddresses').mockResolvedValue([address()])
+    const create = vi.spyOn(orders, 'createOrder').mockRejectedValueOnce(new ApiError(503, JSON.stringify({ message: '지금은 포인트를 쓸 수 없어요. 포인트 없이 주문하거나 잠시 후 다시 시도해 주세요.' }))).mockResolvedValue(orderDetail)
+    renderAt('/checkout?cartItemIds=9')
+
+    await userEvent.type(await screen.findByLabelText('사용 포인트'), '1000')
+    await userEvent.click(screen.getByRole('button', { name: '결제하기' }))
+    expect(await screen.findByText('지금은 포인트를 쓸 수 없어요. 포인트 없이 주문하거나 잠시 후 다시 시도해 주세요.')).toBeInTheDocument()
+    await userEvent.clear(screen.getByLabelText('사용 포인트'))
+    await userEvent.click(screen.getByRole('button', { name: '결제하기' }))
+    expect(await screen.findByText('주문 상세 화면')).toBeInTheDocument()
+
+    expect(create.mock.calls[0][3]).toBe(1000)
+    expect(create.mock.calls[1][3]).toBe(0)
+    expect(create.mock.calls[1][5]?.expectedPaymentAmount).toBe(10200)
+    expect(create.mock.calls[1][5]?.idempotencyKey).not.toBe(create.mock.calls[0][5]?.idempotencyKey)
+  })
+
+  it('shows the price-changed message and reloads the summary with the new amount', async () => {
+    const getCart = vi
+      .spyOn(cart, 'getCart')
+      .mockResolvedValueOnce({ items: [cartItem], totalAmount: 0, itemCount: 1 })
+      .mockResolvedValue({ items: [{ ...cartItem, unitPrice: 5600, lineAmount: 11200 }], totalAmount: 0, itemCount: 1 })
+    vi.spyOn(orders, 'getAddresses').mockResolvedValue([address()])
+    const create = vi
+      .spyOn(orders, 'createOrder')
+      .mockRejectedValueOnce(new ApiError(409, JSON.stringify({ code: 'PRICE_CHANGED', message: '가격이 바뀌었어요. 결제 금액을 다시 확인해 주세요.', paymentAmount: 11200 })))
+      .mockResolvedValue(orderDetail)
+    renderAt('/checkout?cartItemIds=9')
+
+    await screen.findByText('모두 스티커 팩')
+    await userEvent.click(screen.getByRole('button', { name: '결제하기' }))
+    expect(await screen.findByText('가격이 바뀌었어요. 결제 금액을 다시 확인해 주세요.')).toBeInTheDocument()
+    expect((await screen.findAllByText('11,200원')).length).toBeGreaterThanOrEqual(2)
+    expect(getCart).toHaveBeenCalledTimes(2)
+
+    await userEvent.click(screen.getByRole('button', { name: '결제하기' }))
+    expect(await screen.findByText('주문 상세 화면')).toBeInTheDocument()
+    expect(create.mock.calls[1][5]?.expectedPaymentAmount).toBe(11200)
+    expect(create.mock.calls[1][5]?.idempotencyKey).not.toBe(create.mock.calls[0][5]?.idempotencyKey)
   })
 })
