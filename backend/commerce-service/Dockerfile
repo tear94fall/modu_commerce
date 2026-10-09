@@ -16,6 +16,8 @@ RUN --mount=type=cache,target=/root/.gradle ./gradlew --no-daemon -x test :comme
  && cp commerce-api/build/libs/commerce-api-*-SNAPSHOT.jar /app.jar
 
 # 2단계: 실행. exec 형식이라 java 가 PID 1 로 SIGTERM 을 받는다(server.shutdown=graceful). 힙은 컨테이너 메모리 제한의 75%.
+# JVM 시간대는 UTC 로 못박는다. 앱의 LocalDateTime 은 UTC 이고 JDBC(serverTimezone=Asia/Seoul)가 DB 에 KST 벽시계로 바꿔 쓴다 —
+# 기존 행이 모두 그 짝으로 쓰였으므로 JVM 시간대(TZ)가 바뀌면 새 행만 9시간 어긋난다.
 FROM amazoncorretto:21
 COPY --from=build /app.jar /commerce-service.jar
-ENTRYPOINT ["java","-XX:MaxRAMPercentage=75.0","-jar","/commerce-service.jar"]
+ENTRYPOINT ["java","-XX:MaxRAMPercentage=75.0","-Duser.timezone=UTC","-jar","/commerce-service.jar"]

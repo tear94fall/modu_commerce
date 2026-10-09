@@ -90,6 +90,7 @@ data class ProductRequest(
                     extraPrice =
                         it.extraPrice ?: 0,
                     stock = it.stock ?: 0,
+                    baseStock = it.baseStock,
                 )
             }
                 ?: listOf(SkuSpec(options = emptyMap(), extraPrice = 0, stock = stock ?: 0))
@@ -134,4 +135,12 @@ data class SkuRequest(
     @field:Schema(description = "재고, 0 이상. 없으면 0", example = "30")
     @field:PositiveOrZero(message = "재고는 0 이상이어야 합니다.")
     val stock: Int? = null,
+    @field:Schema(
+        description =
+            "선택. 화면이 불러왔을 때의 재고. 있으면 기존 옵션의 재고를 stock − baseStock 만큼 증감한다(그사이 팔린 수량을 덮어쓰지 않는다, " +
+                "0 아래로는 내려가지 않음). 없으면 stock 으로 덮어쓴다. 새 옵션에는 쓰지 않는다",
+        example = "30",
+    )
+    @field:PositiveOrZero(message = "기준 재고는 0 이상이어야 합니다.")
+    val baseStock: Int? = null,
 )

@@ -1,28 +1,42 @@
 package com.example.commerce.api.point
 
 import com.example.commerce.api.config.ModuPointProperties
+import com.example.commerce.application.common.logger
 import com.example.commerce.application.point.InsufficientPointException
 import com.example.commerce.application.point.PointEarnRejectedException
-import org.springframework.beans.factory.annotation.Value
+import com.example.commerce.application.point.PointGatewayException
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException
+import io.github.resilience4j.circuitbreaker.CircuitBreaker
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import org.springframework.http.HttpStatus
-import org.springframework.stereotype.Component
 import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientException
 import org.springframework.web.client.body
 
-/** point-service 내부 API 호출. 실패는 종류를 가리지 않고 [PointUnavailableException] 으로 바꿔 503 으로 답한다. */
-@Component
+/**
+ * point-service 내부 API 호출. 실패는 종류를 가리지 않고 [PointUnavailableException] 으로 바꿔 503 으로 답한다.
+ *
+ * 연결·응답 시간 한도는 빈을 만드는 쪽(RemoteClientConfig)이 [builder] 의 요청 팩토리에 건다(modu.point.connect-timeout / read-timeout).
+ * 모든 호출은 회로 차단기 [CIRCUIT_BREAKER] 를 지난다. point-service 가 연달아 실패하면 회로가 열려 한동안 부르지 않고 바로
+ * [PointUnavailableException] 을 던진다(요청 스레드가 시간 한도만큼 붙잡히지 않는다). 잔액 부족·적립 거절 같은 업무 응답은 실패로 세지 않는다.
+ */
 class PointClient(
     builder: RestClient.Builder,
     props: ModuPointProperties,
-    @Value("\${modu.internal-api.token}") internalToken: String,
+    internalToken: String,
+    circuitBreakerRegistry: CircuitBreakerRegistry,
 ) {
     private val client =
         builder
             .baseUrl(props.url)
             .defaultHeader(INTERNAL_TOKEN_HEADER, internalToken)
             .build()
+
+    /** 설정(resilience4j.circuitbreaker.instances.point)이 있으면 그것, 없으면 modu.point.circuit-breaker 값으로 만든다. */
+    val circuitBreaker: CircuitBreaker =
+        circuitBreakerRegistry.circuitBreaker(CIRCUIT_BREAKER, breakerConfig(props.circuitBreaker))
 
     fun balance(userId: String): PointBalance =
         call {
@@ -130,21 +144,73 @@ class PointClient(
                 .body<PointChangeResult>()
         }
 
+    /**
+     * 차감 [refId](`order:<번호>`)가 있으면 되돌린다(point-service 는 `refund:` + refId 로 돌려준다 — 취소 환불과 같은 키라 겹치지 않는다).
+     * 차감이 없으면 cancelled=false, reason=NO_SPEND.
+     */
+    fun cancelSpend(
+        userId: String,
+        refId: String,
+        memo: String?,
+    ): PointCancelResponse =
+        call {
+            client
+                .post()
+                .uri("/api-internal/point/spend/cancel")
+                .body(PointCancelRequest(userId, refId, memo))
+                .retrieve()
+                .body<PointCancelResponse>()
+        }
+
+    /** 원장에 있는 거래만 돌려준다(최대 500개). */
+    fun refs(refs: List<PointRefKey>): PointRefsResponse =
+        call {
+            client
+                .post()
+                .uri("/api-internal/point/refs")
+                .body(PointRefsRequest(refs))
+                .retrieve()
+                .body<PointRefsResponse>()
+        }
+
     private fun <T> call(block: () -> T?): T =
         try {
-            block() ?: throw PointUnavailableException()
-        } catch (e: RestClientException) {
+            circuitBreaker.executeSupplier {
+                try {
+                    block() ?: throw PointUnavailableException()
+                } catch (e: RestClientException) {
+                    throw PointUnavailableException(e)
+                }
+            }
+        } catch (e: CallNotPermittedException) {
+            logger.warn { "point-service circuit open: ${e.message}" }
             throw PointUnavailableException(e)
         }
 
     companion object {
         const val INTERNAL_TOKEN_HEADER = "X-Internal-Token"
+        const val CIRCUIT_BREAKER = "point"
+
+        /** point-service 장애([PointUnavailableException])만 실패로 센다. 잔액 부족(409)·거절(400)은 서버가 살아 있다는 뜻이다. */
+        fun breakerConfig(props: ModuPointProperties.CircuitBreakerProperties): CircuitBreakerConfig =
+            CircuitBreakerConfig
+                .custom()
+                .slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED)
+                .slidingWindowSize(props.slidingWindowSize)
+                .minimumNumberOfCalls(props.minimumNumberOfCalls)
+                .failureRateThreshold(props.failureRateThreshold)
+                .waitDurationInOpenState(props.waitDurationInOpenState)
+                .permittedNumberOfCallsInHalfOpenState(props.permittedCallsInHalfOpenState)
+                .automaticTransitionFromOpenToHalfOpenEnabled(false)
+                .recordExceptions(PointUnavailableException::class.java)
+                .build()
     }
 }
 
+/** point-service 를 못 부름(연결 실패·시간 초과·오류 응답·회로 열림). 503 으로 답한다. */
 class PointUnavailableException(
     cause: Throwable? = null,
-) : RuntimeException("포인트 서비스에 연결할 수 없습니다.", cause)
+) : RuntimeException(PointGatewayException.MESSAGE, cause)
 
 data class PointBalance(
     val userId: String,
@@ -185,6 +251,43 @@ data class PointChangeResult(
     val applied: Boolean,
     val amount: Long,
     val balance: Long,
+)
+
+/** spend/cancel 요청. refId 는 원래 차감 키(order:<번호>). */
+data class PointCancelRequest(
+    val userId: String,
+    val refId: String,
+    val memo: String?,
+)
+
+/** spend/cancel 응답. reason: NO_SPEND, ALREADY_REFUNDED, 되돌렸으면 null. */
+data class PointCancelResponse(
+    val cancelled: Boolean,
+    val reason: String? = null,
+    val amount: Long = 0,
+    val balance: Long = 0,
+)
+
+data class PointRefKey(
+    val userId: String,
+    val refId: String,
+)
+
+data class PointRefsRequest(
+    val refs: List<PointRefKey>,
+)
+
+data class PointRefsResponse(
+    val transactions: List<PointRefTransactionDto> = emptyList(),
+)
+
+/** refs 응답의 거래 한 건. */
+data class PointRefTransactionDto(
+    val userId: String,
+    val refId: String,
+    val type: String,
+    val amount: Long,
+    val createdDate: String? = null,
 )
 
 /** point-service 의 EarnRequestDto. */

@@ -49,6 +49,7 @@ class CatalogTestSupport(
             "coupon_scope_targets",
             "coupons",
             "reviews",
+            "point_outbox",
             "order_items",
             "orders",
             "cart_items",

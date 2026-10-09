@@ -29,6 +29,9 @@ spring:
         maximum-pool-size: 10
         minimum-idle: 2
         connection-timeout: 30000
+        # 행 잠금 대기 한도(초). 주문·SKU 잠금(SELECT … FOR UPDATE)이 이보다 오래 막히면 잠금 실패 → 503 "요청이 몰려…".
+        # Hibernate 의 MySQL 방언은 jakarta.persistence.lock.timeout 힌트를 SQL 에 싣지 못해 세션 변수로 건다(기본 50초).
+        connection-init-sql: SET SESSION innodb_lock_wait_timeout = ${DB_LOCK_WAIT_TIMEOUT_SECONDS:3}
 
     replica:
       url: ${DB_REPLICA_URL:${DB_MASTER_URL:jdbc:mysql://localhost:3316/commerce?useSSL=false&characterEncoding=UTF-8&serverTimezone=Asia/Seoul&allowPublicKeyRetrieval=true}}
@@ -100,12 +103,28 @@ modu:
   # 아래는 설정 서버 없이 로컬에서 띄울 때의 기본값.
   internal-api:
     token: modu-internal-dev-token
-  # 마이 탭 포인트 조회가 부르는 point-service(모두 챗 백엔드). 기본은 modu.services.point-service, 환경 변수로 덮어쓸 수 있다.
+  # 포인트 결제·환불·마이 탭 포인트가 부르는 point-service(모두 챗 백엔드). 기본은 modu.services.point-service, 환경 변수로 덮어쓸 수 있다.
   point:
     url: ${MODU_POINT_URL:${modu.services.point-service}}
+    # 연결·응답 한도. point-service 가 멈춰도 주문 요청이 오래 붙잡히지 않는다.
+    connect-timeout: 1s
+    read-timeout: 3s
+    # 회로 차단기: 최근 20번 중(10번 이상 불렀을 때) 절반 이상 실패하면 30초 동안 부르지 않고 바로 503.
+    circuit-breaker:
+      sliding-window-size: 20
+      minimum-number-of-calls: 10
+      failure-rate-threshold: 50
+      wait-duration-in-open-state: 30s
+      permitted-calls-in-half-open-state: 3
+    # 포인트 아웃박스: 1분마다 릴레이(차감 되돌리기·취소 환불 재시도), 매일 04:00 KST 전날 대사.
+    outbox:
+      relay-enabled: true
+      reconcile-enabled: true
   # 리뷰 작성자 이름·이메일을 받는 member-service(모두 챗 백엔드). 기본은 modu.services.member-service.
   member:
     url: ${MODU_MEMBER_URL:${modu.services.member-service}}
+    connect-timeout: 1s
+    read-timeout: 3s
 
   # 기획전·이벤트 캐시. 개발·운영은 config-service 가 redis-enabled=true 와 클러스터 노드를 내려준다. 기본(IDE·테스트)은 메모리 캐시.
   cache:

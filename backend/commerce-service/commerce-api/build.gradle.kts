@@ -31,6 +31,8 @@ dependencies {
     // 스케줄러 분산 잠금. 파드가 2개 이상이어도 등급 산정·적립 재시도·푸시 캠페인이 한 곳에서만 돈다(shedlock 테이블, SchedulerLockConfig).
     implementation("net.javacrumbs.shedlock:shedlock-spring:6.3.0")
     implementation("net.javacrumbs.shedlock:shedlock-provider-jdbc-template:6.3.0")
+    // point-service 호출의 회로 차단기(PointClient). 레지스트리 빈과 Micrometer 지표(resilience4j_circuitbreaker_*)를 자동 구성한다.
+    implementation("io.github.resilience4j:resilience4j-spring-boot3:2.2.0")
 
     testImplementation("org.springframework.security:spring-security-test")
     // 코틀린 non-null 파라미터에 Mockito 매처(eq/any)를 쓰기 위해

@@ -168,8 +168,8 @@ class ProductRepositoryTest
         fun `인기순은 찜 수 내림차순`() {
             catalog()
             val mug = productRwRepository.findAll().first { it.name == "모두 머그컵 세트" }
-            repeat(3) { mug.increaseWishCount() }
-            productRwRepository.save(mug)
+            // 찜 수는 엔티티 저장으로 바뀌지 않는다(updatable = false). 원자적 UPDATE 로만 올린다.
+            repeat(3) { productRwRepository.incrementWishCount(requireNotNull(mug.id)) }
 
             val first = productRoRepository.searchAppPage(null, null, ProductSort.POPULAR, PageRequest.of(0, 1)).content.single()
             assertEquals("모두 머그컵 세트", first.name)

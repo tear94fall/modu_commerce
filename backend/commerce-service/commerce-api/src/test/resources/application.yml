@@ -62,6 +62,10 @@ modu:
     token: test-internal-token
   point:
     url: ${modu.services.point-service}
+    # 아웃박스 릴레이·대사 스케줄러는 끄고 테스트가 서비스를 직접 부른다.
+    outbox:
+      relay-enabled: false
+      reconcile-enabled: false
   member:
     url: ${modu.services.member-service}
   # 푸시: 스케줄러는 끄고(테스트가 runDue 를 직접 부른다) 지금 보내기는 요청 스레드에서 바로 보낸다.

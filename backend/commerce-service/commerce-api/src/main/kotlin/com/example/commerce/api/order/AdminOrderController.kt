@@ -78,7 +78,8 @@ class AdminOrderController(
         summary = "주문 상태 변경",
         description =
             "PAID → SHIPPING·CANCELLED, SHIPPING → DELIVERED 만 허용하고 그 밖은 400. 없는 주문이면 404. " +
-                "취소하면 재고·쿠폰·결제 포인트를 되돌리고(포인트 서버를 못 부르면 503), 배송 완료면 커밋 뒤 구매 적립을 한다.",
+                "취소하면 재고·쿠폰을 되돌리고 결제 포인트는 커밋 뒤 환불한다(point-service 가 죽어 있으면 pointRefundStatus=PENDING, 나중에 다시 보낸다). " +
+                "배송 완료면 커밋 뒤 구매 적립을 한다.",
     )
     @PatchMapping("/{id}/status")
     fun changeStatus(

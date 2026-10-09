@@ -1,16 +1,22 @@
 package com.example.commerce.api.common
 
 import com.example.commerce.api.point.PointUnavailableException
+import com.example.commerce.application.common.logger
 import com.example.commerce.application.point.PointGatewayException
 import com.example.commerce.application.service.AlreadyCheckedInException
 import com.example.commerce.application.service.CouponAlreadyIssuedException
 import com.example.commerce.application.service.CouponCodeNotFoundException
 import com.example.commerce.application.service.CustomerRequiredException
+import com.example.commerce.application.service.PriceChangedException
 import com.example.commerce.application.service.PushCampaignStateException
 import com.example.commerce.application.service.PushSendFailedException
 import com.example.commerce.application.service.TierRunConflictException
 import com.fasterxml.jackson.annotation.JsonInclude
 import jakarta.persistence.EntityNotFoundException
+import jakarta.persistence.LockTimeoutException
+import jakarta.persistence.PessimisticLockException
+import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.dao.PessimisticLockingFailureException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
@@ -90,17 +96,51 @@ class GlobalExceptionHandler {
     fun handleTierRunConflict(ex: TierRunConflictException): ResponseEntity<ErrorResponse> =
         ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse(ex.message ?: "이미 등급 산정이 진행 중입니다."))
 
+    /** point-service 장애·시간 초과·회로 열림. 포인트 없는 주문은 이 경로를 타지 않는다. */
     @ExceptionHandler(PointUnavailableException::class, PointGatewayException::class)
     @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
     fun handlePointUnavailable(ex: RuntimeException): ResponseEntity<ErrorResponse> =
-        ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(ErrorResponse(ex.message ?: "포인트 서비스에 연결할 수 없습니다."))
+        ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(ErrorResponse(ex.message ?: PointGatewayException.MESSAGE))
+
+    /** 화면이 본 결제 금액이 서버 계산과 다르다. 앱은 문구를 보이고 새 금액으로 주문서를 다시 그린다. */
+    @ExceptionHandler(PriceChangedException::class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    fun handlePriceChanged(ex: PriceChangedException): ResponseEntity<ErrorResponse> =
+        ResponseEntity
+            .status(HttpStatus.CONFLICT)
+            .body(ErrorResponse(PriceChangedException.MESSAGE, PriceChangedException.CODE, paymentAmount = ex.paymentAmount))
+
+    /** 유니크 제약 등에 걸림 — 같은 요청이 동시에 두 번 처리된 경우가 대부분이다. */
+    @ExceptionHandler(DataIntegrityViolationException::class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    fun handleDataIntegrity(ex: DataIntegrityViolationException): ResponseEntity<ErrorResponse> {
+        logger.warn { "data integrity violation: ${ex.mostSpecificCause.message}" }
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse(DUPLICATE_MESSAGE))
+    }
+
+    /** 행 잠금을 시간 안에 못 잡음(같은 주문·옵션에 요청이 몰림). 잠시 뒤 다시 하면 된다. */
+    @ExceptionHandler(PessimisticLockingFailureException::class, PessimisticLockException::class, LockTimeoutException::class)
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    fun handleLockFailure(ex: Exception): ResponseEntity<ErrorResponse> {
+        logger.warn { "lock not acquired: ${ex.message}" }
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(ErrorResponse(BUSY_MESSAGE))
+    }
+
+    companion object {
+        const val DUPLICATE_MESSAGE = "이미 처리된 요청이에요."
+        const val BUSY_MESSAGE = "요청이 몰려 처리하지 못했어요. 잠시 후 다시 시도해 주세요."
+    }
 }
 
-/** [code] 는 앱이 분기할 때만 붙는다(CUSTOMER_REQUIRED). 없으면 JSON 에서 빠진다. */
+/**
+ * [code] 는 앱이 분기할 때만 붙는다(CUSTOMER_REQUIRED, PRICE_CHANGED). [paymentAmount] 는 PRICE_CHANGED 의 새 결제 금액.
+ * null 인 필드는 JSON 에서 빠진다.
+ */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class ErrorResponse(
     val message: String,
     val code: String? = null,
+    val paymentAmount: Long? = null,
 )
 
 fun customerRequired() = ErrorResponse(CustomerRequiredException.MESSAGE, CustomerRequiredException.CODE)
