@@ -4,9 +4,6 @@ import com.example.commerce.application.common.logger
 import com.example.commerce.application.service.PromotionCaches
 import com.example.commerce.application.service.PromotionSnapshot
 import com.example.commerce.application.usecase.result.PromotionBannerResult
-import com.fasterxml.jackson.databind.JavaType
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.SerializationFeature
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.cache.Cache
@@ -20,8 +17,10 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.data.redis.cache.RedisCacheConfiguration
 import org.springframework.data.redis.cache.RedisCacheManager
 import org.springframework.data.redis.connection.RedisConnectionFactory
-import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer
+import org.springframework.data.redis.serializer.JacksonJsonRedisSerializer
 import org.springframework.data.redis.serializer.RedisSerializationContext
+import tools.jackson.databind.JavaType
+import tools.jackson.databind.ObjectMapper
 import java.time.Duration
 
 /**
@@ -62,7 +61,7 @@ class CacheConfig(
             .entryTtl(ttl)
             .prefixCacheNameWith(props.keyPrefix)
             .disableCachingNullValues()
-            .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(Jackson2JsonRedisSerializer<Any>(mapper, type)))
+            .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(JacksonJsonRedisSerializer<Any>(mapper, type)))
         return RedisCacheManager
             .builder(connectionFactory.getObject())
             .withCacheConfiguration(
@@ -77,8 +76,11 @@ class CacheConfig(
     }
 
     companion object {
-        /** Redis 에 넣는 JSON. 날짜는 "2026-09-25" 문자열(redis-cli 로 봐도 읽힌다). */
-        fun cacheObjectMapper(base: ObjectMapper): ObjectMapper = base.copy().disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+        /**
+         * Redis 에 넣는 JSON. 날짜는 "2026-09-25" 문자열(redis-cli 로 봐도 읽힌다).
+         * Jackson 3 은 날짜를 항상 ISO 문자열로 쓴다(WRITE_DATES_AS_TIMESTAMPS 자체가 없어졌다) — 그대로 쓴다.
+         */
+        fun cacheObjectMapper(base: ObjectMapper): ObjectMapper = base
     }
 
     /** Redis 가 죽어도 조회는 DB 로 계속된다. 캐시 오류는 로그만 남긴다. */

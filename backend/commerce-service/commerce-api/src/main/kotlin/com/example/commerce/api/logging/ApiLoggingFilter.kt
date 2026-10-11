@@ -54,7 +54,8 @@ class ApiLoggingFilter(
         response: HttpServletResponse,
         chain: FilterChain,
     ) {
-        val cachedRequest = ContentCachingRequestWrapper(request)
+        // Spring Framework 7 은 캐시 한도를 요구한다 — 전처럼 본문 전체를 담는다.
+        val cachedRequest = ContentCachingRequestWrapper(request, Int.MAX_VALUE)
         val cachedResponse = ContentCachingResponseWrapper(response)
         val started = System.nanoTime()
         try {

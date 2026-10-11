@@ -4,7 +4,9 @@ plugins {
 
 dependencies {
     implementation(project(":commerce-application"))
-    implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.boot:spring-boot-starter-webmvc")
+    // RestClient 자동 설정·ClientHttpRequestFactoryBuilder. Boot 4 에선 webmvc 스타터가 끌어오지 않아 따로 선언한다.
+    implementation("org.springframework.boot:spring-boot-starter-restclient")
     // 컨테이너 준비·생존 검사(/actuator/health/readiness, /liveness). 서비스 포트(도커 네트워크 안)에서만 열린다.
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     // /actuator/prometheus. Prometheus 가 서비스 포트에서 긁어 간다(SecurityConfig 가 토큰 없이 연다).
@@ -14,8 +16,8 @@ dependencies {
     implementation("org.springframework.cloud:spring-cloud-starter-config")
     // admin 상품 등록·수정 요청 검증(@Valid)
     implementation("org.springframework.boot:spring-boot-starter-validation")
-    // API 문서(GET /v3/api-docs, JSON 만). 화면은 시스템 콘솔(modu-system)이 게이트웨이를 거쳐 그린다. Boot 3.5 ↔ springdoc 2.8.x
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-api:2.8.17")
+    // API 문서(GET /v3/api-docs, JSON 만). 화면은 시스템 콘솔(modu-system)이 게이트웨이를 거쳐 그린다. Boot 4.0 ↔ springdoc 3.0.x
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-api:3.0.3")
     // 모두 계정(auth-service) 토큰을 JWKS 로 검증하는 리소스 서버
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
@@ -29,14 +31,16 @@ dependencies {
         exclude(group = "com.fasterxml.jackson.dataformat", module = "jackson-dataformat-xml")
     }
     // 스케줄러 분산 잠금. 파드가 2개 이상이어도 등급 산정·적립 재시도·푸시 캠페인이 한 곳에서만 돈다(shedlock 테이블, SchedulerLockConfig).
-    implementation("net.javacrumbs.shedlock:shedlock-spring:6.3.0")
-    implementation("net.javacrumbs.shedlock:shedlock-provider-jdbc-template:6.3.0")
+    implementation("net.javacrumbs.shedlock:shedlock-spring:7.10.1")
+    implementation("net.javacrumbs.shedlock:shedlock-provider-jdbc-template:7.10.1")
     // point-service 호출의 회로 차단기(PointClient). 레지스트리 빈과 Micrometer 지표(resilience4j_circuitbreaker_*)를 자동 구성한다.
-    implementation("io.github.resilience4j:resilience4j-spring-boot3:2.2.0")
+    implementation("io.github.resilience4j:resilience4j-spring-boot4:2.4.0")
 
     testImplementation("org.springframework.security:spring-security-test")
     // 코틀린 non-null 파라미터에 Mockito 매처(eq/any)를 쓰기 위해
-    testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:6.4.0")
+    // @AutoConfigureMetrics(옛 @AutoConfigureObservability) — Boot 4 에서 별도 테스트 스타터로 갈라졌다.
+    testImplementation("org.springframework.boot:spring-boot-starter-actuator-test")
 }
 
 springBoot {

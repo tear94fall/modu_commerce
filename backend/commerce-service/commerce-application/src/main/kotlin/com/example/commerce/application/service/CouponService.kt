@@ -91,7 +91,10 @@ class CouponQueryService(
     fun scopeLabel(coupon: Coupon): String {
         val ids = coupon.scopeIds.toList()
         return when (coupon.scope) {
-            CouponScope.ALL -> "전체 상품"
+            CouponScope.ALL -> {
+                "전체 상품"
+            }
+
             CouponScope.CATEGORY -> {
                 val names = ids.mapNotNull { categoryRoRepository.findById(it)?.name }
                 when {
@@ -100,20 +103,28 @@ class CouponQueryService(
                     else -> "'${names[0]}' 외 ${names.size - 1}개 카테고리"
                 }
             }
-            CouponScope.PRODUCT ->
+
+            CouponScope.PRODUCT -> {
                 if (ids.size == 1) {
                     productRoRepository.findById(ids[0])?.let { "'${it.name}' 전용" } ?: "지정 상품 1개"
                 } else {
                     "지정 상품 ${ids.size}개"
                 }
+            }
         }
     }
 
     /** 카테고리·상품 이름(백오피스 상세). */
     fun scopeTargets(coupon: Coupon): List<Pair<Long, String>> =
         when (coupon.scope) {
-            CouponScope.ALL -> emptyList()
-            CouponScope.CATEGORY -> coupon.scopeIds.mapNotNull { id -> categoryRoRepository.findById(id)?.let { id to it.name } }
+            CouponScope.ALL -> {
+                emptyList()
+            }
+
+            CouponScope.CATEGORY -> {
+                coupon.scopeIds.mapNotNull { id -> categoryRoRepository.findById(id)?.let { id to it.name } }
+            }
+
             CouponScope.PRODUCT -> {
                 val byId = productRoRepository.findAllByIdIn(coupon.scopeIds).associateBy { it.id }
                 coupon.scopeIds.map { id -> id to (byId[id]?.name ?: "삭제된 상품 #$id") }

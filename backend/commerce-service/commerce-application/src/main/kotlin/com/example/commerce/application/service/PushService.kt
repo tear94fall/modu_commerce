@@ -213,6 +213,7 @@ class PushCampaignCommandService(
                 require(product.status == ProductStatus.SELLING) { "판매 중인 상품만 고를 수 있습니다." }
                 product.name
             }
+
             PushTargetType.PROMOTION -> {
                 val promotion =
                     promotionRwRepository.findByIdOrNull(requireNotNull(content.targetId))
@@ -220,7 +221,10 @@ class PushCampaignCommandService(
                 require(promotion.visible) { "노출 중인 기획전·이벤트만 고를 수 있습니다." }
                 promotion.title
             }
-            PushTargetType.COUPONS, PushTargetType.HOME -> null
+
+            PushTargetType.COUPONS, PushTargetType.HOME -> {
+                null
+            }
         }
 
     fun cancel(id: Long) {

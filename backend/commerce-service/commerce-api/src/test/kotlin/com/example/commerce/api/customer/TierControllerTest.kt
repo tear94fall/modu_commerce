@@ -11,8 +11,8 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
@@ -100,12 +100,13 @@ class TierControllerTest
             userId: String,
             couponId: Int,
         ): List<String> =
-            jdbc.queryForList(
-                "select issue_key from user_coupons where user_id = ? and coupon_id = ? order by issue_key",
-                String::class.java,
-                userId,
-                couponId,
-            )
+            jdbc
+                .queryForList(
+                    "select issue_key from user_coupons where user_id = ? and coupon_id = ? order by issue_key",
+                    String::class.java,
+                    userId,
+                    couponId,
+                ).filterNotNull() // Spring Framework 7 의 널 표기로 List<String?> 이 된다
 
         @Test
         fun `매월 산정은 지난 6개월(KST) 배송 완료 결제 금액으로 등급을 정하고 이력을 남긴다`() {

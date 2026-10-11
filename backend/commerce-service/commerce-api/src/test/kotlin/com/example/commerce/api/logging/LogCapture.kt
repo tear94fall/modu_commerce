@@ -1,5 +1,6 @@
 package com.example.commerce.api.logging
 
+// boot4-src: keep-jackson2 — logstash-logback-encoder 의 StructuredArgument 는 Jackson 2 의 JsonGenerator 에 쓴다. 이 테스트는 Jackson 2 매퍼를 그대로 쓴다.
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender

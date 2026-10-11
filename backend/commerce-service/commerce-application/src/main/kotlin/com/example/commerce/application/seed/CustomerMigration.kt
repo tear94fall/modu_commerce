@@ -68,7 +68,7 @@ class CustomerMigration(
                 "select user_id, min(t) as first_at from (" + SOURCES.joinToString(" union all ") + ") u group by user_id",
             ) { rs, _ -> rs.getString(1) to rs.getTimestamp(2) }
         if (firstSeen.isEmpty()) return 0
-        val existing = jdbc.queryForList("select user_id from commerce_customers", String::class.java).toSet()
+        val existing = jdbc.queryForList("select user_id from commerce_customers", String::class.java).filterNotNull().toSet()
         val now = Timestamp.valueOf(TierPeriods.utcNow(clock))
         val rows = firstSeen.filter { it.first !in existing }.map { (userId, at) -> arrayOf<Any>(userId, at ?: now, lowest, at ?: now) }
         if (rows.isEmpty()) return 0

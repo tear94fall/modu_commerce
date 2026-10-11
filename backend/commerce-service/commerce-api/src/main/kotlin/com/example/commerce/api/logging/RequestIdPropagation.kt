@@ -1,7 +1,7 @@
 package com.example.commerce.api.logging
 
 import org.slf4j.MDC
-import org.springframework.boot.web.client.RestClientCustomizer
+import org.springframework.boot.restclient.RestClientCustomizer
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.HttpRequest
@@ -17,7 +17,7 @@ class RequestIdPropagationInterceptor : ClientHttpRequestInterceptor {
         execution: ClientHttpRequestExecution,
     ): ClientHttpResponse {
         val requestId = MDC.get(RequestContextFilter.MDC_REQUEST_ID)
-        if (!requestId.isNullOrBlank() && !request.headers.containsKey(RequestContextFilter.REQUEST_ID_HEADER)) {
+        if (!requestId.isNullOrBlank() && !request.headers.containsHeader(RequestContextFilter.REQUEST_ID_HEADER)) {
             request.headers.set(RequestContextFilter.REQUEST_ID_HEADER, requestId)
         }
         return execution.execute(request, body)

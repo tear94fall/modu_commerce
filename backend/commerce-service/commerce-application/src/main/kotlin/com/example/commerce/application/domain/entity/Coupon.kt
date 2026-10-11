@@ -190,8 +190,14 @@ class Coupon(
     /** 이 상품에 쓸 수 있는가(범위만 본다). */
     fun covers(product: Product): Boolean =
         when (scope) {
-            CouponScope.ALL -> true
-            CouponScope.PRODUCT -> product.id in scopeIds
+            CouponScope.ALL -> {
+                true
+            }
+
+            CouponScope.PRODUCT -> {
+                product.id in scopeIds
+            }
+
             CouponScope.CATEGORY -> {
                 generateSequence(product.category) { it.parent }.any { it.id in scopeIds }
             }

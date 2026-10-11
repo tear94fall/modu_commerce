@@ -167,8 +167,10 @@ class PromotionCommandService(
                 require(missing.isEmpty()) { "없는 상품이 있습니다: ${missing.joinToString()}" }
                 promotion.replaceProducts(c.productIds)
             }
-            PromotionType.EVENT ->
+
+            PromotionType.EVENT -> {
                 promotion.setReward(if (promotion.kind() == EventKind.ATTENDANCE) c.pointRuleCode else null, c.rewardPoints)
+            }
         }
     }
 }
