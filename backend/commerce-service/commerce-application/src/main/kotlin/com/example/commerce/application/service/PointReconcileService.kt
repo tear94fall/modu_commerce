@@ -127,8 +127,14 @@ class PointReconcileService(
                     queued++
                     logger.warn { "point refund missing for cancelled order ${o.orderNo}: REFUND outbox queued" }
                 }
-                PointOutboxStatus.PENDING -> logger.warn { "point refund missing for cancelled order ${o.orderNo}: outbox still retrying" }
-                else -> logger.error { "point refund missing for cancelled order ${o.orderNo} but outbox is $existing" }
+
+                PointOutboxStatus.PENDING -> {
+                    logger.warn { "point refund missing for cancelled order ${o.orderNo}: outbox still retrying" }
+                }
+
+                else -> {
+                    logger.error { "point refund missing for cancelled order ${o.orderNo} but outbox is $existing" }
+                }
             }
         }
         logger.info { "point reconcile $day: ${orders.size} order(s), anomalies=$anomalies, refunds queued=$queued" }

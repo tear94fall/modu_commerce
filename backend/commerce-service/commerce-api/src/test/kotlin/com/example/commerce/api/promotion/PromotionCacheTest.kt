@@ -14,12 +14,11 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Import
-import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer
+import org.springframework.data.redis.serializer.JacksonJsonRedisSerializer
 import org.springframework.http.MediaType
-import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
@@ -28,6 +27,7 @@ import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
+import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.time.LocalDate
 import javax.sql.DataSource
 
@@ -119,7 +119,8 @@ class PromotionCacheTest
         /** Redis 에는 JSON 으로 들어간다. 코틀린 data class·날짜·enum 이 그대로 돌아오는지(RedisCacheManager 와 같은 직렬화기). */
         @Test
         fun `redis json serialization round-trips banners and snapshots`() {
-            val mapper = CacheConfig.cacheObjectMapper(Jackson2ObjectMapperBuilder.json().build())
+            // Jackson2ObjectMapperBuilder 는 Jackson 2 매퍼를 만든다 — Boot 4(Jackson 3)에선 코틀린 모듈이 붙은 매퍼를 바로 만든다(앱의 자동 설정 매퍼와 같은 꼴).
+            val mapper = CacheConfig.cacheObjectMapper(jacksonObjectMapper())
             val banners =
                 listOf(
                     PromotionBannerResult(
@@ -134,7 +135,7 @@ class PromotionCacheTest
                     ),
                 )
             val listType = mapper.typeFactory.constructCollectionType(List::class.java, PromotionBannerResult::class.java)
-            val bannerSerializer = Jackson2JsonRedisSerializer<Any>(mapper, listType)
+            val bannerSerializer = JacksonJsonRedisSerializer<Any>(mapper, listType)
             assertEquals(banners, bannerSerializer.deserialize(bannerSerializer.serialize(banners)))
 
             val snapshot =
@@ -155,7 +156,7 @@ class PromotionCacheTest
                     null,
                 )
             val snapshotSerializer =
-                Jackson2JsonRedisSerializer<Any>(mapper, mapper.typeFactory.constructType(PromotionSnapshot::class.java))
+                JacksonJsonRedisSerializer<Any>(mapper, mapper.typeFactory.constructType(PromotionSnapshot::class.java))
             val json = String(snapshotSerializer.serialize(snapshot))
             assertEquals(snapshot, snapshotSerializer.deserialize(json.toByteArray()))
             assertTrue(json.contains("\"startDate\":\"2026-09-25\""), json)

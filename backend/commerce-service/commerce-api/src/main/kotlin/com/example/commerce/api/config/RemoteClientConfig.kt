@@ -5,7 +5,7 @@ import com.example.commerce.api.point.PointClient
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder
-import org.springframework.boot.http.client.ClientHttpRequestFactorySettings
+import org.springframework.boot.http.client.HttpClientSettings
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.client.ClientHttpRequestFactory
@@ -47,7 +47,7 @@ class RemoteClientConfig {
             readTimeout: Duration,
         ): ClientHttpRequestFactory =
             ClientHttpRequestFactoryBuilder.detect().build(
-                ClientHttpRequestFactorySettings
+                HttpClientSettings
                     .defaults()
                     .withConnectTimeout(connectTimeout)
                     .withReadTimeout(readTimeout),

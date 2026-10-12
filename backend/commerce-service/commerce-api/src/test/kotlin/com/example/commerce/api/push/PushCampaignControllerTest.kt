@@ -16,9 +16,9 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Primary
 import org.springframework.http.MediaType
@@ -525,7 +525,9 @@ class PushCampaignControllerTest
         }
 
         private fun inboxUsers(campaignId: Int): List<String> =
-            jdbc.queryForList("select user_id from push_inbox_items where campaign_id = ? order by user_id", String::class.java, campaignId)
+            jdbc
+                .queryForList("select user_id from push_inbox_items where campaign_id = ? order by user_id", String::class.java, campaignId)
+                .filterNotNull() // Spring Framework 7 의 널 표기로 List<String?> 이 된다
 
         private fun unread(userId: String): Int =
             JsonPath.read(

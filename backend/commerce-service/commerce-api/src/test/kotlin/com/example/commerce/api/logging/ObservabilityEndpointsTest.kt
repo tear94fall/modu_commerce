@@ -4,19 +4,19 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
+import org.springframework.boot.micrometer.metrics.test.autoconfigure.AutoConfigureMetrics
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 
 /**
  * Prometheus 수집 엔드포인트와 요청 컨텍스트 필터가 실제 필터 체인(Spring Security 포함)에서 도는지 본다.
- * @SpringBootTest 는 기본으로 메트릭 내보내기를 끈다(prometheus 엔드포인트 404). AutoConfigureObservability 로 실제 기동과 같게 켠다.
+ * @SpringBootTest 는 기본으로 메트릭 내보내기를 끈다(prometheus 엔드포인트 404). AutoConfigureMetrics 로 실제 기동과 같게 켠다.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-@AutoConfigureObservability
+@AutoConfigureMetrics
 class ObservabilityEndpointsTest
     @Autowired
     constructor(

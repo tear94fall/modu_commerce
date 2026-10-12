@@ -10,8 +10,8 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
@@ -54,7 +54,7 @@ class ReplicaLagTest
         @BeforeEach
         fun freezeReplica() {
             support.reseed()
-            val script = master.queryForList("SCRIPT", String::class.java)
+            val script = master.queryForList("SCRIPT", String::class.java).filterNotNull()
             replica.execute("DROP ALL OBJECTS")
             script.forEach { replica.execute(it) }
         }

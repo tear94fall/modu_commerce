@@ -11,7 +11,8 @@ data class PageResult<T>(
     val size: Int,
 ) {
     companion object {
-        fun <E, T> from(
+        // Spring Data 4 의 Page<T> 는 T : Any 라 바운드가 필요하다.
+        fun <E : Any, T : Any> from(
             page: Page<E>,
             mapper: (E) -> T,
         ): PageResult<T> =
