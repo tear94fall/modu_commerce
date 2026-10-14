@@ -9,6 +9,6 @@ interface CategoryRoRepository : RoRepository<Category, Long> {
 
     fun findById(id: Long): Category?
 
-    @Query("select c.id from Category c where c.parent.id = :parentId")
-    fun findChildIds(parentId: Long): List<Long>
+    @Query("select c.id from Category c where c.parent.id in :parentIds")
+    fun findChildIds(parentIds: Collection<Long>): List<Long>
 }

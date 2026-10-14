@@ -27,7 +27,10 @@ data class CouponCommand(
         require(name.isNotBlank() && name.length <= 40) { "쿠폰 이름은 1~40자로 입력하세요." }
         require((description?.length ?: 0) <= 200) { "설명은 200자까지 입력할 수 있습니다." }
         when (discountType) {
-            DiscountType.FIXED -> require(discountValue >= 1) { "할인 금액은 1원 이상이어야 합니다." }
+            DiscountType.FIXED -> {
+                require(discountValue >= 1) { "할인 금액은 1원 이상이어야 합니다." }
+            }
+
             DiscountType.PERCENT -> {
                 require(discountValue in 1..90) { "할인율은 1~90% 사이로 입력하세요." }
                 require(maxDiscount == null || maxDiscount >= 1) { "최대 할인 금액은 1원 이상이어야 합니다." }

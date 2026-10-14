@@ -8,6 +8,12 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
+// 푸시(FCM)용 Firebase 설정. app/google-services.json 은 gitignore 되어 있고, 없으면 플러그인을 걸지 않는다.
+// 그래도 빌드는 되고, 앱은 Firebase 가 초기화되지 않았음을 보고 푸시 기능만 끈다(PushTokens).
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 android {
     namespace = "com.example.moducommerce"
     compileSdk = 35
@@ -30,8 +36,8 @@ android {
     }
 
     buildTypes {
-        // 커머스 화면(web/) 주소. 디버그는 Mac 의 Vite dev 서버(LAN, HMR)를 열어 저장 즉시 반영되고,
-        // 릴리스는 nginx 로 띄운 정적 빌드(web/docker-compose.yml, :8082)를 연다.
+        // 커머스 화면(web/) 주소. 디버그는 Mac 의 Vite dev 서버(LAN, HMR — `cd web && npm run dev -- --host`)를 열어 저장 즉시 반영되고,
+        // 릴리스는 dev k8s 의 nginx 정적 빌드(modu_infra k8s, :8082)를 연다. 평소 폰에는 릴리스를 깐다(dev 서버 없이도 돈다).
         debug {
             buildConfigField("String", "WEB_URL", "\"http://192.168.0.3:5174/\"")
         }
@@ -39,6 +45,8 @@ android {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             buildConfigField("String", "WEB_URL", "\"http://192.168.0.3:8082/\"")
+            // 배포용 키가 없어 디버그 키로 서명한다(개인 dev). 스토어 배포 때는 signingConfigs 를 따로 둔다.
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
@@ -89,6 +97,9 @@ dependencies {
     implementation(libs.okhttp.logging)
     implementation(libs.gson)
     implementation(libs.play.services.auth)
+
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)

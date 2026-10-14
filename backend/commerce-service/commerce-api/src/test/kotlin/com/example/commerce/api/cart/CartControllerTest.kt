@@ -6,8 +6,8 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.MediaType
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
 import org.springframework.test.web.servlet.MockMvc
@@ -35,7 +35,7 @@ class CartControllerTest
             user: org.springframework.test.web.servlet.request.RequestPostProcessor,
             skuId: Long,
             quantity: Int,
-        ) = mockMvc.post("/api/v1/cart/items") {
+        ) = mockMvc.post("/api-public/v1/cart/items") {
             with(user)
             contentType = MediaType.APPLICATION_JSON
             content = """{"skuId":$skuId,"quantity":$quantity}"""
@@ -57,7 +57,7 @@ class CartControllerTest
 
             val cart =
                 mockMvc
-                    .get("/api/v1/cart") { with(me) }
+                    .get("/api-public/v1/cart") { with(me) }
                     .andExpect {
                         status { isOk() }
                         jsonPath("$.items.length()") { value(2) }
@@ -69,18 +69,18 @@ class CartControllerTest
             val itemId = JsonPath.read<Int>(cart.response.contentAsString, "$.items[1].id")
 
             mockMvc
-                .patch("/api/v1/cart/items/$itemId") {
+                .patch("/api-public/v1/cart/items/$itemId") {
                     with(me)
                     contentType = MediaType.APPLICATION_JSON
                     content = """{"quantity":5}"""
                 }.andExpect { jsonPath("$.quantity") { value(5) } }
 
             // 남의 장바구니 줄은 못 본다
-            mockMvc.delete("/api/v1/cart/items/$itemId") { with(other) }.andExpect { status { isNotFound() } }
-            mockMvc.get("/api/v1/cart") { with(other) }.andExpect { jsonPath("$.itemCount") { value(0) } }
+            mockMvc.delete("/api-public/v1/cart/items/$itemId") { with(other) }.andExpect { status { isNotFound() } }
+            mockMvc.get("/api-public/v1/cart") { with(other) }.andExpect { jsonPath("$.itemCount") { value(0) } }
 
-            mockMvc.delete("/api/v1/cart/items/$itemId") { with(me) }.andExpect { status { isNoContent() } }
-            mockMvc.get("/api/v1/cart") { with(me) }.andExpect { jsonPath("$.itemCount") { value(1) } }
+            mockMvc.delete("/api-public/v1/cart/items/$itemId") { with(me) }.andExpect { status { isNoContent() } }
+            mockMvc.get("/api-public/v1/cart") { with(me) }.andExpect { jsonPath("$.itemCount") { value(1) } }
         }
 
         @Test

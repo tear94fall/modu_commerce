@@ -19,10 +19,25 @@ class StubPointGateway : PointGateway {
         memo: String?,
     ) = PointEarnResult(applied = true, amount = 10)
 
+    override fun earnAmount(
+        userId: String,
+        amount: Long,
+        refId: String,
+        memo: String?,
+    ) = PointEarnResult(applied = true, amount = amount)
+
     override fun refund(
         userId: String,
         amount: Long,
         refId: String,
         memo: String?,
     ) = Unit
+
+    override fun cancelSpend(
+        userId: String,
+        spendRefId: String,
+        memo: String?,
+    ) = PointCancelResult(cancelled = false, reason = PointCancelResult.NO_SPEND, amount = 0, balance = 0)
+
+    override fun findTransactions(refs: List<PointRef>): List<PointRefTransaction> = emptyList()
 }

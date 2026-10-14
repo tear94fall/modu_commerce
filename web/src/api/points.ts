@@ -18,9 +18,9 @@ export interface PointTransaction {
 }
 
 /** commerce-service 가 point-service 를 대신 불러 준다. 포인트 서비스가 죽어 있으면 503. */
-export const getMyPoints = () => api<{ balance: number }>('/api/v1/me/points').then((r) => r.balance)
+export const getMyPoints = () => api<{ balance: number }>('/api-public/v1/me/points').then((r) => r.balance)
 
-export const getPointHistory = (page = 0, size = 20) => api<Page<PointTransaction>>(`/api/v1/me/points/history?page=${page}&size=${size}`)
+export const getPointHistory = (page = 0, size = 20) => api<Page<PointTransaction>>(`/api-public/v1/me/points/history?page=${page}&size=${size}`)
 
 /** 580 → "580P". 백오피스와 같은 표기. */
 export const formatPoints = (points: number) => `${points.toLocaleString('ko-KR')}P`

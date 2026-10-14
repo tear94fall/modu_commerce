@@ -1,3 +1,5 @@
+import { clearRecentWrites } from '../api/recent'
+
 /**
  * 브라우저 세션(브리지가 없을 때). auth-service /oauth2/token 을 같은 출처 프록시로 부른다.
  * 앱의 OAuthClient 와 같은 client_id·grant 문자열이어야 한다.
@@ -75,6 +77,7 @@ export function save(pair: TokenPair) {
 export const storedAccessToken = () => localStorage.getItem(ACCESS_KEY)
 
 export function clearSession() {
+  clearRecentWrites() // 방금 한 쓰기의 기억은 그 계정 것이다
   localStorage.removeItem(ACCESS_KEY)
   localStorage.removeItem(REFRESH_KEY)
 }

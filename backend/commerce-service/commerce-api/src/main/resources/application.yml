@@ -1,5 +1,7 @@
 server:
   port: 8200
+  # SIGTERM 뒤 새 요청은 거절하고 처리 중인 요청은 끝까지 보낸다(compose stop_grace_period 30s 안).
+  shutdown: graceful
 
 spring:
   application:
@@ -27,6 +29,9 @@ spring:
         maximum-pool-size: 10
         minimum-idle: 2
         connection-timeout: 30000
+        # 행 잠금 대기 한도(초). 주문·SKU 잠금(SELECT … FOR UPDATE)이 이보다 오래 막히면 잠금 실패 → 503 "요청이 몰려…".
+        # Hibernate 의 MySQL 방언은 jakarta.persistence.lock.timeout 힌트를 SQL 에 싣지 못해 세션 변수로 건다(기본 50초).
+        connection-init-sql: SET SESSION innodb_lock_wait_timeout = ${DB_LOCK_WAIT_TIMEOUT_SECONDS:3}
 
     replica:
       url: ${DB_REPLICA_URL:${DB_MASTER_URL:jdbc:mysql://localhost:3316/commerce?useSSL=false&characterEncoding=UTF-8&serverTimezone=Asia/Seoul&allowPublicKeyRetrieval=true}}
@@ -42,14 +47,51 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: ${JPA_DDL_AUTO:update}
+      # 스키마는 DBA 가 gh-ost 로 바꾼다(modu_infra/data/mysql/schema). 코드와 어긋나면 기동 실패로 드러나게 validate.
+      # 로컬 일회용 MySQL 에서는 JPA_DDL_AUTO=update 로 띄운다. 테스트(H2)는 src/test/resources 가 update 를 둔다.
+      ddl-auto: ${JPA_DDL_AUTO:validate}
     properties:
       hibernate:
         format_sql: true
         default_batch_fetch_size: 1000
     open-in-view: false
 
+  # Redis 는 캐시로만 쓴다(Spring Data Redis 저장소를 찾지 않는다). 접속 정보(클러스터 노드)는 config-service 가 내려준다.
+  data:
+    redis:
+      repositories:
+        enabled: false
+
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+# 컨테이너 준비·생존 검사. compose healthcheck 와 쿠버네티스 probe 가 /actuator/health/readiness, /liveness 를 본다.
+# readiness 는 rw(master) 데이터소스만 본다(masterDb, HealthConfig). 레플리카가 죽어도 unready 가 되면 안 되므로 자동 db 는 넣지 않는다.
+# Redis 는 캐시라 꺼져도 DB 로 동작하므로 readiness 에 넣지 않는다.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+      group:
+        readiness:
+          include: readinessState, masterDb
+        liveness:
+          include: livenessState
+
+# 서비스 디스커버리는 쓰지 않는다. 게이트웨이는 config-service 공통 설정의 modu.services.commerce-service(http://commerce-service:8200)로
+# /commerce-service/api-public/** 와 /commerce-service/api-admin/** 를 넘긴다. compose 에선 컨테이너 이름, k8s 에선 같은 이름·포트의 Service.
 modu:
+  # 다른 서비스 주소. 실제 값은 config-service 공통 설정(config-repo application.yml 의 modu.services.*)이 내려준다.
+  # 아래는 설정 서버 없이 띄울 때의 기본값(같은 modu-infra 네트워크의 컨테이너 이름).
+  services:
+    point-service: http://point-service:9600
+    member-service: http://member-service:8080
   oauth:
     # 모두의 채팅 auth-service. 커머스 앱이 SSO 로 받은 modu-commerce 토큰을 여기 JWKS 로 검증한다.
     issuer: ${MODU_OAUTH_ISSUER:http://192.168.0.3:8000/auth-service}
@@ -57,15 +99,63 @@ modu:
     audience: modu-commerce
     # 백오피스(/api-admin/**) 토큰의 aud. 게이트웨이 AuthorizationHeaderFilter=ROLE_ADMIN,modu-admin 과 같은 값.
     admin-audience: modu-admin
-  # 서비스 간 호출 토큰. 실제 값은 config-service 공통 설정(application.yml)이 내려주고, 챗 스택의 INTERNAL_API_TOKEN 과 같아야 한다.
+  # 서비스 간 호출 토큰. config-service 공통 설정(application.yml)의 modu.internal-api.token({cipher})이 내려준다.
+  # 아래는 설정 서버 없이 로컬에서 띄울 때의 기본값.
   internal-api:
-    token: ${INTERNAL_API_TOKEN:modu-internal-dev-token}
-  # 마이 탭 포인트 조회가 부르는 point-service(모두 챗 백엔드). 같은 modu-infra 네트워크의 컨테이너 이름.
+    token: modu-internal-dev-token
+  # 포인트 결제·환불·마이 탭 포인트가 부르는 point-service(모두 챗 백엔드). 기본은 modu.services.point-service, 환경 변수로 덮어쓸 수 있다.
   point:
-    url: ${MODU_POINT_URL:http://point-service:9600}
-  # 리뷰 작성자 이름·이메일을 받는 member-service(모두 챗 백엔드).
+    url: ${MODU_POINT_URL:${modu.services.point-service}}
+    # 연결·응답 한도. point-service 가 멈춰도 주문 요청이 오래 붙잡히지 않는다.
+    connect-timeout: 1s
+    read-timeout: 3s
+    # 회로 차단기: 최근 20번 중(10번 이상 불렀을 때) 절반 이상 실패하면 30초 동안 부르지 않고 바로 503.
+    circuit-breaker:
+      sliding-window-size: 20
+      minimum-number-of-calls: 10
+      failure-rate-threshold: 50
+      wait-duration-in-open-state: 30s
+      permitted-calls-in-half-open-state: 3
+    # 포인트 아웃박스: 1분마다 릴레이(차감 되돌리기·취소 환불 재시도), 매일 04:00 KST 전날 대사.
+    outbox:
+      relay-enabled: true
+      reconcile-enabled: true
+  # 리뷰 작성자 이름·이메일을 받는 member-service(모두 챗 백엔드). 기본은 modu.services.member-service.
   member:
-    url: ${MODU_MEMBER_URL:http://member-service:8080}
+    url: ${MODU_MEMBER_URL:${modu.services.member-service}}
+    connect-timeout: 1s
+    read-timeout: 3s
+
+  # 기획전·이벤트 캐시. 개발·운영은 config-service 가 redis-enabled=true 와 클러스터 노드를 내려준다. 기본(IDE·테스트)은 메모리 캐시.
+  cache:
+    redis-enabled: ${MODU_CACHE_REDIS_ENABLED:false}
+    banners-ttl: 5m
+    promotion-ttl: 10m
+
+  # 푸시 캠페인. Firebase 키는 config-repo(commerce-service.yml)의 modu.push.firebase-credentials-base64({cipher})로 받는다.
+  # 설정 서버 없이 로컬에서 띄울 때는 키 파일 경로(MODU_PUSH_FIREBASE_CREDENTIALS)로 대신한다. 둘 다 없으면 보내지 않고 로그만 남긴다.
+  push:
+    firebase-credentials: ${MODU_PUSH_FIREBASE_CREDENTIALS:}
+    # 1분마다 예약 캠페인을 보낸다. 테스트는 끈다.
+    scheduler-enabled: true
+    # "지금 보내기"를 요청 스레드 밖에서 보낸다. 테스트는 끈다(바로 보낸다).
+    async-send: true
+
+  # 커머스 가입(약관 동의). 지금 약관 버전(동의할 때 고객 행에 남는다).
+  customer:
+    terms-version: "2026-10"
+  # 회원 등급: 매월 1일 00:10(KST) 산정 + 매월 쿠폰, 10분마다 실패한 구매 적립 재시도. 테스트는 끈다.
+  tier:
+    scheduler-enabled: true
+    earn-retry-enabled: true
+
+# API 문서(GET /v3/api-docs). 도커 네트워크 안에서만 열리고 외부는 게이트웨이(ROLE_SYSTEM)가 막는다.
+springdoc:
+  api-docs:
+    enabled: ${SPRINGDOC_API_DOCS_ENABLED:true}
+    path: /v3/api-docs
+  default-produces-media-type: application/json
+  paths-to-exclude: /actuator/**, /error
 
 logging:
   level:

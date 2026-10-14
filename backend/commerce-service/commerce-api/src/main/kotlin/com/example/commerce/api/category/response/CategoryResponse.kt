@@ -11,6 +11,8 @@ data class CategoryResponse(
     val children: List<CategoryResponse>,
     val icon: String?,
     val color: String?,
+    /** 최상위가 1, 최대 3. */
+    val depth: Int,
 ) {
     companion object {
         fun from(result: CategoryResult): CategoryResponse =
@@ -22,6 +24,7 @@ data class CategoryResponse(
                 children = result.children.map(::from),
                 icon = result.icon,
                 color = result.color,
+                depth = result.depth,
             )
     }
 }

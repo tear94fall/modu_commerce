@@ -23,7 +23,7 @@ class ModuAppBridgeTest {
     private val refresher = mockk<SessionRefresher>()
     private val events = SessionEvents()
 
-    private fun bridge(scope: CoroutineScope) = ModuAppBridge(store, refresher, events, mockk<AuthRepository>(relaxed = true), Gson(), scope)
+    private fun bridge(scope: CoroutineScope) = ModuAppBridge(store, refresher, events, mockk<AuthRepository>(relaxed = true), Gson(), scope, mockk(relaxed = true))
 
     @Test
     fun `a network failure during refresh does not log the user out`() = runTest {

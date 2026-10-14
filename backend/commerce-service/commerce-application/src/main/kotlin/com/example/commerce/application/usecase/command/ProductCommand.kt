@@ -21,7 +21,8 @@ data class ProductCommand(
 data class CategoryCommand(
     val name: String,
     val parentId: Long?,
-    val sortOrder: Int,
+    /** null 이면 등록은 형제 맨 뒤, 수정은 그대로(다른 부모로 옮기면 맨 뒤). */
+    val sortOrder: Int?,
     /** 이모지 한 개. 없으면 null. */
     val icon: String? = null,
     /** #RRGGBB. 없으면 null. */

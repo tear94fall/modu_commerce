@@ -6,6 +6,7 @@ import { ErrorBox } from '../components/Boxes'
 import CartButton from '../components/CartButton'
 import { SearchIcon } from '../components/Icons'
 import { Screen, TopBar } from '../components/Layout'
+import NotificationButton from '../components/NotificationButton'
 import { ProductGrid } from '../components/ProductCard'
 import PromotionCarousel from '../components/PromotionBanner'
 import Toast from '../components/Toast'
@@ -50,7 +51,7 @@ export default function HomePage() {
       pager.toggleWish(productId).then(() => {})
       return
     }
-    setWish(productId, next).catch(() => {
+    setWish(productId, next, current).catch(() => {
       patch(!next)
       setMessage('찜을 바꾸지 못했습니다.')
     })
@@ -70,6 +71,7 @@ export default function HomePage() {
             <Link to="/search" className="icon-btn" aria-label="검색">
               <SearchIcon />
             </Link>
+            <NotificationButton />
             <CartButton />
           </>
         }

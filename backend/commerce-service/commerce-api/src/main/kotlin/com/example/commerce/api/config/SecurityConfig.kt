@@ -3,6 +3,7 @@ package com.example.commerce.api.config
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.annotation.Order
+import org.springframework.http.HttpMethod
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
 import org.springframework.security.config.http.SessionCreationPolicy
@@ -20,6 +21,19 @@ import org.springframework.security.web.SecurityFilterChain
 @Configuration
 @EnableWebSecurity
 class SecurityConfig {
+    /**
+     * 서비스 간 내부 API. 토큰 검사는 [InternalApiFilter](X-Internal-Token)가 하므로 여기서는 JWT 를 요구하지 않는다.
+     */
+    @Bean
+    @Order(0)
+    fun internalSecurityFilterChain(http: HttpSecurity): SecurityFilterChain =
+        http
+            .securityMatcher("/api-internal/**")
+            .csrf { it.disable() }
+            .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
+            .authorizeHttpRequests { it.anyRequest().permitAll() }
+            .build()
+
     /**
      * 백오피스 전용. 게이트웨이도 같은 검사를 하지만 8200 포트로 직접 오는 요청이 있으므로
      * 여기서 aud=modu-admin 과 roles 의 ROLE_ADMIN 을 다시 본다.
@@ -42,14 +56,27 @@ class SecurityConfig {
                 }
             }.build()
 
+    /**
+     * 앱 API(`/api-public/` 아래)와 나머지. 앱은 API 게이트웨이 `/commerce-service/api-public/` 로 부르고
+     * 게이트웨이가 토큰(ROLE_USER, aud=modu-commerce)을 본 뒤 넘긴다. 여기서도 같은 토큰을 JWKS 로 다시 검증한다.
+     */
     @Bean
     @Order(2)
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain =
         http
             .csrf { it.disable() }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
-            .authorizeHttpRequests { it.anyRequest().authenticated() }
-            .oauth2ResourceServer { it.jwt {} }
+            .authorizeHttpRequests {
+                // 등급 안내는 로그인 전에도 볼 수 있다.
+                it.requestMatchers(HttpMethod.GET, "/api-public/v1/tiers").permitAll()
+                // API 문서. 서비스 포트는 도커 네트워크 안에서만 열리고 외부 접근은 게이트웨이가 막는다.
+                it.requestMatchers(*API_DOCS_PATHS).permitAll()
+                // 컨테이너 준비·생존 검사(compose healthcheck, k8s probe). 상태만 보이고(show-details: never) 서비스 포트 안에서만 열린다.
+                it.requestMatchers(*HEALTH_PATHS).permitAll()
+                // Prometheus 수집(/actuator/prometheus). 서비스 포트 안에서만 열리고 외부는 게이트웨이가 막는다.
+                it.requestMatchers(*METRICS_PATHS).permitAll()
+                it.anyRequest().authenticated()
+            }.oauth2ResourceServer { it.jwt {} }
             .build()
 
     /** 앱 체인이 쓰는 기본 디코더(aud=modu-commerce). admin 체인은 자기 디코더를 따로 만든다. */
@@ -58,6 +85,9 @@ class SecurityConfig {
 
     companion object {
         const val ADMIN_ROLE = "ROLE_ADMIN"
+        val API_DOCS_PATHS = arrayOf("/v3/api-docs", "/v3/api-docs/**")
+        val HEALTH_PATHS = arrayOf("/actuator/health", "/actuator/health/**")
+        val METRICS_PATHS = arrayOf("/actuator/prometheus")
 
         fun tokenValidator(
             issuer: String,

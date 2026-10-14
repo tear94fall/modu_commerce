@@ -7,7 +7,7 @@ import { CartIcon } from './Icons'
 export default function CartButton() {
   const [count, setCount] = useState(0)
   useEffect(() => {
-    getCart()
+    getCart(true)
       .then((c) => setCount(c.itemCount))
       .catch(() => {})
   }, [])

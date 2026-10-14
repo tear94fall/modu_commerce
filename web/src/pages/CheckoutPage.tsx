@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getCart } from '../api/cart'
 import { getProduct } from '../api/catalog'
-import { ApiError } from '../api/client'
+import { ApiError, isPriceChanged } from '../api/client'
+import { earnPoints } from '../api/customer'
 import { expiresOnLabel, getApplicableCoupons, type ApplicableCoupon } from '../api/coupons'
 import { createAddress, createOrder, getAddresses, type Address, type AddressInput } from '../api/orders'
 import { formatPoints, getMyPoints } from '../api/points'
@@ -13,7 +14,9 @@ import CouponCard from '../components/CouponCard'
 import { Screen, TopBar } from '../components/Layout'
 import OrderItems, { type LineView } from '../components/OrderItems'
 import Toast from '../components/Toast'
+import { useCustomer } from '../customer/context'
 import { formatPrice } from '../util/format'
+import { newIdempotencyKey } from '../util/idempotency'
 
 interface Line extends LineView {
   cartItemId: number | null
@@ -45,6 +48,11 @@ export default function CheckoutPage() {
   const [coupons, setCoupons] = useState<ApplicableCoupon[] | null>(null)
   const [couponId, setCouponId] = useState<number | null>(null)
   const [couponPanel, setCouponPanel] = useState(false)
+  /**
+   * 이번 결제의 Idempotency-Key. 같은 입력으로 다시 누르면(네트워크 오류·시간 초과 뒤 재시도) 같은 키를 보내
+   * 서버가 주문을 두 번 만들지 않는다. 배송지·상품·쿠폰·포인트·금액이 바뀌면 새 키, 주문이 되면 버린다.
+   */
+  const attempt = useRef<{ signature: string; key: string } | null>(null)
 
   const load = useCallback(async () => {
     setError(false)
@@ -87,6 +95,9 @@ export default function CheckoutPage() {
   const usePoints = clampPoints(pointText, maxPoints)
   const payment = total - couponDiscount - usePoints
   const canPay = !paying && !!lines && lines.length > 0 && selected !== null
+  /** 배송 완료 때 받을 구매 적립 미리 보기(지금 등급 기준). 서버와 같은 계산: floor(결제 금액 × 적립률 / 100). */
+  const tier = useCustomer().customer?.tier ?? null
+  const expectedEarn = tier && tier.earnRate > 0 ? earnPoints(payment, tier.earnRate) : null
 
   const closePicker = useCallback(() => setPicker(false), [])
   const closeForm = useCallback(() => setForm(false), [])
@@ -124,18 +135,29 @@ export default function CheckoutPage() {
   const pay = async () => {
     if (!canPay || !lines || !selected) return
     setPaying(true)
+    const items = lines.map((l) => ({ skuId: l.skuId, quantity: l.quantity }))
+    const cartItemIds = lines.map((l) => l.cartItemId).filter((id): id is number => id !== null)
+    const signature = JSON.stringify([selected.id, items, cartItemIds, usePoints, coupon?.id ?? null, payment])
+    if (attempt.current?.signature !== signature) attempt.current = { signature, key: newIdempotencyKey() }
     try {
-      const order = await createOrder(
-        selected.id,
-        lines.map((l) => ({ skuId: l.skuId, quantity: l.quantity })),
-        lines.map((l) => l.cartItemId).filter((id): id is number => id !== null),
-        usePoints,
-        coupon?.id ?? null,
-      )
+      const order = await createOrder(selected.id, items, cartItemIds, usePoints, coupon?.id ?? null, {
+        idempotencyKey: attempt.current.key,
+        expectedPaymentAmount: payment,
+      })
+      attempt.current = null
       navigate(`/orders/${order.id}`, { replace: true, state: { justOrdered: true } })
     } catch (e) {
+      // 그사이 가격·쿠폰이 바뀌었다. 문구를 보이고 주문서를 다시 불러 새 금액을 보여 준다(금액이 바뀌니 다음 결제는 새 키).
+      if (isPriceChanged(e)) {
+        setMessage(e.message)
+        load()
+        setPaying(false)
+        return
+      }
       const badRequest = e instanceof ApiError && e.status === 400
-      setMessage(badRequest ? e.message : '주문하지 못했습니다')
+      // 400(재고·쿠폰·포인트), 409(이미 처리됨), 503(포인트 서비스·혼잡)은 서버 문구를 그대로 보여 준다.
+      const known = e instanceof ApiError && (e.status === 400 || e.status === 409 || e.status === 503) && !e.message.startsWith('HTTP ')
+      setMessage(known ? e.message : '주문하지 못했습니다')
       // 쿠폰이 그사이 만료 · 사용됐으면 선택을 풀고 목록을 다시 받는다.
       if (badRequest && coupon && e.message.includes('쿠폰')) {
         setCouponId(null)
@@ -260,6 +282,11 @@ export default function CheckoutPage() {
               <span>결제 금액</span>
               <span className="v">{formatPrice(payment)}</span>
             </div>
+            {tier && expectedEarn !== null && (
+              <div className="earn-line" role="note">
+                {tier.name} {tier.earnRate}% 적립 예정 · {formatPoints(expectedEarn)}
+              </div>
+            )}
           </section>
           <div className="bottom-bar">
             <div className="summary">

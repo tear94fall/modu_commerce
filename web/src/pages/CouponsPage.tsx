@@ -27,20 +27,23 @@ export default function CouponsPage() {
   const [redeeming, setRedeeming] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
+  /** 사용 가능 탭이면 그 목록으로 장수도 정한다. 다른 탭이면 장수만 따로 센다. 목록·장수 모두 방금 받은 쿠폰을 덮는다(api/coupons.ts). */
   const load = useCallback((status: UserCouponStatus) => {
     setError(false)
     setCoupons(null)
     getMyCoupons(status)
-      .then(setCoupons)
+      .then((list) => {
+        setCoupons(list)
+        if (status === 'AVAILABLE') setAvailable(list.length)
+      })
       .catch(() => setError(true))
-  }, [])
-  const loadCount = useCallback(() => {
-    getMyCouponCount()
-      .then(setAvailable)
-      .catch(() => setAvailable(null))
+    if (status !== 'AVAILABLE') {
+      getMyCouponCount()
+        .then(setAvailable)
+        .catch(() => setAvailable(null))
+    }
   }, [])
   useEffect(() => load(tab), [load, tab])
-  useEffect(loadCount, [loadCount])
 
   const clearMessage = useCallback(() => setMessage(null), [])
 
@@ -53,7 +56,7 @@ export default function CouponsPage() {
       await redeemCoupon(trimmed)
       setCode('')
       setMessage('쿠폰을 받았습니다')
-      loadCount()
+      // 다시 받는 목록은 방금 받은 쿠폰을 덮는다(api/coupons.ts) — 레플리카가 늦어도 목록·장수에 바로 보인다.
       if (tab === 'AVAILABLE') load('AVAILABLE')
       else setTab('AVAILABLE')
     } catch (err) {

@@ -1,9 +1,10 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as catalog from '../api/catalog'
 import * as promotions from '../api/promotions'
+import * as push from '../api/push'
 import HomePage from './HomePage'
 
 const product = (over: Partial<catalog.ProductSummary> = {}): catalog.ProductSummary => ({
@@ -38,6 +39,7 @@ describe('HomePage', () => {
     vi.restoreAllMocks()
     vi.spyOn(catalog, 'getCategories').mockResolvedValue([{ id: 1, name: '패션', children: [] }])
     vi.spyOn(promotions, 'getPromotionBanners').mockResolvedValue([])
+    vi.spyOn(push, 'getUnreadNotificationCount').mockResolvedValue(0)
   })
 
   it('shows promotion banners on top and opens one on tap', async () => {
@@ -75,6 +77,16 @@ describe('HomePage', () => {
     expect(screen.getAllByText('33%').length).toBe(3)
   })
 
+  it('shows the notification bell with the unread count', async () => {
+    vi.spyOn(catalog, 'getProducts').mockResolvedValue(page([product()]))
+    vi.spyOn(push, 'getUnreadNotificationCount').mockResolvedValue(2)
+    renderHome()
+
+    const bell = screen.getByRole('link', { name: '알림' })
+    expect(bell).toHaveAttribute('href', '/notifications')
+    expect(await within(bell).findByText('2')).toBeInTheDocument()
+  })
+
   it('opens the category list from a chip and the detail from a card', async () => {
     vi.spyOn(catalog, 'getProducts').mockResolvedValue(page([product()]))
     renderHome()
@@ -90,7 +102,7 @@ describe('HomePage', () => {
 
     const button = await screen.findByRole('button', { name: '찜' })
     await userEvent.click(button)
-    expect(setWish).toHaveBeenCalledWith(1, true)
+    expect(setWish).toHaveBeenCalledWith(1, true, expect.objectContaining({ id: 1 }))
     expect(await screen.findByText('찜을 바꾸지 못했습니다.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '찜' })).toHaveAttribute('aria-pressed', 'false')
   })

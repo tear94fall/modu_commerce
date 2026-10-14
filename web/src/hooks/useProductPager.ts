@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { setWish, type Page, type ProductSummary } from '../api/catalog'
+import { appendNew } from '../util/list'
 
 export interface PagerState {
   items: ProductSummary[]
@@ -27,7 +28,7 @@ export function useProductPager(load: (page: number) => Promise<Page<ProductSumm
         if (requestId !== requestRef.current) return
         pageRef.current = page
         setState((s) => ({
-          items: page === 0 ? result.content : [...s.items, ...result.content],
+          items: page === 0 ? result.content : appendNew(s.items, result.content),
           loading: false,
           error: false,
           hasNext: result.number + 1 < result.totalPages,
@@ -57,7 +58,7 @@ export function useProductPager(load: (page: number) => Promise<Page<ProductSumm
       const patch = (wished: boolean) => setState((s) => ({ ...s, items: s.items.map((p) => (p.id === productId ? { ...p, wished } : p)) }))
       patch(next)
       try {
-        await setWish(productId, next)
+        await setWish(productId, next, current)
       } catch {
         patch(!next)
         setState((s) => ({ ...s, message: '찜을 바꾸지 못했습니다.' }))

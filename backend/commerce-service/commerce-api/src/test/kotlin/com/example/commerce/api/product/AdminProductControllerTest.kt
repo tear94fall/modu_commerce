@@ -8,8 +8,8 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.MediaType
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
@@ -45,7 +45,7 @@ class AdminProductControllerTest
                     jsonPath("$.content.length()") { value(2) }
                     jsonPath("$.content[0].name") { value("모두 스티커 팩") }
                     jsonPath("$.content[0].totalStock") { value(100) }
-                    jsonPath("$.content[0].categoryName") { value("노트·데스크") }
+                    jsonPath("$.content[0].categoryName") { value("문구 > 노트·데스크") }
                     jsonPath("$.totalElements") { value(ProductSeeder.SAMPLE_COUNT) }
                     jsonPath("$.totalPages") { value(12) }
                 }
@@ -91,7 +91,7 @@ class AdminProductControllerTest
 
             mockMvc.delete("/api-admin/v1/products/$id") { with(admin) }.andExpect { status { isNoContent() } }
             mockMvc.get("/api-admin/v1/products/$id") { with(admin) }.andExpect { status { isNotFound() } }
-            mockMvc.get("/api/v1/products/$id") { with(jwt()) }.andExpect { status { isNotFound() } }
+            mockMvc.get("/api-public/v1/products/$id") { with(jwt()) }.andExpect { status { isNotFound() } }
             mockMvc.delete("/api-admin/v1/products/$id") { with(admin) }.andExpect { status { isNotFound() } }
         }
 
@@ -145,7 +145,7 @@ class AdminProductControllerTest
 
             // 앱 상세에서도 같은 구조로 보인다
             mockMvc
-                .get("/api/v1/products/$id") { with(jwt()) }
+                .get("/api-public/v1/products/$id") { with(jwt()) }
                 .andExpect {
                     status { isOk() }
                     jsonPath("$.skus.length()") { value(3) }

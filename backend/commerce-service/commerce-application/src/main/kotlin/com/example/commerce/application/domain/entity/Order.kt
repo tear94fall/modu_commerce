@@ -11,7 +11,9 @@ import jakarta.persistence.ManyToOne
 import jakarta.persistence.OneToMany
 import jakarta.persistence.OrderBy
 import jakarta.persistence.Table
+import jakarta.persistence.UniqueConstraint
 import java.security.SecureRandom
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -30,6 +32,9 @@ enum class OrderStatus {
             DELIVERED, CANCELLED -> false
         }
 }
+
+/** 구매 적립 상태. NONE = 적립 없음(고객 아님·0P), PENDING = 포인트 서버 호출 대기(재시도), DONE = 적립됨, FAILED = 거절됨. */
+enum class EarnStatus { NONE, PENDING, DONE, FAILED }
 
 /** 주문 한 줄. 상품이 나중에 바뀌어도 내역이 그대로이도록 이름·옵션·사진·단가를 복사해 둔다. */
 @Entity
@@ -59,8 +64,15 @@ class OrderItem(
     fun lineAmount(): Long = unitPrice * quantity
 }
 
+/**
+ * 시각 컬럼(paid_at, cancelled_at, delivered_at, earned_at)은 UTC 다. 호출자(서비스)가 주입받은 Clock 으로 만든 UTC 시각을 넘긴다
+ * (TierPeriods.utcNow). JVM 기본 시간대에 기대지 않는다.
+ */
 @Entity
-@Table(name = "orders")
+@Table(
+    name = "orders",
+    uniqueConstraints = [UniqueConstraint(name = "uk_orders_user_idempotency", columnNames = ["user_id", "idempotency_key"])],
+)
 class Order(
     @Column(name = "order_no", nullable = false, unique = true, length = 20)
     val orderNo: String,
@@ -76,6 +88,11 @@ class Order(
     val address1: String,
     @Column(name = "address2", length = 100)
     val address2: String?,
+    /** 결제 시각(UTC). 결제는 모의라 생성 시각과 같다. */
+    paidAt: LocalDateTime,
+    /** 앱이 보낸 Idempotency-Key. 같은 회원·같은 키로 다시 오면 새로 만들지 않고 이 주문을 돌려준다. 없으면 null. */
+    @Column(name = "idempotency_key", length = 64)
+    val idempotencyKey: String? = null,
 ) : BaseEntity() {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
@@ -111,11 +128,35 @@ class Order(
     val paymentMethod: String = PAYMENT_MOCK
 
     @Column(name = "paid_at", nullable = false)
-    var paidAt: LocalDateTime = LocalDateTime.now()
+    var paidAt: LocalDateTime = paidAt
         protected set
 
     @Column(name = "cancelled_at")
     var cancelledAt: LocalDateTime? = null
+        protected set
+
+    /** 배송 완료 시각(UTC). 회원 등급 기준 기간은 이 시각으로 센다. */
+    @Column(name = "delivered_at")
+    var deliveredAt: LocalDateTime? = null
+        protected set
+
+    /** 구매 적립 포인트. null 이면 아직 정하지 않았다(배송 완료 전). */
+    @Column(name = "earn_points")
+    var earnPoints: Long? = null
+        protected set
+
+    /** 적립을 정할 때의 등급 적립률(%). */
+    @Column(name = "earn_rate")
+    var earnRate: Int? = null
+        protected set
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "earn_status", nullable = false, length = 10, columnDefinition = "varchar(10) not null default 'NONE'")
+    var earnStatus: EarnStatus = EarnStatus.NONE
+        protected set
+
+    @Column(name = "earned_at")
+    var earnedAt: LocalDateTime? = null
         protected set
 
     @OneToMany(mappedBy = "order", cascade = [CascadeType.ALL], orphanRemoval = true)
@@ -172,19 +213,42 @@ class Order(
 
     fun pointRefundRefId(): String = "refund:order:$orderNo"
 
-    /** 사용자 취소. 결제 완료 상태에서만. 재고 복구는 호출자가 한다. */
-    fun cancel(now: LocalDateTime = LocalDateTime.now()) {
+    /** 사용자 취소. 결제 완료 상태에서만. 재고 복구는 호출자가 한다. [now] 는 UTC. */
+    fun cancel(now: LocalDateTime) {
         transition(OrderStatus.CANCELLED, now)
     }
 
-    /** 관리자 상태 변경. 허용된 전이만. */
+    /** 관리자 상태 변경. 허용된 전이만. [now] 는 UTC(취소·배송 완료 시각). */
     fun transition(
         next: OrderStatus,
-        now: LocalDateTime = LocalDateTime.now(),
+        now: LocalDateTime,
     ) {
         require(status.canTransitionTo(next)) { "${status.label()} 상태에서 ${next.label()} 로 바꿀 수 없습니다." }
         status = next
         if (next == OrderStatus.CANCELLED) cancelledAt = now
+        if (next == OrderStatus.DELIVERED) deliveredAt = now
+    }
+
+    /** 구매 적립 포인트의 멱등 키. */
+    fun purchaseEarnRefId(): String = "purchase:order:$id"
+
+    /** 적립액을 정한다. 0P 면 NONE, 아니면 PENDING(포인트 서버 호출 전). */
+    fun decideEarn(
+        points: Long,
+        rate: Int,
+    ) {
+        earnPoints = points
+        earnRate = rate
+        earnStatus = if (points > 0) EarnStatus.PENDING else EarnStatus.NONE
+    }
+
+    fun earned(now: LocalDateTime) {
+        earnStatus = EarnStatus.DONE
+        earnedAt = now
+    }
+
+    fun earnFailed() {
+        earnStatus = EarnStatus.FAILED
     }
 
     fun isCancelled(): Boolean = status == OrderStatus.CANCELLED
@@ -194,23 +258,32 @@ class Order(
         private val random = SecureRandom()
         private const val ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
-        /** `20260919-4F7K2A`. 날짜 + 32진 6자리 난수(1,073,741,824 가지). 유니크 제약이 최종 방어다. */
-        fun newOrderNo(now: LocalDateTime = LocalDateTime.now()): String =
-            now.format(DateTimeFormatter.BASIC_ISO_DATE) + "-" + (1..6).map { ALPHABET[random.nextInt(ALPHABET.length)] }.joinToString("")
+        /**
+         * `20260919-4F7K2A`. 한국 날짜([kstDate]) + 32진 6자리 난수(1,073,741,824 가지).
+         * 서비스가 저장 전에 같은 번호가 있는지 보고 다시 뽑는다. 유니크 제약이 최종 방어다.
+         */
+        fun newOrderNo(kstDate: LocalDate): String =
+            kstDate.format(DateTimeFormatter.BASIC_ISO_DATE) + "-" +
+                (1..6).map { ALPHABET[random.nextInt(ALPHABET.length)] }.joinToString("")
 
+        /** [nowUtc] 는 결제 시각(UTC), [orderNo] 는 [newOrderNo] 로 만든 번호. */
         fun create(
             userId: String,
             address: Address,
-            now: LocalDateTime = LocalDateTime.now(),
+            orderNo: String,
+            nowUtc: LocalDateTime,
+            idempotencyKey: String? = null,
         ): Order =
             Order(
-                orderNo = newOrderNo(now),
+                orderNo = orderNo,
                 userId = userId,
                 recipient = address.recipient,
                 phone = address.phone,
                 zipCode = address.zipCode,
                 address1 = address.address1,
                 address2 = address.address2,
+                paidAt = nowUtc,
+                idempotencyKey = idempotencyKey,
             )
     }
 }

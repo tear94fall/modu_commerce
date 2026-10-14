@@ -10,19 +10,15 @@
 # NGINX_LOCAL_RESOLVERS 에 넣는다(Docker 면 127.0.0.11, 쿠버네티스면 클러스터 DNS).
 resolver ${NGINX_LOCAL_RESOLVERS} valid=10s ipv6=off;
 
-upstream commerce {
-    zone commerce 64k;
-    server commerce-service:8200 resolve;
-}
-
 upstream gateway {
     zone gateway 64k;
-    server gateway-service:8000 resolve;
+    # GATEWAY_HOST/STORAGE_HOST: nginx resolver 는 search 도메인을 안 써서 k8s 에선 FQDN 을 env 로 준다(기본값은 Dockerfile).
+    server ${GATEWAY_HOST}:8000 resolve;
 }
 
 upstream storage {
     zone storage 64k;
-    server storage-service:9999 resolve;
+    server ${STORAGE_HOST}:9999 resolve;
 }
 
 server {
@@ -31,14 +27,17 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
-    # 카탈로그·장바구니·주문: commerce-service 로 바로.
-    location /api/ {
-        proxy_pass http://commerce;
+    # 카탈로그·장바구니·주문: 게이트웨이의 commerce-service 경로(/commerce-service/api-public/**)로.
+    # 게이트웨이가 토큰(ROLE_USER, aud modu-commerce)을 확인하고 modu.services.commerce-service 주소로 넘긴다. Authorization 은 그대로 넘어가고,
+    # 게이트웨이 CORS 가 다른 출처를 막으므로(POST·PUT 등은 같은 출처여도 Origin 이 붙는다) Origin 은 지운다.
+    location /api-public/ {
+        proxy_pass http://gateway/commerce-service/api-public/;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Origin "";
         proxy_read_timeout 60s;
     }
 
@@ -67,7 +66,9 @@ server {
         add_header Cache-Control "public, immutable";
     }
 
+    # index.html 은 매번 새로 확인한다(해시 붙은 assets 만 오래 캐시). 안 그러면 배포 뒤에도 브라우저가 옛 화면을 띄운다.
     location / {
+        add_header Cache-Control "no-cache" always;
         try_files $uri $uri/ /index.html;
     }
 }

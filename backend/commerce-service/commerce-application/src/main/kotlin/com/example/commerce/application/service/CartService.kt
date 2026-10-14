@@ -3,19 +3,23 @@ package com.example.commerce.application.service
 import com.example.commerce.application.domain.entity.CartItem
 import com.example.commerce.application.domain.entity.ProductSku
 import com.example.commerce.application.domain.entity.ProductStatus
-import com.example.commerce.application.domain.repository.ro.CartItemRoRepository
 import com.example.commerce.application.domain.repository.rw.CartItemRwRepository
 import com.example.commerce.application.domain.repository.rw.ProductSkuRwRepository
 import jakarta.persistence.EntityNotFoundException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
+/**
+ * 장바구니 조회는 master 에서 한다(읽기 전용 트랜잭션). 앱이 담기·수량 변경 직후 GET /cart 로 다시 읽고,
+ * 결제 화면도 GET /cart 의 수량으로 주문을 만든다 — 레플리카 지연으로 옛 수량이 보이면 틀린 수량이 주문된다.
+ * 한 사람의 몇 줄짜리 조회라 master 부담은 작다.
+ */
 @Service
-@Transactional(transactionManager = "roTransactionManager", readOnly = true)
+@Transactional(transactionManager = "rwTransactionManager", readOnly = true)
 class CartQueryService(
-    private val cartItemRoRepository: CartItemRoRepository,
+    private val cartItemRwRepository: CartItemRwRepository,
 ) {
-    fun items(userId: String): List<CartItem> = cartItemRoRepository.findAllByUserIdOrderByIdDesc(userId)
+    fun items(userId: String): List<CartItem> = cartItemRwRepository.findAllByUserIdOrderByIdDesc(userId)
 }
 
 @Service

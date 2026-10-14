@@ -1,0 +1,11 @@
+# 이미지 빌드 컨텍스트에서 뺀다. 빌드 산출물·IDE 파일은 1단계에서 다시 만들거나 필요 없다.
+build/
+*/build/
+.gradle/
+.kotlin/
+*/.kotlin/
+.idea/
+*.iml
+# 시크릿은 이미지에 들어가면 안 된다(설정은 config-service 가 내려준다).
+**/src/main/resources/firebase/
+**/application-oauth.yml

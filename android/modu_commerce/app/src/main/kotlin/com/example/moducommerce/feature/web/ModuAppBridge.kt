@@ -3,6 +3,7 @@ package com.example.moducommerce.feature.web
 import android.webkit.JavascriptInterface
 import com.example.moducommerce.core.di.ApplicationScope
 import com.example.moducommerce.core.model.UserProfile
+import com.example.moducommerce.core.push.NotificationPermissions
 import com.example.moducommerce.core.session.SessionEvents
 import com.example.moducommerce.core.session.SessionRefresher
 import com.example.moducommerce.core.session.SessionStore
@@ -26,6 +27,7 @@ class ModuAppBridge @Inject constructor(
     private val authRepository: AuthRepository,
     private val gson: Gson,
     @ApplicationScope private val scope: CoroutineScope,
+    private val notificationPermissions: NotificationPermissions,
 ) {
 
     @JavascriptInterface
@@ -67,6 +69,18 @@ class ModuAppBridge @Inject constructor(
 
     @JavascriptInterface
     fun getProfile(): String = gson.toJson(runBlocking { sessionStore.profile.first() } ?: UserProfile())
+
+    /** OS 알림 권한: "granted" | "denied" | "default"(아직 물어본 적 없음). */
+    @JavascriptInterface
+    fun getNotificationPermission(): String = notificationPermissions.current()
+
+    /** 권한 창을 띄운다. 결과는 `window.ModuWeb.onNotificationPermission(result)` 로 간다(WebScreen). */
+    @JavascriptInterface
+    fun requestNotificationPermission() = notificationPermissions.request()
+
+    /** 이 앱의 시스템 알림 설정 화면. */
+    @JavascriptInterface
+    fun openNotificationSettings() = notificationPermissions.openSettings()
 
     companion object {
         const val NAME = "ModuApp"

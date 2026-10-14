@@ -57,7 +57,7 @@ export default function PromotionPage() {
     const patch = (wished: boolean) =>
       setDetail((d) => (d ? { ...d, products: d.products.map((p) => (p.id === productId ? { ...p, wished } : p)) } : d))
     patch(next)
-    setWish(productId, next).catch(() => {
+    setWish(productId, next, current).catch(() => {
       patch(!next)
       setMessage('찜을 바꾸지 못했습니다.')
     })

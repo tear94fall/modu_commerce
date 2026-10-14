@@ -1,9 +1,12 @@
 package com.example.commerce.application.usecase.promotion
 
 import com.example.commerce.application.domain.entity.EventKind
+import com.example.commerce.application.domain.entity.Promotion
 import com.example.commerce.application.domain.entity.PromotionType
 import com.example.commerce.application.service.AttendanceService
 import com.example.commerce.application.service.CouponQueryService
+import com.example.commerce.application.service.PromotionCacheService
+import com.example.commerce.application.service.PromotionCaches
 import com.example.commerce.application.service.PromotionCommandService
 import com.example.commerce.application.service.PromotionQueryService
 import com.example.commerce.application.service.WishlistQueryService
@@ -19,20 +22,24 @@ import com.example.commerce.application.usecase.result.PageResult
 import com.example.commerce.application.usecase.result.ProductSummaryResult
 import com.example.commerce.application.usecase.result.PromotionBannerResult
 import com.example.commerce.application.usecase.result.PromotionDetailResult
+import org.springframework.cache.annotation.CacheEvict
+import org.springframework.cache.annotation.Caching
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 @Component
 class GetPromotionBannersUseCase(
     private val promotionQueryService: PromotionQueryService,
+    private val promotionCacheService: PromotionCacheService,
 ) {
-    @Transactional(transactionManager = "roTransactionManager", readOnly = true)
-    fun execute(): List<PromotionBannerResult> = promotionQueryService.banners().map(PromotionBannerResult::from)
+    /** 캐시(오늘 날짜 키)에서 읽는다. 앱을 열 때마다 불리는 가장 뜨거운 조회다. */
+    fun execute(): List<PromotionBannerResult> = promotionCacheService.banners(promotionQueryService.today())
 }
 
 @Component
 class GetPromotionUseCase(
     private val promotionQueryService: PromotionQueryService,
+    private val promotionCacheService: PromotionCacheService,
     private val wishlistQueryService: WishlistQueryService,
     private val couponQueryService: CouponQueryService,
 ) {
@@ -41,25 +48,26 @@ class GetPromotionUseCase(
         userId: String,
         id: Long,
     ): PromotionDetailResult {
-        val p = promotionQueryService.visible(id)
+        // 공통 정보는 캐시에서, 상품 가격·품절·쿠폰 수량·찜·출석은 매번 새로 읽는다.
+        val p = promotionCacheService.snapshot(id)?.takeIf { it.visible } ?: throw PromotionQueryService.notFound(id)
         val today = promotionQueryService.today()
         val products =
             if (p.type == PromotionType.EXHIBITION) {
-                val list = promotionQueryService.sellingProducts(p)
+                val list = promotionQueryService.sellingProducts(p.productIds)
                 val wished = wishlistQueryService.wishedIds(userId, list.mapNotNull { it.id })
                 list.map { ProductSummaryResult.from(it, wished = it.id in wished) }
             } else {
                 emptyList()
             }
         val attendance =
-            if (p.kind() == EventKind.ATTENDANCE) {
+            if (p.eventKind == EventKind.ATTENDANCE) {
                 val dates = promotionQueryService.myCheckDates(id, userId)
                 AttendanceInfoResult(p.rewardPoints, today, today in dates, dates, p.totalDays())
             } else {
                 null
             }
         return PromotionDetailResult(
-            requireNotNull(p.id),
+            p.id,
             p.type,
             p.title,
             p.subtitle,
@@ -71,7 +79,7 @@ class GetPromotionUseCase(
             p.statusOn(today),
             products,
             attendance,
-            p.kind(),
+            p.eventKind,
             couponQueryService.offers(userId, couponQueryService.live(p.couponIds)),
         )
     }
@@ -111,11 +119,21 @@ class SearchAdminPromotionsUseCase(
 @Component
 class GetAdminPromotionUseCase(
     private val promotionQueryService: PromotionQueryService,
+    private val promotionCommandService: PromotionCommandService,
     private val couponQueryService: CouponQueryService,
 ) {
     @Transactional(transactionManager = "roTransactionManager", readOnly = true)
-    fun execute(id: Long): AdminPromotionDetailResult {
-        val p = promotionQueryService.find(id)
+    fun execute(id: Long): AdminPromotionDetailResult = resultOf(promotionQueryService.find(id))
+
+    /**
+     * 만들기·고치기 응답. 기획전 자체는 master 에서 읽는다(레플리카에는 지연 동안 없거나 옛값이다).
+     * 트랜잭션 안에서 매핑해야 기획전 상품(지연 로딩)을 읽을 수 있다. 출석 수·상품·쿠폰은 쓰기와 상관없어 레플리카에서.
+     */
+    @Transactional(transactionManager = "rwTransactionManager", readOnly = true)
+    fun executeOnMaster(id: Long): AdminPromotionDetailResult = resultOf(promotionCommandService.find(id))
+
+    private fun resultOf(p: Promotion): AdminPromotionDetailResult {
+        val id = requireNotNull(p.id)
         val coupons = couponQueryService.adminSummaries(couponQueryService.live(p.couponIds))
         return AdminPromotionDetailResult.from(
             p,
@@ -127,24 +145,41 @@ class GetAdminPromotionUseCase(
     }
 }
 
+/**
+ * 만들기·고치기·지우기. 캐시는 여기(트랜잭션 밖)서 비운다: 서비스 트랜잭션이 커밋된 뒤라 옛 값이 다시 들어가지 않고,
+ * Redis 가 죽어 비우기가 실패해도 이미 커밋된 변경이 오류로 보이지 않는다(캐시 오류 처리기가 로그만 남긴다, 최대 TTL 만큼 늦게 반영).
+ */
 @Component
 class SavePromotionUseCase(
     private val promotionCommandService: PromotionCommandService,
     private val getAdminPromotionUseCase: GetAdminPromotionUseCase,
 ) {
+    @CacheEvict(cacheNames = [PromotionCaches.BANNERS], allEntries = true)
     fun create(command: PromotionCommand): AdminPromotionDetailResult {
         val id = requireNotNull(promotionCommandService.create(command).id)
-        return getAdminPromotionUseCase.execute(id)
+        return getAdminPromotionUseCase.executeOnMaster(id)
     }
 
+    @Caching(
+        evict = [
+            CacheEvict(cacheNames = [PromotionCaches.BANNERS], allEntries = true),
+            CacheEvict(cacheNames = [PromotionCaches.PROMOTION], key = "#p0"),
+        ],
+    )
     fun update(
         id: Long,
         command: PromotionCommand,
     ): AdminPromotionDetailResult {
         promotionCommandService.update(id, command)
-        return getAdminPromotionUseCase.execute(id)
+        return getAdminPromotionUseCase.executeOnMaster(id)
     }
 
+    @Caching(
+        evict = [
+            CacheEvict(cacheNames = [PromotionCaches.BANNERS], allEntries = true),
+            CacheEvict(cacheNames = [PromotionCaches.PROMOTION], key = "#p0"),
+        ],
+    )
     fun delete(id: Long) = promotionCommandService.delete(id)
 }
 

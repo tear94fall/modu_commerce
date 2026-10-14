@@ -20,11 +20,16 @@ data class OptionGroupSpec(
     val values: List<String>,
 )
 
-/** SKU 하나를 만드는 재료. [options] 는 그룹명 → 값명. 옵션 없는 상품은 빈 맵. */
+/**
+ * SKU 하나를 만드는 재료. [options] 는 그룹명 → 값명. 옵션 없는 상품은 빈 맵.
+ * [baseStock] 은 관리자 화면이 불러왔을 때의 재고. 있으면 기존 SKU 의 재고를 절댓값이 아니라 증감(stock − baseStock)으로
+ * 적용해, 화면을 연 뒤 팔린 수량을 덮어쓰지 않는다. 없으면 [stock] 을 그대로 쓴다(옛 본문 호환).
+ */
 data class SkuSpec(
     val options: Map<String, String>,
     val extraPrice: Long = 0,
     val stock: Int = 0,
+    val baseStock: Int? = null,
 )
 
 /**
@@ -69,16 +74,23 @@ class Product(
     @Column(name = "status", nullable = false, columnDefinition = "varchar(20) not null default 'SELLING'")
     var status: ProductStatus = ProductStatus.SELLING
 
-    /** 찜 수 캐시. 인기순 정렬에 쓴다. */
-    @Column(name = "wish_count", nullable = false, columnDefinition = "bigint not null default 0")
+    /**
+     * 찜 수 캐시. 인기순 정렬에 쓴다. 엔티티 저장(상품 수정 등)이 덮어쓰지 않게 updatable = false —
+     * 바꾸는 것은 ProductRwRepository 의 원자적 UPDATE 뿐이다. 아래 increase/decrease 는 같은 요청의 응답 값만 맞춘다.
+     */
+    @Column(name = "wish_count", nullable = false, updatable = false, columnDefinition = "bigint not null default 0")
     var wishCount: Long = 0
+        protected set
 
-    /** 노출 중인 리뷰 수·별점 합 캐시. 목록 카드의 "★4.5 (12)" 를 조인 없이 그린다. 리뷰 작성·수정·삭제·숨김이 맞춘다. */
-    @Column(name = "review_count", nullable = false, columnDefinition = "bigint not null default 0")
+    /**
+     * 노출 중인 리뷰 수·별점 합 캐시. 목록 카드의 "★4.5 (12)" 를 조인 없이 그린다. 리뷰 작성·수정·삭제·숨김이 맞춘다.
+     * 찜 수와 같이 updatable = false 이고 ProductRwRepository 의 원자적 UPDATE 로만 바뀐다.
+     */
+    @Column(name = "review_count", nullable = false, updatable = false, columnDefinition = "bigint not null default 0")
     var reviewCount: Long = 0
         protected set
 
-    @Column(name = "rating_sum", nullable = false, columnDefinition = "bigint not null default 0")
+    @Column(name = "rating_sum", nullable = false, updatable = false, columnDefinition = "bigint not null default 0")
     var ratingSum: Long = 0
         protected set
 
@@ -128,12 +140,26 @@ class Product(
     }
 
     /**
+     * [skuSpecs] 중 재고를 증감으로 적용할(baseStock 이 있는) 기존 SKU. 서비스가 이 행들을 id 순으로 잠그고
+     * 지금 재고를 읽어 [replaceOptions] 의 currentStocks 로 넘긴다.
+     */
+    fun skusWithStockDelta(skuSpecs: List<SkuSpec>): List<ProductSku> {
+        val keys = skuSpecs.filter { it.baseStock != null }.map { ProductSku.optionKeyOf(it.options) }.toSet()
+        if (keys.isEmpty()) return emptyList()
+        return skus.filter { it.id != null && it.optionKey() in keys }
+    }
+
+    /**
      * 옵션 그룹·값과 SKU 를 통째로 바꾼다. 같은 조합의 SKU 는 기존 인스턴스(id)를 유지해
      * 장바구니·주문이 가리키는 id 가 살아남는다. 규칙 위반은 IllegalArgumentException(→ 400).
+     *
+     * 기존 SKU 의 재고: spec 에 baseStock 이 있으면 max(0, 지금 재고 + (stock − baseStock)). 지금 재고는 [currentStocks]
+     * (SKU id → 잠근 채 읽은 DB 값)에서, 없으면 엔티티 값에서 읽는다. baseStock 이 없으면 stock 그대로. 새 SKU 는 stock.
      */
     fun replaceOptions(
         groups: List<OptionGroupSpec>,
         skuSpecs: List<SkuSpec>,
+        currentStocks: Map<Long, Int> = emptyMap(),
     ) {
         validateOptions(groups, skuSpecs)
 
@@ -157,7 +183,12 @@ class Product(
                 if (existing != null) {
                     existing.optionValues.clear()
                     existing.optionValues.addAll(values)
-                    existing.update(spec.extraPrice, spec.stock)
+                    val stock =
+                        spec.baseStock?.let { base ->
+                            val current = existing.id?.let { currentStocks[it] } ?: existing.stock
+                            maxOf(0, current + (spec.stock - base))
+                        } ?: spec.stock
+                    existing.update(spec.extraPrice, stock)
                     existing
                 } else {
                     ProductSku(product = this, optionValues = values.toMutableSet(), extraPrice = spec.extraPrice, stock = spec.stock)
@@ -188,6 +219,8 @@ class Product(
         if (list <= price || list <= 0) return 0
         return ((list - price) * 100 / list).toInt()
     }
+
+    // 아래 카운터 함수는 메모리 값만 바꾼다(컬럼이 updatable = false). DB 는 ProductRwRepository 의 원자적 UPDATE 가 바꾼다.
 
     fun increaseWishCount() {
         wishCount += 1
@@ -247,6 +280,7 @@ class Product(
             }
             require(spec.extraPrice >= 0) { "추가금은 0 이상이어야 합니다." }
             require(spec.stock >= 0) { "재고는 0 이상이어야 합니다." }
+            require(spec.baseStock == null || spec.baseStock >= 0) { "기준 재고는 0 이상이어야 합니다." }
         }
         val keys = skuSpecs.map { ProductSku.optionKeyOf(it.options) }
         require(keys.toSet().size == keys.size) { "같은 옵션 조합이 두 번 들어 있습니다." }

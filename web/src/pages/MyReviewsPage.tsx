@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { deleteReview, getMyReviews, type Review } from '../api/reviews'
+import { appendNew } from '../util/list'
 import { EmptyBox, ErrorBox, Loading } from '../components/Boxes'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { Screen, TopBar } from '../components/Layout'
@@ -22,7 +23,7 @@ export default function MyReviewsPage() {
     setError(false)
     getMyReviews(p)
       .then((res) => {
-        setReviews((cur) => (p === 0 ? res.content : [...(cur ?? []), ...res.content]))
+        setReviews((cur) => (p === 0 ? res.content : appendNew(cur ?? [], res.content)))
         setHasNext(res.number + 1 < res.totalPages)
         setPage(p)
       })
@@ -36,7 +37,7 @@ export default function MyReviewsPage() {
     setTarget(null)
     if (!r) return
     try {
-      await deleteReview(r.id)
+      await deleteReview(r.id, r)
       setReviews((cur) => (cur ?? []).filter((x) => x.id !== r.id))
       setMessage('리뷰를 삭제했습니다')
     } catch {

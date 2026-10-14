@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import java.time.LocalDate
+import java.time.LocalDateTime
 
 class OrderEntityTest {
     private fun tshirt(): Product =
@@ -26,10 +28,21 @@ class OrderEntityTest {
             isDefault = true,
         )
 
+    private val now = LocalDateTime.of(2026, 10, 8, 15, 30)
+
+    private fun newOrder(): Order = Order.create("u1", address, Order.newOrderNo(LocalDate.of(2026, 10, 9)), now)
+
+    @Test
+    fun `주문번호는 넘긴 한국 날짜로 시작하고 결제 시각은 넘긴 UTC 시각이다`() {
+        val order = newOrder()
+        assertTrue(order.orderNo.startsWith("20261009-"))
+        assertEquals(now, order.paidAt)
+    }
+
     @Test
     fun `주문 항목은 단가 스냅샷을 갖고 합계를 더한다`() {
         val product = tshirt()
-        val order = Order.create("u1", address)
+        val order = newOrder()
         order.addItem(product.skus[0], 2)
         order.addItem(product.skus[1], 1)
 
@@ -43,17 +56,17 @@ class OrderEntityTest {
 
     @Test
     fun `상태 전이는 허용된 것만`() {
-        val order = Order.create("u1", address)
-        assertThrows(IllegalArgumentException::class.java) { order.transition(OrderStatus.DELIVERED) }
-        order.transition(OrderStatus.SHIPPING)
-        assertThrows(IllegalArgumentException::class.java) { order.cancel() }
-        order.transition(OrderStatus.DELIVERED)
+        val order = newOrder()
+        assertThrows(IllegalArgumentException::class.java) { order.transition(OrderStatus.DELIVERED, now) }
+        order.transition(OrderStatus.SHIPPING, now)
+        assertThrows(IllegalArgumentException::class.java) { order.cancel(now) }
+        order.transition(OrderStatus.DELIVERED, now)
         assertFalse(order.status.canTransitionTo(OrderStatus.CANCELLED))
 
-        val fresh = Order.create("u1", address)
-        fresh.cancel()
+        val fresh = newOrder()
+        fresh.cancel(now)
         assertTrue(fresh.isCancelled())
-        assertTrue(fresh.cancelledAt != null)
+        assertEquals(now, fresh.cancelledAt)
     }
 
     @Test

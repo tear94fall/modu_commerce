@@ -53,6 +53,13 @@ class PromotionQueryService(
         return ids.mapNotNull { byId[it] }
     }
 
+    /** 앱 기획전 상품: 관리자 순서대로 판매 중인 것만(가격·품절은 늘 새로 읽는다). */
+    fun sellingProducts(productIds: List<Long>): List<Product> {
+        if (productIds.isEmpty()) return emptyList()
+        val byId = productRoRepository.findAllByIdIn(productIds).associateBy { it.id }
+        return productIds.mapNotNull { byId[it] }.filter { it.status == ProductStatus.SELLING }
+    }
+
     /** 앱 기획전 상품: 판매 중인 것만. */
     fun sellingProducts(promotion: Promotion): List<Product> = products(promotion).filter { it.status == ProductStatus.SELLING }
 
@@ -126,6 +133,14 @@ class PromotionCommandService(
         promotion.delete(LocalDateTime.now(clock))
     }
 
+    /** master 에서 읽는다. 방금 만든·고친 것을 응답할 때, 쓰기 전에 조건을 볼 때. 지운 것은 없는 것으로 본다. */
+    @Transactional(transactionManager = "rwTransactionManager", readOnly = true)
+    fun find(id: Long): Promotion = promotionRwRepository.findByIdOrNull(id) ?: throw PromotionQueryService.notFound(id)
+
+    /** 앱에 노출 중인 것(master). 노출이 꺼졌으면 없는 것으로 본다. */
+    @Transactional(transactionManager = "rwTransactionManager", readOnly = true)
+    fun visible(id: Long): Promotion = find(id).takeIf { it.visible } ?: throw PromotionQueryService.notFound(id)
+
     private fun apply(
         promotion: Promotion,
         c: PromotionCommand,
@@ -152,8 +167,10 @@ class PromotionCommandService(
                 require(missing.isEmpty()) { "없는 상품이 있습니다: ${missing.joinToString()}" }
                 promotion.replaceProducts(c.productIds)
             }
-            PromotionType.EVENT ->
+
+            PromotionType.EVENT -> {
                 promotion.setReward(if (promotion.kind() == EventKind.ATTENDANCE) c.pointRuleCode else null, c.rewardPoints)
+            }
         }
     }
 }

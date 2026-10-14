@@ -9,7 +9,7 @@ import jakarta.persistence.Table
 import org.hibernate.annotations.SQLRestriction
 import java.time.LocalDateTime
 
-/** 2단계 카테고리(상위 > 하위). 깊이 제한은 서비스가 본다. 소프트 삭제. */
+/** 최대 [MAX_DEPTH]단계 카테고리(대 > 중 > 소). 깊이 제한은 서비스가 본다. 소프트 삭제. */
 @Entity
 @Table(name = "categories")
 @SQLRestriction("deleted_at IS NULL")
@@ -57,6 +57,11 @@ class Category(
         this.sortOrder = sortOrder
     }
 
+    /** 형제 사이 순서만 바꾼다. */
+    fun reorder(sortOrder: Int) {
+        this.sortOrder = sortOrder
+    }
+
     fun delete(now: LocalDateTime = LocalDateTime.now()) {
         deletedAt = now
     }
@@ -65,12 +70,25 @@ class Category(
 
     fun isRoot(): Boolean = parent == null
 
-    /** 상위부터 자기까지. 2단계라 길이는 1 또는 2 다. */
-    fun path(): List<Category> = listOfNotNull(parent, this)
+    /** 최상위부터 자기까지(길이 1..[MAX_DEPTH]). */
+    fun path(): List<Category> = generateSequence(this) { it.parent }.toList().asReversed()
+
+    /** 최상위가 1. */
+    fun depth(): Int = generateSequence(this) { it.parent }.count()
+
+    /** 자기 또는 조상 중에 [id] 가 있는가. */
+    fun isSelfOrDescendantOf(id: Long): Boolean = generateSequence(this) { it.parent }.any { it.id == id }
+
+    /** "문구 > 노트·데스크 > 노트". */
+    fun pathName(): String = path().joinToString(PATH_SEPARATOR) { it.name }
 
     override fun toString(): String = "Category(id=$id, name='$name')"
 
     companion object {
+        /** 최상위가 1단계. */
+        const val MAX_DEPTH = 3
+        const val PATH_SEPARATOR = " > "
+
         private val COLOR = Regex("^#[0-9A-Fa-f]{6}$")
 
         fun create(

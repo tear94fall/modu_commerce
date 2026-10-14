@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { ApiError } from '../api/client'
 import { cancelOrder, fullAddress, getOrder, paymentLabel, statusLabel, type OrderDetail } from '../api/orders'
+import { formatPoints } from '../api/points'
 import { ErrorBox, Loading } from '../components/Boxes'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { Screen, TopBar } from '../components/Layout'
@@ -40,7 +41,7 @@ export default function OrderDetailPage() {
       setOrder(await cancelOrder(orderId))
       setMessage('주문을 취소했습니다')
     } catch (e) {
-      setMessage(e instanceof ApiError && e.status === 400 ? e.message : '주문을 취소하지 못했습니다')
+      setMessage(e instanceof ApiError && (e.status === 400 || e.status === 503) && !e.message.startsWith('HTTP ') ? e.message : '주문을 취소하지 못했습니다')
     } finally {
       setWorking(false)
     }
@@ -56,6 +57,8 @@ export default function OrderDetailPage() {
   }
 
   const cancellable = order.status === 'PAID'
+  /** 포인트 환불이 아직 포인트 서비스에 닿지 않았다(서버가 다시 보낸다). FAILED 도 사용자에겐 처리 중이다. */
+  const refundPending = order.pointRefundStatus === 'PENDING' || order.pointRefundStatus === 'FAILED'
   return (
     <Screen className={cancellable ? 'with-bottom-bar' : ''}>
       <TopBar title="주문 상세" back />
@@ -120,7 +123,7 @@ export default function OrderDetailPage() {
         )}
         {order.pointAmount > 0 && (
           <div className="kv muted">
-            <span>포인트 사용{order.status === 'CANCELLED' ? ' (환불됨)' : ''}</span>
+            <span>포인트 사용{order.status === 'CANCELLED' ? (refundPending ? ' · 포인트 환불 처리 중' : ' (환불됨)') : ''}</span>
             <span>-{formatPrice(order.pointAmount)}</span>
           </div>
         )}
@@ -128,6 +131,7 @@ export default function OrderDetailPage() {
           <span>{paymentLabel(order.paymentMethod)}</span>
           <span className="v">{formatPrice(order.paymentAmount)}</span>
         </div>
+        <EarnLine order={order} />
       </section>
       {cancellable && (
         <div className="bottom-bar">
@@ -139,5 +143,23 @@ export default function OrderDetailPage() {
       <ConfirmDialog open={confirm} title="주문 취소" message="주문을 취소할까요? 결제 금액은 즉시 환불(모의)됩니다." confirmLabel="주문 취소" onConfirm={cancel} onClose={() => setConfirm(false)} />
       <Toast message={message} onDone={clearMessage} />
     </Screen>
+  )
+}
+
+/**
+ * 구매 적립 한 줄. 적립이 정해졌으면(배송 완료) 그 상태를, 아니면 결제완료·배송중의 예상 적립을 보여 준다.
+ * 적립 없음(NONE)·취소 주문은 줄을 숨긴다.
+ */
+function EarnLine({ order }: { order: OrderDetail }) {
+  const { earn, expectedEarn } = order
+  let text: string | null = null
+  if (earn && earn.status === 'DONE') text = `${formatPoints(earn.points ?? 0)} 적립 완료`
+  else if (earn && (earn.status === 'PENDING' || earn.status === 'FAILED')) text = '적립 처리 중'
+  else if (!earn && expectedEarn && expectedEarn.points > 0) text = `배송 완료 시 ${expectedEarn.rate}% 적립 예정 · ${formatPoints(expectedEarn.points)}`
+  if (!text) return null
+  return (
+    <div className={`earn-line${earn?.status === 'DONE' ? ' done' : ''}`} role="note">
+      {text}
+    </div>
   )
 }

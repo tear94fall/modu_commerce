@@ -1,6 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
-import { formatRating, getProductReviews, getReviewSummary, REVIEW_SORT_LABELS, REVIEW_SORTS, type Review, type ReviewSort, type ReviewSummary } from '../api/reviews'
+import {
+  applyRatingDeltas,
+  formatRating,
+  getProductReviews,
+  getReviewSummary,
+  REVIEW_SORT_LABELS,
+  REVIEW_SORTS,
+  type RatingDelta,
+  type Review,
+  type ReviewSort,
+  type ReviewSummary,
+} from '../api/reviews'
+import { appendNew } from '../util/list'
 import { EmptyBox, ErrorBox, Loading } from '../components/Boxes'
 import { Screen, TopBar } from '../components/Layout'
 import ReviewList from '../components/ReviewList'
@@ -12,7 +24,10 @@ export default function ProductReviewsPage() {
   const { id } = useParams()
   const productId = Number(id)
   const location = useLocation()
-  const [summary, setSummary] = useState<ReviewSummary | null>(null)
+  const [serverSummary, setSummary] = useState<ReviewSummary | null>(null)
+  /** 요약과 함께 받은 첫 장이 알려 준, 레플리카가 아직 모르는 내 쓰기. 요약에 더해 보여 준다. */
+  const [deltas, setDeltas] = useState<RatingDelta[]>([])
+  const summary = serverSummary && applyRatingDeltas(serverSummary, deltas)
   const [reviews, setReviews] = useState<Review[] | null>(null)
   const [sort, setSort] = useState<ReviewSort>('latest')
   const [hasNext, setHasNext] = useState(false)
@@ -24,7 +39,8 @@ export default function ProductReviewsPage() {
     (p: number, s: ReviewSort) => {
       setError(false)
       const list = getProductReviews(productId, p, s).then((res) => {
-        setReviews((cur) => (p === 0 ? res.content : [...(cur ?? []), ...res.content]))
+        setReviews((cur) => (p === 0 ? res.content : appendNew(cur ?? [], res.content)))
+        if (p === 0 && s === 'latest') setDeltas(res.ratingDeltas ?? [])
         setHasNext(res.number + 1 < res.totalPages)
         setPage(p)
       })

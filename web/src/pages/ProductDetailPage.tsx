@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { addCartItem } from '../api/cart'
-import { getProduct, setWish, type ProductDetail } from '../api/catalog'
+import { getProduct, setWish, type ProductDetail, type ProductSummary } from '../api/catalog'
 import { ApiError } from '../api/client'
 import { getDownloadableCoupons, offerDiscountFor, type CouponOffer } from '../api/coupons'
-import { formatRating, getProductReviews, type Review } from '../api/reviews'
+import { applyRatingDeltasTo, formatRating, getProductReviews, type RatingDelta, type Review } from '../api/reviews'
 import BottomPanel from '../components/BottomPanel'
 import { ErrorBox, Loading } from '../components/Boxes'
 import CouponOfferList from '../components/CouponOfferList'
@@ -30,6 +30,8 @@ export default function ProductDetailPage() {
   const [slide, setSlide] = useState(0)
   /** 최신 리뷰 세 개 미리보기. 못 불러오면 빈 목록(상세는 그대로 뜬다). */
   const [reviews, setReviews] = useState<Review[]>([])
+  /** 미리보기와 함께 받은, 레플리카가 아직 모르는 내 리뷰 쓰기. 리뷰 수·평균에 더한다. */
+  const [ratingDeltas, setRatingDeltas] = useState<RatingDelta[]>([])
   /** 이 상품에 쓸 수 있는 받을 쿠폰. 없거나 못 불러오면 빈 목록(줄을 숨긴다). */
   const [offers, setOffers] = useState<CouponOffer[]>([])
   const [couponOpen, setCouponOpen] = useState(false)
@@ -45,7 +47,10 @@ export default function ProductDetailPage() {
       })
       .catch((e: unknown) => setStatus(e instanceof ApiError && e.status === 404 ? 'notFound' : 'error'))
     getProductReviews(productId, 0, 'latest', 3)
-      .then((p) => setReviews(p.content))
+      .then((p) => {
+        setReviews(p.content)
+        setRatingDeltas(p.ratingDeltas ?? [])
+      })
       .catch(() => setReviews([]))
     getDownloadableCoupons(productId)
       .then(setOffers)
@@ -67,6 +72,7 @@ export default function ProductDetailPage() {
   }
 
   const sku = selectSku(detail, selected)
+  const rating = applyRatingDeltasTo(detail, ratingDeltas)
   const total = totalPrice(detail, sku, quantity)
   const bestCoupon = offers.reduce((best, o) => Math.max(best, offerDiscountFor(o, detail.price)), 0)
 
@@ -74,7 +80,7 @@ export default function ProductDetailPage() {
     const next = !detail.wished
     const before = detail
     setDetail({ ...detail, wished: next, wishCount: Math.max(0, detail.wishCount + (next ? 1 : -1)) })
-    setWish(detail.id, next).catch(() => {
+    setWish(detail.id, next, toSummary(detail)).catch(() => {
       setDetail(before)
       setMessage('찜을 바꾸지 못했습니다.')
     })
@@ -128,9 +134,9 @@ export default function ProductDetailPage() {
         {detail.categoryPath.length > 0 && <div className="crumb">{detail.categoryPath.join(' › ')}</div>}
         <h1>{detail.name}</h1>
         <Price price={detail.price} listPrice={detail.listPrice} discountRate={detail.discountRate} />
-        {detail.reviewCount > 0 && (
+        {rating.reviewCount > 0 && (
           <Link to={`/products/${detail.id}/reviews`} className="rating-line">
-            <StarIcon className="on" /> {formatRating(detail.ratingAverage)} <span className="cnt">리뷰 {detail.reviewCount.toLocaleString('ko-KR')}개 ›</span>
+            <StarIcon className="on" /> {formatRating(rating.ratingAverage)} <span className="cnt">리뷰 {rating.reviewCount.toLocaleString('ko-KR')}개 ›</span>
           </Link>
         )}
         {offers.length > 0 && (
@@ -149,8 +155,8 @@ export default function ProductDetailPage() {
       )}
       <section className="reviews-preview">
         <div className="block-head">
-          <h2>리뷰 {detail.reviewCount > 0 ? detail.reviewCount.toLocaleString('ko-KR') : ''}</h2>
-          {detail.reviewCount > 0 && <Link to={`/products/${detail.id}/reviews`}>전체 보기</Link>}
+          <h2>리뷰 {rating.reviewCount > 0 ? rating.reviewCount.toLocaleString('ko-KR') : ''}</h2>
+          {rating.reviewCount > 0 && <Link to={`/products/${detail.id}/reviews`}>전체 보기</Link>}
         </div>
         {reviews.length === 0 ? <div className="empty">아직 리뷰가 없습니다. 구매 후 첫 리뷰를 남겨 주세요.</div> : <ReviewList reviews={reviews} />}
       </section>
@@ -231,3 +237,17 @@ export default function ProductDetailPage() {
     </Screen>
   )
 }
+
+/** 찜 목록에 바로 끼울 카드 모양. */
+const toSummary = (d: ProductDetail): ProductSummary => ({
+  id: d.id,
+  name: d.name,
+  imageUrl: d.images[0] ?? null,
+  price: d.price,
+  listPrice: d.listPrice,
+  discountRate: d.discountRate,
+  soldOut: d.soldOut,
+  wished: true,
+  reviewCount: d.reviewCount,
+  ratingAverage: d.ratingAverage,
+})

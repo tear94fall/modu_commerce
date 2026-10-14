@@ -23,7 +23,7 @@ class GoogleSignInHelper internal constructor(
     companion object {
         fun client(context: Context): GoogleSignInClient {
             val options = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                .requestIdToken(context.getString(R.string.default_web_client_id))
+                .requestIdToken(context.getString(R.string.google_login_client_id))
                 .requestEmail()
                 .build()
             return GoogleSignIn.getClient(context, options)

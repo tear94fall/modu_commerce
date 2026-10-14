@@ -19,6 +19,7 @@ const renderList = (url: string) =>
 
 const location = () => new URL(screen.getByTestId('location').textContent ?? '', 'http://x')
 const roots = () => screen.getByRole('tablist', { name: '대분류' })
+const crumbs = () => screen.getByRole('navigation', { name: '카테고리 경로' })
 const subs = (root: string) => screen.getByRole('tablist', { name: `${root} 소분류` })
 
 describe('ProductListPage', () => {
@@ -95,6 +96,71 @@ describe('ProductListPage', () => {
 
     expect(await screen.findByText('생활 상품')).toBeInTheDocument()
     expect(location().searchParams.get('categoryId')).toBe('1')
+  })
+
+  it('drills down to depth 3 with chips and goes back up with the breadcrumb', async () => {
+    renderList('/products?categoryId=3&title=%ED%8C%A8%EC%85%98&sort=popular')
+    expect(await screen.findByText('상품-3')).toBeInTheDocument()
+
+    // 대분류: 중분류 칩(서버 순서), "전체" 가 대분류 자신. 경로는 전체 › 패션.
+    expect(within(subs('패션')).getAllByRole('tab').map((c) => c.textContent)).toEqual(['전체', '의류', '신발'])
+    expect(within(subs('패션')).getByRole('tab', { name: '전체' })).toHaveAttribute('aria-selected', 'true')
+    expect(within(crumbs()).getByRole('link', { name: '전체' })).toHaveAttribute('href', '/categories?root=3')
+    expect(within(crumbs()).getByText('패션')).toHaveAttribute('aria-current', 'page')
+
+    // 하위가 있는 중분류: 그 소분류 칩(하의 → 상의, 서버 순서).
+    await userEvent.click(within(subs('패션')).getByRole('tab', { name: '의류' }))
+    expect(await screen.findByText('상품-32')).toBeInTheDocument()
+    expect(screen.getByText('패션 › 의류')).toBeInTheDocument()
+    expect(within(subs('의류')).getAllByRole('tab').map((c) => c.textContent)).toEqual(['전체', '하의', '상의'])
+    expect(within(subs('의류')).getByRole('tab', { name: '전체' })).toHaveAttribute('aria-selected', 'true')
+    expect(within(roots()).getByRole('tab', { name: /패션/ })).toHaveAttribute('aria-selected', 'true')
+
+    // 소분류: 형제 칩 그대로, 고른 칩만 바뀐다. 경로는 전체 › 패션 › 의류 › 상의.
+    await userEvent.click(within(subs('의류')).getByRole('tab', { name: '상의' }))
+    expect(await screen.findByText('상품-321')).toBeInTheDocument()
+    expect(screen.getByText('패션 › 의류 › 상의')).toBeInTheDocument()
+    expect(within(subs('의류')).getAllByRole('tab').map((c) => c.textContent)).toEqual(['전체', '하의', '상의'])
+    expect(within(subs('의류')).getByRole('tab', { name: '상의' })).toHaveAttribute('aria-selected', 'true')
+    expect(within(crumbs()).getAllByRole('listitem').map((li) => li.textContent?.replace('›', '').trim())).toEqual(['전체', '패션', '의류', '상의'])
+    expect(within(crumbs()).getByText('상의')).toHaveAttribute('aria-current', 'page')
+    expect(catalog.getProducts).toHaveBeenLastCalledWith({ categoryId: 321, sort: 'popular', page: 0 })
+
+    // 경로로 한 단계씩 위로.
+    await userEvent.click(within(crumbs()).getByRole('button', { name: '의류' }))
+    expect(await screen.findByText('상품-32')).toBeInTheDocument()
+    expect(location().searchParams.get('categoryId')).toBe('32')
+    expect(location().searchParams.get('sort')).toBe('popular')
+    expect(within(subs('의류')).getByRole('tab', { name: '전체' })).toHaveAttribute('aria-selected', 'true')
+
+    await userEvent.click(within(crumbs()).getByRole('button', { name: '패션' }))
+    expect(await screen.findByText('상품-3')).toBeInTheDocument()
+    expect(within(subs('패션')).getAllByRole('tab').map((c) => c.textContent)).toEqual(['전체', '의류', '신발'])
+    expect(within(crumbs()).queryByRole('button')).toBeNull()
+
+    // 모두 replace 라서 뒤로 가면 목록에 들어오기 전 화면.
+    await userEvent.click(screen.getByRole('button', { name: '이전' }))
+    expect(screen.getByText('카테고리 화면')).toBeInTheDocument()
+  })
+
+  it('offers the parent category on an empty depth-3 list', async () => {
+    vi.spyOn(catalog, 'getProducts').mockImplementation(async ({ categoryId }) => (categoryId === 322 ? page([]) : page([product({ name: '의류 상품' })])))
+    renderList('/products?categoryId=322&title=%ED%95%98%EC%9D%98')
+
+    expect(await screen.findByText('아직 상품이 없어요')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '의류 전체 보기' }))
+
+    expect(await screen.findByText('의류 상품')).toBeInTheDocument()
+    expect(location().searchParams.get('categoryId')).toBe('32')
+  })
+
+  it('opens the category tab from the breadcrumb root', async () => {
+    renderList('/products?categoryId=11&title=%EC%A3%BC%EB%B0%A9')
+    await screen.findByText('상품-11')
+
+    await userEvent.click(within(crumbs()).getByRole('link', { name: '전체' }))
+    expect(screen.getByText('카테고리 화면')).toBeInTheDocument()
+    expect(location().pathname + location().search).toBe('/categories?root=1')
   })
 
   it('keeps the plain layout for lists without a category', async () => {

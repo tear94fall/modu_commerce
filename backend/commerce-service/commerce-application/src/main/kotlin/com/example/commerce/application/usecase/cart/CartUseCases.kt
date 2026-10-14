@@ -11,7 +11,8 @@ import org.springframework.transaction.annotation.Transactional
 class GetCartUseCase(
     private val cartQueryService: CartQueryService,
 ) {
-    @Transactional(transactionManager = "roTransactionManager", readOnly = true)
+    /** master 에서 읽는다([CartQueryService] 참고). 매핑이 SKU·상품을 지연 로딩하니 같은 트랜잭션 안에서. */
+    @Transactional(transactionManager = "rwTransactionManager", readOnly = true)
     fun execute(userId: String): CartResult = CartResult.from(cartQueryService.items(userId))
 }
 

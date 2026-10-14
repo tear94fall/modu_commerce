@@ -2,6 +2,7 @@ package com.example.commerce.api.order
 
 import com.example.commerce.api.support.CatalogTestSupport
 import com.example.commerce.application.point.InsufficientPointException
+import com.example.commerce.application.point.PointCancelResult
 import com.example.commerce.application.point.PointGateway
 import com.jayway.jsonpath.JsonPath
 import org.junit.jupiter.api.AfterEach
@@ -15,8 +16,8 @@ import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.MediaType
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
@@ -45,10 +46,17 @@ class OrderPointTest
         @AfterEach
         fun reseed() = support.reseed()
 
+        @BeforeEach
+        fun cancelOk() {
+            whenever(pointGateway.cancelSpend(any(), any(), anyOrNull())).thenAnswer {
+                PointCancelResult(cancelled = true, reason = null, amount = 0, balance = 0)
+            }
+        }
+
         private fun addressId(): Int =
             JsonPath.read(
                 mockMvc
-                    .post("/api/v1/addresses") {
+                    .post("/api-public/v1/addresses") {
                         with(me)
                         contentType = MediaType.APPLICATION_JSON
                         content = """{"recipient":"임준섭","phone":"010-1234-5678","zipCode":"06236","address1":"서울 강남구","address2":null}"""
@@ -58,7 +66,7 @@ class OrderPointTest
             )
 
         private fun order(usePoints: Long) =
-            mockMvc.post("/api/v1/orders") {
+            mockMvc.post("/api-public/v1/orders") {
                 with(me)
                 contentType = MediaType.APPLICATION_JSON
                 content =
@@ -80,13 +88,18 @@ class OrderPointTest
             val orderNo = JsonPath.read<String>(body, "$.orderNo")
             verify(pointGateway).spend(eq("11"), eq(3_000L), eq("order:$orderNo"), eq("주문 결제 $orderNo"))
 
-            mockMvc.get("/api/v1/orders") { with(me) }.andExpect {
+            mockMvc.get("/api-public/v1/orders") { with(me) }.andExpect {
                 jsonPath("$.content[0].pointAmount") { value(3_000) }
                 jsonPath("$.content[0].paymentAmount") { value(15_000) }
             }
 
-            mockMvc.post("/api/v1/orders/$orderId/cancel") { with(me) }.andExpect { status { isOk() } }
-            verify(pointGateway).refund(eq("11"), eq(3_000L), eq("refund:order:$orderNo"), eq("주문 취소 $orderNo"))
+            // 환불은 취소 커밋 뒤 spend/cancel(원래 차감 키)로 보낸다. point-service 는 refund:order:번호 로 돌려준다.
+            mockMvc.post("/api-public/v1/orders/$orderId/cancel") { with(me) }.andExpect {
+                status { isOk() }
+                jsonPath("$.pointRefundStatus") { value("DONE") }
+            }
+            verify(pointGateway).cancelSpend(eq("11"), eq("order:$orderNo"), eq("주문 취소 $orderNo"))
+            verify(pointGateway, never()).refund(any(), any(), any(), anyOrNull())
         }
 
         @Test
@@ -100,8 +113,11 @@ class OrderPointTest
                     with(admin)
                     contentType = MediaType.APPLICATION_JSON
                     content = """{"status":"CANCELLED"}"""
-                }.andExpect { status { isOk() } }
-            verify(pointGateway).refund(eq("11"), eq(500L), eq("refund:order:$orderNo"), anyOrNull())
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.pointRefundStatus") { value("DONE") }
+                }
+            verify(pointGateway).cancelSpend(eq("11"), eq("order:$orderNo"), anyOrNull())
         }
 
         @Test
@@ -126,7 +142,7 @@ class OrderPointTest
                 status { isBadRequest() }
                 jsonPath("$.message") { value("포인트가 부족합니다. 잔액을 확인해 주세요.") }
             }
-            mockMvc.get("/api/v1/orders") { with(me) }.andExpect { jsonPath("$.totalElements") { value(0) } }
+            mockMvc.get("/api-public/v1/orders") { with(me) }.andExpect { jsonPath("$.totalElements") { value(0) } }
             org.junit.jupiter.api.Assertions
                 .assertEquals(support.stockOf("모두 머그컵 세트"), support.stockOf("모두 머그컵 세트"))
         }

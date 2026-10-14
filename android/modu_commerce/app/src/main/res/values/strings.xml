@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">모두의 커머스</string>
     <!-- 모두의 채팅과 같은 구글 프로젝트의 웹 클라이언트 ID(비밀 아님). requestIdToken 용. -->
-    <string name="default_web_client_id">529862674339-34f6a7he3npv9kkufh8u8ie6mma3f92j.apps.googleusercontent.com</string>
+    <string name="google_login_client_id">529862674339-34f6a7he3npv9kkufh8u8ie6mma3f92j.apps.googleusercontent.com</string>
 
     <!-- 로그인 -->
     <string name="login_tagline">모두 계정으로 바로 쇼핑하세요</string>
@@ -24,4 +24,8 @@
     <string name="web_offline">인터넷에 연결되어 있지 않습니다.\n연결되면 자동으로 다시 불러옵니다.</string>
     <string name="web_retrying">다시 불러오는 중입니다</string>
     <string name="action_retry">다시 시도</string>
+
+    <!-- 푸시 -->
+    <string name="push_channel_promotions">혜택·이벤트 알림</string>
+    <string name="push_channel_promotions_desc">특가·쿠폰·기획전 소식. 마이페이지 &gt; 알림 설정에서 수신 동의를 바꿀 수 있습니다.</string>
 </resources>
