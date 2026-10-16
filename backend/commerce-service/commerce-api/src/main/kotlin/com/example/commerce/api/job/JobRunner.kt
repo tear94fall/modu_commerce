@@ -2,11 +2,13 @@ package com.example.commerce.api.job
 
 import com.example.commerce.api.logging.JobMdc
 import com.example.commerce.api.logging.RequestContextFilter
+import com.fasterxml.jackson.annotation.JsonInclude
 import org.slf4j.MDC
 import org.springframework.stereotype.Component
 import java.util.concurrent.ConcurrentHashMap
 
-/** 한 회차의 결과. batch-service 가 이력(`batch_job_run`)에 그대로 적는다. */
+/** 한 회차의 결과. batch-service 가 이력(`batch_job_run`)에 그대로 적는다. 비어 있는 result·error 는 JSON 에서 뺀다. */
+@JsonInclude(JsonInclude.Include.NON_NULL)
 data class JobRun(
     val job: String,
     /** `ok` 또는 `failed`. */
