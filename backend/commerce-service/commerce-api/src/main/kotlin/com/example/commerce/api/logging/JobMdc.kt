@@ -7,6 +7,8 @@ import org.slf4j.MDC
 /**
  * 스케줄 작업(등급 산정, 적립 재시도, 푸시 캠페인, 포인트 아웃박스·대사)의 한 회차를 감싼다.
  * - 로그에 요청 없이도 묶음 키를 남긴다: `requestId = "job-" + 새 값`, `job = 작업 이름`. 작업이 끝나면 지운다.
+ * - MDC 에 requestId 가 이미 있으면(batch-service 가 `/api-internal/v1/jobs/{name}/run` 으로 돌리는 회차 — RequestContextFilter 가 X-Request-Id 를 넣어 둔다)
+ *   새로 만들지 않고 그대로 쓴다. 그래야 batch-service 의 회차 id 하나로 양쪽 로그가 묶인다. 그 id 는 요청이 끝날 때 필터가 지운다.
  * - 끝나면 `job.run` 이벤트 한 줄: 작업 이름·결과(ok/failed)·소요 시간, 실패면 error 와 스택(ERROR). http.access·api.access·kafka.publish 와
  *   같은 방식으로 OpenSearch 에서 `attributes.event:"job.run"` 으로 배치 실행 이력을 본다. 예외는 그대로 던진다.
  * ShedLock 이 락을 못 잡아 본문이 돌지 않은 회차는 여기까지 오지 않으므로 이벤트도 없다.
@@ -23,7 +25,8 @@ object JobMdc {
         name: String,
         block: () -> T,
     ): T {
-        MDC.put(RequestContextFilter.MDC_REQUEST_ID, REQUEST_ID_PREFIX + RequestContextFilter.newRequestId())
+        val ownRequestId = MDC.get(RequestContextFilter.MDC_REQUEST_ID) == null
+        if (ownRequestId) MDC.put(RequestContextFilter.MDC_REQUEST_ID, REQUEST_ID_PREFIX + RequestContextFilter.newRequestId())
         MDC.put(MDC_JOB, name)
         val started = System.nanoTime()
         try {
@@ -56,7 +59,7 @@ object JobMdc {
             throw e
         } finally {
             MDC.remove(MDC_JOB)
-            MDC.remove(RequestContextFilter.MDC_REQUEST_ID)
+            if (ownRequestId) MDC.remove(RequestContextFilter.MDC_REQUEST_ID)
         }
     }
 

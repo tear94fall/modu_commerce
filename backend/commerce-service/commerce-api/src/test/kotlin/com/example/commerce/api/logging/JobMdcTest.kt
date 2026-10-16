@@ -39,6 +39,20 @@ class JobMdcTest {
         assertNull(MDC.get(RequestContextFilter.MDC_REQUEST_ID))
     }
 
+    /** batch-service 가 HTTP 로 돌리는 회차: RequestContextFilter 가 X-Request-Id(배치 회차 id)를 MDC 에 넣어 둔 상태다 — 그 id 를 그대로 써야 양쪽 로그가 한 id 로 묶인다. */
+    @Test
+    fun `MDC 에 requestId 가 이미 있으면 새로 만들지 않고 그대로 쓰고, 끝나도 지우지 않는다`() {
+        MDC.put(RequestContextFilter.MDC_REQUEST_ID, "job-batch000000001")
+
+        JobMdc.run("point-outbox-relay") {
+            assertEquals("job-batch000000001", MDC.get(RequestContextFilter.MDC_REQUEST_ID))
+        }
+
+        assertEquals("job-batch000000001", MDC.get(RequestContextFilter.MDC_REQUEST_ID), "요청 범위의 id 는 필터가 지운다")
+        assertNull(MDC.get(JobMdc.MDC_JOB))
+        assertEquals("job-batch000000001", capture.events.single().mdcPropertyMap[RequestContextFilter.MDC_REQUEST_ID])
+    }
+
     @Test
     fun `작업이 예외로 끝나도 MDC 를 지운다`() {
         runCatching { JobMdc.run("tier-monthly-run") { error("boom") } }
