@@ -1,15 +1,27 @@
 package com.example.commerce.api.logging
 
+import ch.qos.logback.classic.Level
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.slf4j.MDC
 
 class JobMdcTest {
+    private lateinit var capture: LogCapture
+
+    @BeforeEach
+    fun setUp() {
+        capture = LogCapture(JobMdc.LOGGER)
+    }
+
     @AfterEach
-    fun tearDown() = MDC.clear()
+    fun tearDown() {
+        capture.close()
+        MDC.clear()
+    }
 
     @Test
     fun `작업 동안 job 과 job- 접두 requestId 를 두고 끝나면 지운다`() {
@@ -33,5 +45,36 @@ class JobMdcTest {
 
         assertNull(MDC.get(JobMdc.MDC_JOB))
         assertNull(MDC.get(RequestContextFilter.MDC_REQUEST_ID))
+    }
+
+    /** 회차마다 `job.run` 이벤트 한 줄 — OpenSearch 에서 attributes.event:"job.run" 으로 배치 실행 이력을 본다. */
+    @Test
+    fun `작업이 끝나면 job run 이벤트 한 줄을 남긴다 — 이름·결과 ok·소요 시간, MDC 의 job- requestId 와 함께`() {
+        JobMdc.run("point-reconcile") { Thread.sleep(5) }
+
+        val event = capture.events.single()
+        val fields = LogCapture.fields(event)
+        assertEquals(Level.INFO, event.level)
+        assertEquals("job.run", fields["event"])
+        assertEquals("point-reconcile", fields["job"])
+        assertEquals("ok", fields["outcome"])
+        assertTrue((fields["durationMs"] as Number).toLong() >= 5, fields["durationMs"].toString())
+        assertTrue(event.mdcPropertyMap[RequestContextFilter.MDC_REQUEST_ID]!!.startsWith(JobMdc.REQUEST_ID_PREFIX))
+        assertEquals("point-reconcile", event.mdcPropertyMap[JobMdc.MDC_JOB])
+    }
+
+    @Test
+    fun `작업이 예외로 끝나면 ERROR job run 이벤트에 outcome failed 와 error 를 남기고 예외는 그대로 던진다`() {
+        val thrown = runCatching { JobMdc.run("tier-monthly-run") { error("boom") } }.exceptionOrNull()
+
+        assertEquals("boom", thrown?.message)
+        val event = capture.events.single()
+        val fields = LogCapture.fields(event)
+        assertEquals(Level.ERROR, event.level)
+        assertEquals("job.run", fields["event"])
+        assertEquals("tier-monthly-run", fields["job"])
+        assertEquals("failed", fields["outcome"])
+        assertTrue((fields["error"] as String).contains("boom"), fields["error"].toString())
+        assertEquals("boom", event.throwableProxy?.message)
     }
 }
