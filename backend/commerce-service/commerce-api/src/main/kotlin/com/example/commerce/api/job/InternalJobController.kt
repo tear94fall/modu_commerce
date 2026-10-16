@@ -19,10 +19,17 @@ import org.springframework.web.bind.annotation.RestController
 @Tag(name = "배치 잡 (내부)", description = "서비스끼리만 호출(X-Internal-Token). batch-service 가 잡 목록을 읽고 한 회차를 돌린다.")
 @RestController
 @RequestMapping("/api-internal/v1/jobs")
-class InternalJobController(private val jobRunner: JobRunner) {
-    data class JobSummary(val name: String, val description: String)
+class InternalJobController(
+    private val jobRunner: JobRunner,
+) {
+    data class JobSummary(
+        val name: String,
+        val description: String,
+    )
 
-    data class Message(val message: String)
+    data class Message(
+        val message: String,
+    )
 
     @Operation(summary = "잡 목록", description = "이 서비스가 돌릴 수 있는 잡의 이름과 설명. 이름순.")
     @GetMapping

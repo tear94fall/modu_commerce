@@ -3,6 +3,7 @@ package com.example.commerce.api.job
 import com.example.commerce.api.logging.JobMdc
 import com.example.commerce.api.logging.RequestContextFilter
 import com.fasterxml.jackson.annotation.JsonInclude
+import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import org.springframework.stereotype.Component
 import java.util.concurrent.ConcurrentHashMap
@@ -20,9 +21,13 @@ data class JobRun(
     val error: String? = null,
 )
 
-class UnknownJobException(val jobName: String) : RuntimeException("unknown job")
+class UnknownJobException(
+    val jobName: String,
+) : RuntimeException("unknown job")
 
-class JobAlreadyRunningException(val jobName: String) : RuntimeException("job already running")
+class JobAlreadyRunningException(
+    val jobName: String,
+) : RuntimeException("job already running")
 
 /**
  * 이름으로 [Job] 을 찾아 한 회차를 돌린다. 스케줄러(`@Scheduled`)와 `/api-internal/v1/jobs/{name}/run` 이 같은 길을 쓴다.
@@ -31,7 +36,10 @@ class JobAlreadyRunningException(val jobName: String) : RuntimeException("job al
  * - 잡의 예외는 여기서 잡아 `outcome=failed` 로 돌려준다(ERROR 로그와 스택은 JobMdc 가 이미 남겼다). 스케줄러는 그래서 try/catch 가 필요 없다.
  */
 @Component
-class JobRunner(jobs: List<Job>) {
+class JobRunner(
+    jobs: List<Job>,
+) {
+    private val log = LoggerFactory.getLogger(JobRunner::class.java)
     private val byName: Map<String, Job> = jobs.associateBy { it.name }
     private val running: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
@@ -51,7 +59,7 @@ class JobRunner(jobs: List<Job>) {
                 val result =
                     JobMdc.run(name) {
                         requestId = MDC.get(RequestContextFilter.MDC_REQUEST_ID)
-                        job.run()
+                        job.run().also { if (didSomething(it)) log.info("job {} result {}", name, it) }
                     }
                 JobRun(name, "ok", elapsedMs(started), requestId, result = result)
             } catch (e: Exception) {
@@ -61,6 +69,13 @@ class JobRunner(jobs: List<Job>) {
             running.remove(name)
         }
     }
+
+    /** 건수가 0 이거나 비어 있으면 조용히(1분 주기 잡이 매번 한 줄씩 남기지 않게). */
+    private fun didSomething(result: Map<String, Any?>): Boolean =
+        result.values.any {
+            it != null && it != 0 && it != 0L &&
+                it != emptyMap<String, Any?>()
+        }
 
     private fun elapsedMs(startedNanos: Long): Long = (System.nanoTime() - startedNanos) / 1_000_000
 }

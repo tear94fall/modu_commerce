@@ -1,11 +1,10 @@
 package com.example.commerce.api.config
 
-import com.example.commerce.api.logging.JobMdc
+import com.example.commerce.api.job.JobRunner
 import com.example.commerce.api.push.FirebasePushSender
 import com.example.commerce.api.push.LoggingPushSender
 import com.example.commerce.application.common.logger
 import com.example.commerce.application.push.PushSender
-import com.example.commerce.application.service.PushCampaignSendService
 import com.google.auth.oauth2.GoogleCredentials
 import com.google.auth.oauth2.ServiceAccountCredentials
 import com.google.firebase.FirebaseApp
@@ -93,19 +92,12 @@ class PushConfig {
 @EnableScheduling
 @ConditionalOnProperty(prefix = "modu.push", name = ["scheduler-enabled"], havingValue = "true", matchIfMissing = true)
 class PushSchedulingConfig(
-    private val pushCampaignSendService: PushCampaignSendService,
+    private val jobRunner: JobRunner,
 ) {
     // 파드가 여러 개여도 같은 캠페인을 두 번 보내지 않게 한 곳에서만 돈다(SchedulerLockConfig). 한 번의 발송은 최대 5분.
     @Scheduled(fixedDelay = 60_000, initialDelay = 30_000)
     @SchedulerLock(name = "commerce:push-campaigns", lockAtLeastFor = "PT30S", lockAtMostFor = "PT5M")
     fun sendDueCampaigns() {
-        JobMdc.run("push-campaigns") {
-            try {
-                val sent = pushCampaignSendService.runDue()
-                if (sent > 0) logger.info { "push scheduler sent $sent campaign(s)" }
-            } catch (e: Exception) {
-                logger.error(e) { "push scheduler failed" }
-            }
-        }
+        jobRunner.run("push-campaigns")
     }
 }
