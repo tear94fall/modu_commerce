@@ -143,7 +143,8 @@ class TierRunService(
     }
 
     /** [runMonthly]·[startManual] 이 돌려준 run id 의 결말. */
-    fun result(runId: Long): TierRunResult? = runCatching { tierRunCommandService.find(runId) }.getOrNull()?.let { TierRunResult(it.status, it.message) }
+    fun result(runId: Long): TierRunResult? =
+        runCatching { tierRunCommandService.find(runId) }.getOrNull()?.let { TierRunResult(it.status, it.message) }
 
     fun execute(runId: Long) {
         try {
