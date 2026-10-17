@@ -104,6 +104,12 @@ class TierRunCommandService(
     }
 }
 
+/** 실행 한 건의 결말 — 배치 잡이 "성공으로 보고할지" 를 이걸로 정한다([execute] 는 예외를 안에서 잡아 행만 FAILED 로 바꾸기 때문). */
+data class TierRunResult(
+    val status: TierRunStatus,
+    val message: String?,
+)
+
 /**
  * 등급 산정 실행. 매월 1일(스케줄러) 또는 관리자 수동. 단계마다 짧은 트랜잭션을 쓴다.
  * 쿠폰은 발급 키 `tier:<그 달>` 로 주므로 같은 달에 다시 돌려도 이미 받은 사람에게는 또 주지 않는다.
@@ -135,6 +141,10 @@ class TierRunService(
         execute(id)
         return id
     }
+
+    /** [runMonthly]·[startManual] 이 돌려준 run id 의 결말. */
+    fun result(runId: Long): TierRunResult? =
+        runCatching { tierRunCommandService.find(runId) }.getOrNull()?.let { TierRunResult(it.status, it.message) }
 
     fun execute(runId: Long) {
         try {

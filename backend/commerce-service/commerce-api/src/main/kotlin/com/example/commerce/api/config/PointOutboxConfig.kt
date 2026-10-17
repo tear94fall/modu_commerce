@@ -1,13 +1,10 @@
 package com.example.commerce.api.config
 
-import com.example.commerce.api.logging.JobMdc
+import com.example.commerce.api.job.JobRunner
 import com.example.commerce.application.common.TierPeriods
-import com.example.commerce.application.common.logger
 import com.example.commerce.application.domain.entity.PointOutboxStatus
 import com.example.commerce.application.domain.repository.ro.PointOutboxRoRepository
 import com.example.commerce.application.point.PointAnomalyRecorder
-import com.example.commerce.application.service.PointOutboxService
-import com.example.commerce.application.service.PointReconcileService
 import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.MeterRegistry
@@ -72,19 +69,12 @@ class PointOutboxMetricsConfig(
 @EnableScheduling
 @ConditionalOnProperty(prefix = "modu.point.outbox", name = ["relay-enabled"], havingValue = "true", matchIfMissing = true)
 class PointOutboxRelayConfig(
-    private val pointOutboxService: PointOutboxService,
+    private val jobRunner: JobRunner,
 ) {
     @Scheduled(fixedDelay = 60_000, initialDelay = 60_000)
     @SchedulerLock(name = "commerce:point-outbox-relay", lockAtLeastFor = "PT10S", lockAtMostFor = "PT5M")
     fun relay() {
-        JobMdc.run("point-outbox-relay") {
-            try {
-                val done = pointOutboxService.relay()
-                if (done > 0) logger.info { "point outbox relay: $done row(s) done" }
-            } catch (e: Exception) {
-                logger.error(e) { "point outbox relay failed" }
-            }
-        }
+        jobRunner.runIfIdle("point-outbox-relay")
     }
 }
 
@@ -93,17 +83,11 @@ class PointOutboxRelayConfig(
 @EnableScheduling
 @ConditionalOnProperty(prefix = "modu.point.outbox", name = ["reconcile-enabled"], havingValue = "true", matchIfMissing = true)
 class PointReconcileConfig(
-    private val pointReconcileService: PointReconcileService,
+    private val jobRunner: JobRunner,
 ) {
     @Scheduled(cron = "0 0 4 * * *", zone = "Asia/Seoul")
     @SchedulerLock(name = "commerce:point-reconcile", lockAtLeastFor = "PT1M", lockAtMostFor = "PT30M")
     fun reconcile() {
-        JobMdc.run("point-reconcile") {
-            try {
-                pointReconcileService.reconcileYesterday()
-            } catch (e: Exception) {
-                logger.error(e) { "point reconcile failed" }
-            }
-        }
+        jobRunner.runIfIdle("point-reconcile")
     }
 }
