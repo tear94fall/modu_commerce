@@ -29,7 +29,7 @@ class TierSchedulingConfig(
     @Scheduled(cron = "0 10 0 1 * *", zone = "Asia/Seoul")
     @SchedulerLock(name = "commerce:tier-monthly-run", lockAtLeastFor = "PT30S", lockAtMostFor = "PT30M")
     fun monthlyTierRun() {
-        jobRunner.run("tier-monthly-run")
+        jobRunner.runIfIdle("tier-monthly-run")
     }
 }
 
@@ -43,6 +43,6 @@ class PurchaseEarnRetryConfig(
     @Scheduled(fixedDelay = 600_000, initialDelay = 120_000)
     @SchedulerLock(name = "commerce:purchase-earn-retry", lockAtLeastFor = "PT30S", lockAtMostFor = "PT5M")
     fun retryPendingEarns() {
-        jobRunner.run("purchase-earn-retry")
+        jobRunner.runIfIdle("purchase-earn-retry")
     }
 }

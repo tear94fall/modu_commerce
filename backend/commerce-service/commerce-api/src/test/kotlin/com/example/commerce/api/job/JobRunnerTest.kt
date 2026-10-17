@@ -112,4 +112,36 @@ class JobRunnerTest {
             pool.shutdownNow()
         }
     }
+
+    /** 전환 기간에는 batch-service 의 HTTP 회차와 같은 파드의 cron 이 겹칠 수 있다 — 스케줄러는 던지지 않고 WARN 한 줄로 건너뛴다. */
+    @Test
+    fun `runIfIdle 은 같은 잡이 돌고 있으면 null 을 돌려주고 던지지 않는다`() {
+        val started = java.util.concurrent.CountDownLatch(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        val runner =
+            JobRunner(
+                listOf(
+                    FakeJob("slow") {
+                        started.countDown()
+                        release.await(5, java.util.concurrent.TimeUnit.SECONDS)
+                        mapOf("n" to 1)
+                    },
+                ),
+            )
+        val pool =
+            java.util.concurrent.Executors
+                .newSingleThreadExecutor()
+        try {
+            val first = pool.submit<JobRun> { runner.run("slow") }
+            assertTrue(started.await(5, java.util.concurrent.TimeUnit.SECONDS))
+
+            assertNull(runner.runIfIdle("slow"))
+
+            release.countDown()
+            assertEquals("ok", first.get(5, java.util.concurrent.TimeUnit.SECONDS).outcome)
+            assertEquals("ok", runner.runIfIdle("slow")!!.outcome)
+        } finally {
+            pool.shutdownNow()
+        }
+    }
 }

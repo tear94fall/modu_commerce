@@ -98,6 +98,6 @@ class PushSchedulingConfig(
     @Scheduled(fixedDelay = 60_000, initialDelay = 30_000)
     @SchedulerLock(name = "commerce:push-campaigns", lockAtLeastFor = "PT30S", lockAtMostFor = "PT5M")
     fun sendDueCampaigns() {
-        jobRunner.run("push-campaigns")
+        jobRunner.runIfIdle("push-campaigns")
     }
 }

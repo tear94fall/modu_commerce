@@ -74,7 +74,7 @@ class PointOutboxRelayConfig(
     @Scheduled(fixedDelay = 60_000, initialDelay = 60_000)
     @SchedulerLock(name = "commerce:point-outbox-relay", lockAtLeastFor = "PT10S", lockAtMostFor = "PT5M")
     fun relay() {
-        jobRunner.run("point-outbox-relay")
+        jobRunner.runIfIdle("point-outbox-relay")
     }
 }
 
@@ -88,6 +88,6 @@ class PointReconcileConfig(
     @Scheduled(cron = "0 0 4 * * *", zone = "Asia/Seoul")
     @SchedulerLock(name = "commerce:point-reconcile", lockAtLeastFor = "PT1M", lockAtMostFor = "PT30M")
     fun reconcile() {
-        jobRunner.run("point-reconcile")
+        jobRunner.runIfIdle("point-reconcile")
     }
 }

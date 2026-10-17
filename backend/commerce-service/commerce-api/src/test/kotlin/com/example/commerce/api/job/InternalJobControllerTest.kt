@@ -1,5 +1,6 @@
 package com.example.commerce.api.job
 
+import com.example.commerce.api.logging.RequestContextFilter
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.slf4j.MDC
@@ -37,7 +38,14 @@ class InternalJobControllerTest {
                 },
             ),
         )
-    private val mockMvc = MockMvcBuilders.standaloneSetup(InternalJobController(runner)).build()
+
+    /** 운영 경로 그대로: RequestContextFilter 가 X-Request-Id 를 MDC 에 넣은 뒤 컨트롤러가 돈다. */
+    private val mockMvc =
+        MockMvcBuilders
+            .standaloneSetup(
+                InternalJobController(runner),
+            ).addFilters<org.springframework.test.web.servlet.setup.StandaloneMockMvcBuilder>(RequestContextFilter())
+            .build()
 
     @AfterEach
     fun tearDown() = MDC.clear()
@@ -63,6 +71,25 @@ class InternalJobControllerTest {
             jsonPath("$.requestId") { value(org.hamcrest.Matchers.startsWith("job-")) }
             jsonPath("$.durationMs") { isNumber() }
             jsonPath("$.error") { doesNotExist() }
+        }
+    }
+
+    /** batch-service 는 회차 id 를 X-Request-Id 로 보낸다 — 응답의 requestId 가 그 값이어야 콘솔·OpenSearch 가 한 id 로 묶인다. */
+    @Test
+    fun `X-Request-Id 가 job- 회차 id 면 그 id 로 돌고 응답에 그대로 돌려준다`() {
+        mockMvc.post("/api-internal/v1/jobs/ok-job/run") { header("X-Request-Id", "job-batch0000000001") }.andExpect {
+            status { isOk() }
+            jsonPath("$.requestId") { value("job-batch0000000001") }
+            header { string("X-Request-Id", "job-batch0000000001") }
+        }
+    }
+
+    @Test
+    fun `X-Request-Id 없이 부르면 요청 id 와 별개로 job- 회차 id 를 새로 만든다`() {
+        mockMvc.post("/api-internal/v1/jobs/ok-job/run") { header("X-Request-Id", "curl000000000001") }.andExpect {
+            status { isOk() }
+            jsonPath("$.requestId") { value(org.hamcrest.Matchers.startsWith("job-")) }
+            header { string("X-Request-Id", "curl000000000001") }
         }
     }
 

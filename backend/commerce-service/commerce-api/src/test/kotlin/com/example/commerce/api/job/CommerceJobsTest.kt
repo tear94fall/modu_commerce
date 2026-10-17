@@ -1,12 +1,16 @@
 package com.example.commerce.api.job
 
+import com.example.commerce.application.domain.entity.TierRunStatus
 import com.example.commerce.application.service.PointOutboxService
 import com.example.commerce.application.service.PointReconcileReport
 import com.example.commerce.application.service.PointReconcileService
 import com.example.commerce.application.service.PurchaseEarnService
 import com.example.commerce.application.service.PushCampaignSendService
+import com.example.commerce.application.service.TierRunResult
 import com.example.commerce.application.service.TierRunService
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
@@ -15,14 +19,26 @@ import java.time.LocalDate
 /** 잡 5개는 기존 서비스 메서드를 감싸고 결과 요약(건수)을 Map 으로 돌려준다. 이름은 JobMdc 에 쓰던 그대로. */
 class CommerceJobsTest {
     @Test
-    fun `등급 월 산정 잡은 run id 를 결과로, 건너뛴 회차는 null 을 돌려준다`() {
+    fun `등급 월 산정 잡은 run id 와 상태를 결과로, 건너뛴 회차는 skipped 를 명시한다`() {
         val service = mock(TierRunService::class.java)
         `when`(service.runMonthly()).thenReturn(7L, null)
+        `when`(service.result(7L)).thenReturn(TierRunResult(TierRunStatus.DONE, null))
         val job = TierMonthlyRunJob(service)
 
         assertEquals("tier-monthly-run", job.name)
-        assertEquals(mapOf("runId" to 7L), job.run())
-        assertEquals(mapOf("runId" to null), job.run())
+        assertEquals(mapOf("runId" to 7L, "status" to "DONE"), job.run())
+        assertEquals(mapOf("runId" to null, "skipped" to true, "reason" to "another tier run is RUNNING"), job.run())
+    }
+
+    /** TierRunService.execute 는 예외를 안에서 잡아 실행 행만 FAILED 로 바꾼다 — 잡은 그걸 실패로 보고해야 콘솔(batch-service)이 성공으로 적지 않는다. */
+    @Test
+    fun `등급 산정 실행이 FAILED 로 끝나면 잡도 예외로 끝난다`() {
+        val service = mock(TierRunService::class.java)
+        `when`(service.runMonthly()).thenReturn(8L)
+        `when`(service.result(8L)).thenReturn(TierRunResult(TierRunStatus.FAILED, "coupon issue blew up"))
+
+        val e = assertThrows(IllegalStateException::class.java) { TierMonthlyRunJob(service).run() }
+        assertTrue(e.message!!.contains("8") && e.message!!.contains("coupon issue blew up"), e.message)
     }
 
     @Test

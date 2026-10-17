@@ -1,5 +1,6 @@
 package com.example.commerce.api.job
 
+import com.example.commerce.application.domain.entity.TierRunStatus
 import com.example.commerce.application.service.PointOutboxService
 import com.example.commerce.application.service.PointReconcileService
 import com.example.commerce.application.service.PurchaseEarnService
@@ -7,7 +8,10 @@ import com.example.commerce.application.service.PushCampaignSendService
 import com.example.commerce.application.service.TierRunService
 import org.springframework.stereotype.Component
 
-/** 매월 1일 00:10(KST) 등급 산정 + 매월 쿠폰. 다른 실행이 돌고 있으면 건너뛰어 `runId` 가 null 이다. */
+/**
+ * 매월 1일 00:10(KST) 등급 산정 + 매월 쿠폰. 다른 실행이 돌고 있으면 건너뛴다(`skipped: true`).
+ * [TierRunService.execute] 는 예외를 안에서 잡아 실행 행만 FAILED 로 바꾸므로, 여기서 결말을 읽어 FAILED 면 예외로 끝낸다 — 그래야 batch-service 이력에 성공으로 남지 않는다.
+ */
 @Component
 class TierMonthlyRunJob(
     private val tierRunService: TierRunService,
@@ -15,7 +19,13 @@ class TierMonthlyRunJob(
     override val name = "tier-monthly-run"
     override val description = "회원 등급 월 산정과 월 쿠폰 발급"
 
-    override fun run(): Map<String, Any?> = mapOf("runId" to tierRunService.runMonthly())
+    override fun run(): Map<String, Any?> {
+        val runId =
+            tierRunService.runMonthly() ?: return mapOf("runId" to null, "skipped" to true, "reason" to "another tier run is RUNNING")
+        val result = tierRunService.result(runId)
+        if (result?.status == TierRunStatus.FAILED) throw IllegalStateException("tier run $runId FAILED: ${result.message ?: "no message"}")
+        return mapOf("runId" to runId, "status" to result?.status?.name)
+    }
 }
 
 /** PENDING 구매 적립을 다시 시도한다. */

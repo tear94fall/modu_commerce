@@ -53,6 +53,25 @@ class JobMdcTest {
         assertEquals("job-batch000000001", capture.events.single().mdcPropertyMap[RequestContextFilter.MDC_REQUEST_ID])
     }
 
+    /** 헤더 없이(curl 등) 내부 API 를 부르면 필터가 접두 없는 요청 id 를 넣어 둔다 — 그건 배치 회차 id 가 아니므로 job- id 를 새로 만들고, 끝나면 요청 id 를 되돌려 놓는다(api.access 가 쓴다). */
+    @Test
+    fun `MDC 의 requestId 가 job- 접두가 아니면 job- id 를 새로 만들고 끝나면 원래 id 를 되돌린다`() {
+        MDC.put(RequestContextFilter.MDC_REQUEST_ID, "abcd1234abcd1234")
+
+        JobMdc.run("point-outbox-relay") {
+            val id = MDC.get(RequestContextFilter.MDC_REQUEST_ID)
+            assertTrue(id.startsWith(JobMdc.REQUEST_ID_PREFIX), id)
+        }
+
+        assertEquals("abcd1234abcd1234", MDC.get(RequestContextFilter.MDC_REQUEST_ID))
+        assertTrue(
+            capture.events
+                .single()
+                .mdcPropertyMap[RequestContextFilter.MDC_REQUEST_ID]!!
+                .startsWith(JobMdc.REQUEST_ID_PREFIX),
+        )
+    }
+
     @Test
     fun `작업이 예외로 끝나도 MDC 를 지운다`() {
         runCatching { JobMdc.run("tier-monthly-run") { error("boom") } }
