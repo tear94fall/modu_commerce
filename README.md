@@ -28,7 +28,7 @@
 
 - **커머스 고객**은 모두 계정(`user_id`)으로 식별합니다. 회원 정보(이름·이메일·프로필)는 모두의 채팅 member-service 가 갖고, 커머스는 가입(약관 동의)·등급·주문 같은 커머스 쪽 데이터만 둡니다.
 - **포인트**는 커머스 DB 에 없습니다. modu_chat 의 point-service(`modu-point` 스키마)가 원장을 갖고, 커머스는 내부 API 로 적립·사용·환불만 요청합니다.
-- **포인트 아웃박스**(`point_outbox`): point-service 호출과 주문 트랜잭션의 어긋남을 메웁니다. `SPEND_GUARD`(결제 차감 되돌리기), `REFUND`(취소 환불), `EARN`(구매 적립 — 배송 완료와 같은 트랜잭션에 넣고 커밋 뒤 보냄). 커밋 뒤 한 번 보내고, 실패하면 `point-outbox-relay`가 1·2·4분 … 최대 1시간 간격으로 20번까지 다시 보냅니다. `commerce_point_outbox_pending`·`oldest_pending_seconds`·`failed` 게이지, 매일 04:00 KST `point-reconcile`가 전날 차감·환불·적립을 원장과 맞춥니다. 설계: `docs/superpowers/specs/2026-10-18-purchase-earn-outbox-design.md`.
+- **포인트 아웃박스**(`point_outbox`): point-service 호출과 주문 트랜잭션의 어긋남을 메웁니다. `SPEND_GUARD`(결제 차감 되돌리기), `REFUND`(취소 환불), `EARN`(구매 적립 — 배송 완료와 같은 트랜잭션에 넣고 커밋 뒤 보냄). 커밋 뒤 한 번 보내고, 실패하면 `point-outbox-relay`가 1·2·4분 … 최대 1시간 간격으로 20번까지 다시 보냅니다. `commerce_point_outbox_pending`·`oldest_pending_seconds`·`failed` 게이지, 매일 04:00 KST `point-reconcile`가 전날 차감·환불·적립을 원장과 맞춥니다. 설계 문서는 저장소 밖(docs/superpowers, git 제외)에 둔다. FAILED 는 종결 상태라 `commerce_point_outbox_failed` 는 줄지 않는다 — 알림은 "0 보다 큼" 이 아니라 "증가" 에 걸고, 처리는 원인을 본 뒤 `UPDATE point_outbox SET status='PENDING', attempts=0, next_attempt_at=UTC_TIMESTAMP(6) WHERE id=?` 로 다시 보내거나(point-service 가 같은 키를 거부하므로 안전) 그대로 두고 메모를 남긴다. 적립 전환 백필은 예전 FAILED 적립도 FAILED 행으로 옮기므로 그 수부터 시작한다.
 - 다대다 관계(기획전–상품, 기획전–쿠폰, 옵션 값–SKU)는 모두의 채팅과 같은 원칙으로 연관 테이블(`promotion_products`, `promotion_coupons`, `sku_option_values`)을 두어 1대다·1대다로 풀었습니다. `@ManyToMany` 는 쓰지 않습니다.
 
 ### 설계 메모

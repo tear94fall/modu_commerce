@@ -103,7 +103,7 @@ interface OrderRwRepository : RwRepository<Order, Long> {
         @Param("to") to: LocalDateTime,
     ): List<UserAmount>
 
-    /** 관리자 상태 변경·구매 적립. 주문 행을 잠근다. */
+    /** 관리자 상태 변경(배송 완료의 구매 적립 확정 포함). 주문 행을 잠근다. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints(QueryHint(name = LOCK_TIMEOUT_HINT, value = LOCK_TIMEOUT_MS))
     @Query("select o from Order o where o.id = :id")

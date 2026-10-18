@@ -27,6 +27,7 @@ import org.springframework.transaction.support.TransactionTemplate
 @Component
 class CreateOrderUseCase(
     private val orderCommandService: OrderCommandService,
+    private val outboxStatus: PointOutboxStatusQueryService,
     @Qualifier("rwTransactionManager") transactionManager: PlatformTransactionManager,
 ) {
     private val tx = TransactionTemplate(transactionManager)
@@ -51,7 +52,10 @@ class CreateOrderUseCase(
     private fun existing(
         userId: String,
         key: String,
-    ): OrderDetailResult? = orderCommandService.readByIdempotencyKey(userId, key) { OrderDetailResult.from(it) }
+    ): OrderDetailResult? =
+        orderCommandService.readByIdempotencyKey(userId, key) {
+            OrderDetailResult.from(it, earn = outboxStatus.earnOfMaster(it))
+        }
 }
 
 /**
@@ -161,7 +165,7 @@ class GetAdminOrderUseCase(
         }
 }
 
-/** 관리자 상태 변경. 취소면 커밋 뒤 환불을 바로 보내므로 응답은 커밋 뒤 master 에서 다시 읽는다([CancelOrderUseCase] 와 같다). */
+/** 관리자 상태 변경. 취소면 환불을, 배송 완료면 적립을 커밋 뒤 바로 보내므로 응답은 커밋 뒤 master 에서 다시 읽는다([CancelOrderUseCase] 와 같다). */
 @Component
 class ChangeOrderStatusUseCase(
     private val orderCommandService: OrderCommandService,

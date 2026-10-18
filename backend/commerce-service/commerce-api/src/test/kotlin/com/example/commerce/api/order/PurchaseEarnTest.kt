@@ -138,6 +138,21 @@ class PurchaseEarnTest
             jdbc.queryForMap("select earn_status, earn_points, earn_rate from orders where id = ?", id)
 
         @Test
+        fun `적립이 적용되지 않았다는 답(DUPLICATE 아님)은 FAILED 로 두고 다시 보내지 않는다`() {
+            whenever(pointGateway.earnAmount(any(), any(), any(), anyOrNull()))
+                .thenReturn(PointEarnResult(applied = false, amount = 0, reason = "RULE_DISABLED"))
+            val (id, _) = order()
+            delivered(id)
+            val row = requireNotNull(earnRow(id))
+            assertThat(row.status).isEqualTo(PointOutboxStatus.FAILED)
+            assertThat(row.lastError).startsWith("NOT_APPLIED: RULE_DISABLED")
+            mockMvc.get("/api-public/v1/orders/$id") { with(me) }.andExpect { jsonPath("$.earn.status") { value("FAILED") } }
+            later(60)
+            assertThat(pointOutboxService.relay()).isZero()
+            verify(pointGateway, times(1)).earnAmount(any(), any(), any(), anyOrNull())
+        }
+
+        @Test
         fun `배송 완료되면 그 시점 등급 적립률로 금액을 정해 EARN 행을 남기고 커밋 뒤 바로 적립한다`() {
             tier("GOLD")
             val (id, no) = order()
@@ -151,7 +166,7 @@ class PurchaseEarnTest
             verify(pointGateway, never()).earnAmount(any(), any(), any(), anyOrNull())
             assertThat(earnRow(id)).isNull()
 
-            status(id, "DELIVERED")
+            status(id, "DELIVERED").andExpect { jsonPath("$.earn.status") { value("DONE") } }
             verify(pointGateway).earnAmount(eq("11"), eq(540L), eq("purchase:order:$id"), eq("구매 적립 · 주문 $no"))
             val row = requireNotNull(earnRow(id))
             assertThat(row.status).isEqualTo(PointOutboxStatus.DONE)

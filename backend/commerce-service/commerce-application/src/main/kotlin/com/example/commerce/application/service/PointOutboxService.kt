@@ -41,7 +41,7 @@ data class PointOutboxTask(
 
 /**
  * 아웃박스의 DB 단계. 기본은 늘 새 트랜잭션(REQUIRES_NEW): 주문 트랜잭션이 롤백돼도 남아야 하는 표시(SPEND_GUARD)와
- * 커밋 뒤(afterCommit)의 상태 변경이 여기서 따로 커밋된다. 취소 환불(REFUND)만 취소와 같은 트랜잭션에 넣는다(MANDATORY).
+ * 커밋 뒤(afterCommit)의 상태 변경이 여기서 따로 커밋된다. 취소 환불(REFUND)은 취소와, 구매 적립(EARN)은 배송 완료와 같은 트랜잭션에 넣는다(MANDATORY).
  */
 @Service
 @Transactional(transactionManager = "rwTransactionManager", propagation = Propagation.REQUIRES_NEW)
