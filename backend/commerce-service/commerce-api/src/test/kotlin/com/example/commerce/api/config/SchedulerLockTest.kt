@@ -1,6 +1,5 @@
 package com.example.commerce.api.config
 
-import com.example.commerce.application.service.PurchaseEarnService
 import com.example.commerce.application.service.PushCampaignSendService
 import com.example.commerce.application.service.TierRunService
 import net.javacrumbs.shedlock.core.LockConfiguration
@@ -42,14 +41,11 @@ class SchedulerLockTest
         private lateinit var tierRunService: TierRunService
 
         @MockitoBean
-        private lateinit var purchaseEarnService: PurchaseEarnService
-
-        @MockitoBean
         private lateinit var pushCampaignSendService: PushCampaignSendService
 
         @BeforeEach
         fun reset() {
-            clearInvocations(tierRunService, purchaseEarnService, pushCampaignSendService)
+            clearInvocations(tierRunService, pushCampaignSendService)
         }
 
         /** 다른 파드가 잡은 것처럼 잠금을 먼저 쥔다. lockAtLeastFor=0 이라 unlock 하면 바로 풀린다. */
@@ -71,17 +67,6 @@ class SchedulerLockTest
             held.unlock()
             tierScheduling.monthlyTierRun()
             verify(tierRunService).runMonthly()
-        }
-
-        @Test
-        fun `구매 적립 재시도는 잠금이 잡혀 있으면 돌지 않고 풀리면 돈다`() {
-            val held = holdLock("commerce:purchase-earn-retry")
-            earnRetry.retryPendingEarns()
-            verify(purchaseEarnService, never()).retryPending()
-
-            held.unlock()
-            earnRetry.retryPendingEarns()
-            verify(purchaseEarnService).retryPending()
         }
 
         @Test

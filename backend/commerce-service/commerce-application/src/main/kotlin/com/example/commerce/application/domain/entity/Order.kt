@@ -33,7 +33,7 @@ enum class OrderStatus {
         }
 }
 
-/** 구매 적립 상태. NONE = 적립 없음(고객 아님·0P), PENDING = 포인트 서버 호출 대기(재시도), DONE = 적립됨, FAILED = 거절됨. */
+/** 구매 적립 상태(주문 응답). NONE = 적립 없음(고객 아님·0P), PENDING = 보내는 중(재시도 포함), DONE = 적립됨, FAILED = 사람이 봐야 함. EARN 아웃박스 행에서 계산한다. */
 enum class EarnStatus { NONE, PENDING, DONE, FAILED }
 
 /** 주문 한 줄. 상품이 나중에 바뀌어도 내역이 그대로이도록 이름·옵션·사진·단가를 복사해 둔다. */
@@ -65,7 +65,7 @@ class OrderItem(
 }
 
 /**
- * 시각 컬럼(paid_at, cancelled_at, delivered_at, earned_at)은 UTC 다. 호출자(서비스)가 주입받은 Clock 으로 만든 UTC 시각을 넘긴다
+ * 시각 컬럼(paid_at, cancelled_at, delivered_at)은 UTC 다. 호출자(서비스)가 주입받은 Clock 으로 만든 UTC 시각을 넘긴다
  * (TierPeriods.utcNow). JVM 기본 시간대에 기대지 않는다.
  */
 @Entity
@@ -140,7 +140,7 @@ class Order(
     var deliveredAt: LocalDateTime? = null
         protected set
 
-    /** 구매 적립 포인트. null 이면 아직 정하지 않았다(배송 완료 전). */
+    /** 구매 적립 포인트. null 이면 아직 정하지 않았다(배송 완료 전). 배송 완료 트랜잭션에서 그 시점 등급으로 확정한다. */
     @Column(name = "earn_points")
     var earnPoints: Long? = null
         protected set
@@ -150,13 +150,13 @@ class Order(
     var earnRate: Int? = null
         protected set
 
+    /**
+     * 예전 경로(2026-10-18 이전)의 적립 진행 상태. 새 코드는 쓰지 않고(기본값 NONE 으로 들어간다), EARN 아웃박스 행이 없는 예전 주문의
+     * 응답에만 읽는다. 백필 뒤 매핑과 컬럼을 지운다(설계 §4.5).
+     */
     @Enumerated(EnumType.STRING)
     @Column(name = "earn_status", nullable = false, length = 10, columnDefinition = "varchar(10) not null default 'NONE'")
     var earnStatus: EarnStatus = EarnStatus.NONE
-        protected set
-
-    @Column(name = "earned_at")
-    var earnedAt: LocalDateTime? = null
         protected set
 
     @OneToMany(mappedBy = "order", cascade = [CascadeType.ALL], orphanRemoval = true)
@@ -232,23 +232,13 @@ class Order(
     /** 구매 적립 포인트의 멱등 키. */
     fun purchaseEarnRefId(): String = "purchase:order:$id"
 
-    /** 적립액을 정한다. 0P 면 NONE, 아니면 PENDING(포인트 서버 호출 전). */
+    /** 적립액을 정한다(배송 완료 트랜잭션). 진행 상태는 EARN 아웃박스 행이 갖는다 — 0P 면 행을 만들지 않는다. */
     fun decideEarn(
         points: Long,
         rate: Int,
     ) {
         earnPoints = points
         earnRate = rate
-        earnStatus = if (points > 0) EarnStatus.PENDING else EarnStatus.NONE
-    }
-
-    fun earned(now: LocalDateTime) {
-        earnStatus = EarnStatus.DONE
-        earnedAt = now
-    }
-
-    fun earnFailed() {
-        earnStatus = EarnStatus.FAILED
     }
 
     fun isCancelled(): Boolean = status == OrderStatus.CANCELLED

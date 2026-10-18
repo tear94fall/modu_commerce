@@ -11,6 +11,7 @@ import com.example.commerce.application.domain.repository.ro.PointOutboxRoReposi
 import com.example.commerce.application.domain.repository.rw.OrderRwRepository
 import com.example.commerce.application.domain.repository.rw.PointOutboxRwRepository
 import com.example.commerce.application.point.PointCancelResult
+import com.example.commerce.application.point.PointEarnRejectedException
 import com.example.commerce.application.point.PointGateway
 import com.example.commerce.application.usecase.result.OrderEarnResult
 import com.example.commerce.application.usecase.result.earnResultOf
@@ -59,6 +60,13 @@ class PointOutboxCommandService(
     fun enqueueRefund(order: Order): Long {
         pointOutboxRwRepository.findByKindAndRefId(PointOutboxKind.REFUND, order.pointSpendRefId())?.let { return requireNotNull(it.id) }
         return requireNotNull(pointOutboxRwRepository.saveAndFlush(PointOutbox.refund(order, now())).id)
+    }
+
+    /** 구매 적립. 배송 완료와 같은 트랜잭션에서 넣는다(배송 완료가 커밋되면 반드시 남는다). 바로 보낼 수 있게 next_attempt_at = 지금. */
+    @Transactional(transactionManager = "rwTransactionManager", propagation = Propagation.MANDATORY)
+    fun enqueueEarn(order: Order): Long {
+        pointOutboxRwRepository.findByKindAndRefId(PointOutboxKind.EARN, order.purchaseEarnRefId())?.let { return requireNotNull(it.id) }
+        return requireNotNull(pointOutboxRwRepository.saveAndFlush(PointOutbox.earn(order, now())).id)
     }
 
     /**
@@ -185,6 +193,8 @@ class PointOutboxStatusQueryService(
  *   PENDING 으로 남고, 2분 뒤 [relay] 가 주문이 없는 것을 보고 차감을 되돌린다(spend/cancel).
  * - 취소: [refundOnCancel] 이 취소 트랜잭션 안에 REFUND 를 넣고, 커밋 뒤 바로 한 번 보낸다. point-service 가 죽어 있어도 취소는 커밋되고
  *   [relay] 가 1분, 2분, 4분 … 최대 1시간 간격으로 다시 보낸다(20번 실패하면 FAILED).
+ * - 적립: [earnOnDelivered] 가 배송 완료 트랜잭션 안에 EARN 을 넣고, 커밋 뒤 바로 한 번 보낸다. 실패하면 [relay] 가 환불과 같은 간격으로 다시 보낸다.
+ *   DUPLICATE 는 이미 적립된 것이라 DONE, 거절(4xx)·미적용은 다시 보내도 같으니 FAILED(사람이 본다).
  */
 @Service
 class PointOutboxService(
@@ -204,6 +214,12 @@ class PointOutboxService(
         afterCommit { commandService.pendingTask(id)?.let { send(it) } }
     }
 
+    /** 배송 완료 트랜잭션 안에서(호출자가 [Order.decideEarn] 으로 금액을 정했다). 커밋 뒤 바로 한 번 보낸다. */
+    fun earnOnDelivered(order: Order) {
+        val id = commandService.enqueueEarn(order)
+        afterCommit { commandService.pendingTask(id)?.let { send(it) } }
+    }
+
     /** 보낼 차례인 줄을 보낸다. 끝낸(DONE) 수를 돌려준다. */
     fun relay(): Int = commandService.due().count { send(it) }
 
@@ -213,8 +229,13 @@ class PointOutboxService(
             when (task.kind) {
                 PointOutboxKind.SPEND_GUARD -> settleGuard(task)
                 PointOutboxKind.REFUND -> refund(task)
-                PointOutboxKind.EARN -> error("EARN 전송은 아직 없다 — 구매 적립 전환(설계 §1.2)에서 붙인다")
+                PointOutboxKind.EARN -> earn(task)
             }
+        } catch (e: PointEarnRejectedException) {
+            // 값이 잘못돼 거절됐다. 다시 보내도 같으니 사람이 본다.
+            commandService.failed(task.id, "REJECTED: ${e.message}")
+            logger.error { "point outbox ${task.kind} ${task.refId} rejected: ${e.message}" }
+            false
         } catch (e: Exception) {
             val error = "${e.javaClass.simpleName}: ${e.message}"
             if (commandService.retryLater(task.id, error)) {
@@ -251,6 +272,20 @@ class PointOutboxService(
         return true
     }
 
+    /** 구매 적립. 같은 키가 이미 적립됐다는 답(DUPLICATE)은 끝난 것. 그 밖의 미적용은 있을 수 없는 일이라 FAILED 로 두고 사람이 본다. */
+    private fun earn(task: PointOutboxTask): Boolean {
+        val result = pointGateway.earnAmount(task.userId, task.amount, task.refId, "구매 적립 · 주문 ${task.orderNo}")
+        if (result.applied || result.reason == DUPLICATE) {
+            commandService.done(task.id)
+            return true
+        }
+        commandService.failed(task.id, "NOT_APPLIED: ${result.reason}")
+        logger.error {
+            "point earn anomaly: not applied for delivered order ${task.orderNo} (${task.refId}, ${task.amount}P): ${result.reason}"
+        }
+        return false
+    }
+
     private fun afterCommit(action: () -> Unit) {
         val safe = {
             try {
@@ -269,5 +304,9 @@ class PointOutboxService(
                 override fun afterCommit() = safe()
             },
         )
+    }
+
+    companion object {
+        const val DUPLICATE = "DUPLICATE"
     }
 }

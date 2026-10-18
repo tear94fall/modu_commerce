@@ -4,7 +4,6 @@ import com.example.commerce.application.domain.entity.TierRunStatus
 import com.example.commerce.application.service.PointOutboxService
 import com.example.commerce.application.service.PointReconcileReport
 import com.example.commerce.application.service.PointReconcileService
-import com.example.commerce.application.service.PurchaseEarnService
 import com.example.commerce.application.service.PushCampaignSendService
 import com.example.commerce.application.service.TierRunResult
 import com.example.commerce.application.service.TierRunService
@@ -43,15 +42,11 @@ class CommerceJobsTest {
 
     @Test
     fun `건수를 돌려주는 잡 셋 — 적립 재시도·푸시 캠페인·아웃박스 릴레이`() {
-        val earn = mock(PurchaseEarnService::class.java)
-        `when`(earn.retryPending()).thenReturn(3)
         val push = mock(PushCampaignSendService::class.java)
         `when`(push.runDue()).thenReturn(2)
         val outbox = mock(PointOutboxService::class.java)
         `when`(outbox.relay()).thenReturn(5)
 
-        assertEquals("purchase-earn-retry", PurchaseEarnRetryJob(earn).name)
-        assertEquals(mapOf("credited" to 3), PurchaseEarnRetryJob(earn).run())
         assertEquals("push-campaigns", PushCampaignsJob(push).name)
         assertEquals(mapOf("sent" to 2), PushCampaignsJob(push).run())
         assertEquals("point-outbox-relay", PointOutboxRelayJob(outbox).name)

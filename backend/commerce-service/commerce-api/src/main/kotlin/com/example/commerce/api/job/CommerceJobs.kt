@@ -3,7 +3,6 @@ package com.example.commerce.api.job
 import com.example.commerce.application.domain.entity.TierRunStatus
 import com.example.commerce.application.service.PointOutboxService
 import com.example.commerce.application.service.PointReconcileService
-import com.example.commerce.application.service.PurchaseEarnService
 import com.example.commerce.application.service.PushCampaignSendService
 import com.example.commerce.application.service.TierRunService
 import org.springframework.stereotype.Component
@@ -26,17 +25,6 @@ class TierMonthlyRunJob(
         if (result?.status == TierRunStatus.FAILED) throw IllegalStateException("tier run $runId FAILED: ${result.message ?: "no message"}")
         return mapOf("runId" to runId, "status" to result?.status?.name)
     }
-}
-
-/** PENDING 구매 적립을 다시 시도한다. */
-@Component
-class PurchaseEarnRetryJob(
-    private val purchaseEarnService: PurchaseEarnService,
-) : Job {
-    override val name = "purchase-earn-retry"
-    override val description = "PENDING 구매 적립 재시도"
-
-    override fun run(): Map<String, Any?> = mapOf("credited" to purchaseEarnService.retryPending())
 }
 
 /** 예약 시각이 지난 푸시 캠페인을 보낸다. */
