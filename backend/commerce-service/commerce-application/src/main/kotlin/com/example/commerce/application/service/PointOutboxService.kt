@@ -140,7 +140,7 @@ class PointOutboxCommandService(
 
 /**
  * 주문 응답의 아웃박스 상태(환불·적립). 레플리카(조회 화면) 또는 master(쓰기 직후 응답)에서 읽는다.
- * 적립은 EARN 행 하나로 상태를 정하고, 행이 없는 예전 주문은 `orders.earn_status` 로 떨어진다([earnOf]).
+ * 적립은 EARN 행 하나로 상태를 정한다([earnOf]).
  */
 @Service
 class PointOutboxStatusQueryService(

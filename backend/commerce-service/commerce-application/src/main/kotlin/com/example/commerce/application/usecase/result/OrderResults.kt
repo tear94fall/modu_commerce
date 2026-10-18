@@ -232,7 +232,7 @@ data class CreateOrderOutcome(
 
 /**
  * 적립이 정해진 주문(배송 완료 뒤)의 적립 상태. 진행 상태는 EARN 아웃박스 [row] 가 갖는다.
- * 행이 없고 적립액이 있으면 예전 경로의 주문(백필 전)이라 `orders.earn_status` 를 그대로 쓴다 — 설계 §2.3·§4.5.
+ * 적립액이 있는 주문은 배송 완료와 같은 트랜잭션에 행이 생기므로 행이 없을 수 없다 — 혹시 없으면(지워짐) 대사가 다시 만들 때까지 PENDING 으로 본다.
  */
 fun earnResultOf(
     o: Order,
@@ -246,7 +246,7 @@ fun earnResultOf(
             PointOutboxStatus.PENDING -> EarnStatus.PENDING
             PointOutboxStatus.DONE -> EarnStatus.DONE
             PointOutboxStatus.FAILED -> EarnStatus.FAILED
-            null -> o.earnStatus
+            null -> EarnStatus.PENDING
         }
     return OrderEarnResult(status, points, rate)
 }
