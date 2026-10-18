@@ -267,6 +267,7 @@ class OrderConsistencyTest
             verify(pointGateway, times(2)).cancelSpend(eq("11"), eq("order:$orderNo"), eq("주문 취소 $orderNo"))
             mockMvc.get("/api-public/v1/orders/$id") { with(me) }.andExpect { jsonPath("$.pointRefundStatus") { value("DONE") } }
             assertEquals(0.0, meterRegistry.get("commerce.point.outbox.pending").gauge().value())
+            assertEquals(0.0, meterRegistry.get("commerce.point.outbox.failed").gauge().value())
         }
 
         @Test
@@ -310,6 +311,7 @@ class OrderConsistencyTest
                     jsonPath("$.pointRefundStatus") { value("FAILED") }
                 }
             assertEquals("NO_SPEND: point-service has no spend order:$orderNo", row(PointOutboxKind.REFUND, orderNo).lastError)
+            assertEquals(1.0, meterRegistry.get("commerce.point.outbox.failed").gauge().value())
         }
 
         @Test
