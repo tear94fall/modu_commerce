@@ -49,7 +49,7 @@ class PointOutboxRelayJob(
     override fun run(): Map<String, Any?> = mapOf("relayed" to pointOutboxService.relay())
 }
 
-/** 전날(KST) 포인트 사용 주문을 point-service 원장과 맞춰 본다. */
+/** 전날(KST) 포인트 사용 주문과 배송 완료 적립 주문을 point-service 원장과 맞춰 본다. */
 @Component
 class PointReconcileJob(
     private val pointReconcileService: PointReconcileService,
@@ -64,6 +64,8 @@ class PointReconcileJob(
             "checked" to report.checked,
             "anomalies" to report.anomalies,
             "refundsQueued" to report.refundsQueued,
+            "earnChecked" to report.earnChecked,
+            "earnsQueued" to report.earnsQueued,
         )
     }
 }

@@ -78,9 +78,25 @@ class PointOutboxCommandService(
         orderNo: String,
         refId: String,
         amount: Long,
+    ): PointOutboxStatus? = ensure(PointOutboxKind.REFUND, userId, orderNo, refId, amount)
+
+    /** 대사가 찾은 "적립 없는 배송 완료 주문" 에 EARN 행이 없으면 만든다. @return 지금 있는 행의 상태(새로 만들었으면 null) */
+    fun ensureEarn(
+        userId: String,
+        orderNo: String,
+        refId: String,
+        amount: Long,
+    ): PointOutboxStatus? = ensure(PointOutboxKind.EARN, userId, orderNo, refId, amount)
+
+    private fun ensure(
+        kind: PointOutboxKind,
+        userId: String,
+        orderNo: String,
+        refId: String,
+        amount: Long,
     ): PointOutboxStatus? {
-        pointOutboxRwRepository.findByKindAndRefId(PointOutboxKind.REFUND, refId)?.let { return it.status }
-        pointOutboxRwRepository.saveAndFlush(PointOutbox(PointOutboxKind.REFUND, userId, orderNo, refId, amount, now()))
+        pointOutboxRwRepository.findByKindAndRefId(kind, refId)?.let { return it.status }
+        pointOutboxRwRepository.saveAndFlush(PointOutbox(kind, userId, orderNo, refId, amount, now()))
         return null
     }
 

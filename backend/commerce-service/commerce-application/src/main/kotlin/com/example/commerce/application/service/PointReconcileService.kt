@@ -30,6 +30,17 @@ data class OrderPointSnapshot(
     val refundRefId: String get() = "refund:order:$orderNo"
 }
 
+/** 적립 대사에 쓰는 주문 값. 시각은 UTC. */
+data class OrderEarnSnapshot(
+    val id: Long,
+    val orderNo: String,
+    val userId: String,
+    val earnPoints: Long,
+    val deliveredAt: LocalDateTime,
+) {
+    val earnRefId: String get() = "purchase:order:$id"
+}
+
 @Service
 class PointReconcileQueryService(
     private val orderRoRepository: OrderRoRepository,
@@ -42,21 +53,33 @@ class PointReconcileQueryService(
         orderRoRepository.findPointOrdersBetween(from, to).map {
             OrderPointSnapshot(it.orderNo, it.userId, it.status, it.pointAmount, it.cancelledAt)
         }
+
+    @Transactional(transactionManager = "roTransactionManager", readOnly = true)
+    fun earnOrders(
+        from: LocalDateTime,
+        to: LocalDateTime,
+    ): List<OrderEarnSnapshot> =
+        orderRoRepository.findEarnOrdersBetween(from, to).map {
+            OrderEarnSnapshot(requireNotNull(it.id), it.orderNo, it.userId, requireNotNull(it.earnPoints), requireNotNull(it.deliveredAt))
+        }
 }
 
-/** 대사 결과. [anomalies] 는 종류 → 건수. */
+/** 대사 결과. [anomalies] 는 종류 → 건수. [checked] 는 포인트 사용 주문, [earnChecked] 는 배송 완료 적립 주문. */
 data class PointReconcileReport(
     val day: LocalDate,
     val checked: Int,
     val anomalies: Map<String, Int>,
     val refundsQueued: Int,
+    val earnChecked: Int,
+    val earnsQueued: Int,
 )
 
 /**
- * 포인트 대사(매일 04:00 KST, 전날 하루). 전날(KST) 만들었거나 취소한 포인트 사용 주문을 point-service 원장과 맞춰 본다.
+ * 포인트 대사(매일 04:00 KST, 전날 하루). 전날(KST) 만들었거나 취소한 포인트 사용 주문과 배송 완료한 적립 주문을 point-service 원장과 맞춰 본다.
  * - 결제완료·배송중·배송완료(그리고 취소) 주문에 차감(order:<번호>)이 없음 → ERROR "point spend missing"
  * - 취소한 지 1시간이 넘었는데 환불(refund:order:<번호>)이 없음 → REFUND 아웃박스가 없으면 만들어 릴레이가 보내게 한다
- * - 금액이 다름 → ERROR
+ * - 배송 완료 1시간이 넘었는데 적립(purchase:order:<id>)이 원장에 없음 → EARN 아웃박스가 없으면 만들어 릴레이가 보내게 한다.
+ *   행이 DONE·FAILED 인데 원장이 비면 ERROR(사람이 본다). 금액이 다름 → ERROR
  * 찾은 이상은 commerce_point_reconcile_anomalies_total{type} 로 센다.
  */
 @Service
@@ -75,6 +98,7 @@ class PointReconcileService(
         val to = utc(day.plusDays(1))
         val now = TierPeriods.utcNow(clock)
         val orders = queryService.pointOrders(from, to)
+        val earnOrders = queryService.earnOrders(from, to)
         val refs =
             orders.flatMap { o ->
                 listOfNotNull(
@@ -87,7 +111,7 @@ class PointReconcileService(
                         null
                     },
                 )
-            }
+            } + earnOrders.map { PointRef(it.userId, it.earnRefId) }
         val ledger =
             refs
                 .chunked(PointGateway.MAX_REFS)
@@ -95,6 +119,7 @@ class PointReconcileService(
                 .associateBy { it.userId to it.refId }
         val anomalies = mutableMapOf<String, Int>()
         var queued = 0
+        var earnsQueued = 0
 
         fun anomaly(type: String) {
             anomalies.merge(type, 1, Int::plus)
@@ -137,8 +162,38 @@ class PointReconcileService(
                 }
             }
         }
-        logger.info { "point reconcile $day: ${orders.size} order(s), anomalies=$anomalies, refunds queued=$queued" }
-        return PointReconcileReport(day, orders.size, anomalies, queued)
+
+        earnOrders.forEach { o ->
+            val earn = ledger[o.userId to o.earnRefId]
+            if (earn != null) {
+                if (mismatch(earn, o.earnPoints)) {
+                    logger.error { "point amount mismatch: ${o.earnRefId} ledger=${earn.amount} order=${o.earnPoints}" }
+                    anomaly(AMOUNT_MISMATCH)
+                }
+                return@forEach
+            }
+            if (Duration.between(o.deliveredAt, now) < EARN_GRACE) return@forEach
+            anomaly(EARN_MISSING)
+            when (val existing = outboxCommandService.ensureEarn(o.userId, o.orderNo, o.earnRefId, o.earnPoints)) {
+                null -> {
+                    earnsQueued++
+                    logger.warn { "point earn missing for delivered order ${o.orderNo}: EARN outbox queued" }
+                }
+
+                PointOutboxStatus.PENDING -> {
+                    logger.warn { "point earn missing for delivered order ${o.orderNo}: outbox still retrying" }
+                }
+
+                else -> {
+                    logger.error { "point earn missing for delivered order ${o.orderNo} but outbox is $existing" }
+                }
+            }
+        }
+        logger.info {
+            "point reconcile $day: ${orders.size} point order(s), ${earnOrders.size} earn order(s), anomalies=$anomalies, " +
+                "refunds queued=$queued, earns queued=$earnsQueued"
+        }
+        return PointReconcileReport(day, orders.size, anomalies, queued, earnOrders.size, earnsQueued)
     }
 
     private fun mismatch(
@@ -151,7 +206,9 @@ class PointReconcileService(
     companion object {
         const val SPEND_MISSING = "spend_missing"
         const val REFUND_MISSING = "refund_missing"
+        const val EARN_MISSING = "earn_missing"
         const val AMOUNT_MISMATCH = "amount_mismatch"
         val REFUND_GRACE: Duration = Duration.ofHours(1)
+        val EARN_GRACE: Duration = REFUND_GRACE
     }
 }

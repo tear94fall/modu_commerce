@@ -58,12 +58,19 @@ class CommerceJobsTest {
     fun `포인트 대사 잡은 보고서를 평평한 결과로 돌려준다`() {
         val service = mock(PointReconcileService::class.java)
         `when`(service.reconcileYesterday())
-            .thenReturn(PointReconcileReport(LocalDate.of(2026, 10, 16), 12, mapOf("point spend missing" to 1), 2))
+            .thenReturn(PointReconcileReport(LocalDate.of(2026, 10, 16), 12, mapOf("point spend missing" to 1), 2, 30, 1))
         val job = PointReconcileJob(service)
 
         assertEquals("point-reconcile", job.name)
         assertEquals(
-            mapOf("day" to "2026-10-16", "checked" to 12, "anomalies" to mapOf("point spend missing" to 1), "refundsQueued" to 2),
+            mapOf(
+                "day" to "2026-10-16",
+                "checked" to 12,
+                "anomalies" to mapOf("point spend missing" to 1),
+                "refundsQueued" to 2,
+                "earnChecked" to 30,
+                "earnsQueued" to 1,
+            ),
             job.run(),
         )
     }

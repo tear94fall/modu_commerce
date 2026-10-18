@@ -7,6 +7,7 @@ import com.example.commerce.application.domain.entity.PointOutboxKind
 import com.example.commerce.application.domain.entity.PointOutboxStatus
 import com.example.commerce.application.domain.repository.rw.PointOutboxRwRepository
 import com.example.commerce.application.point.PointCancelResult
+import com.example.commerce.application.point.PointEarnResult
 import com.example.commerce.application.point.PointGateway
 import com.example.commerce.application.point.PointGatewayException
 import com.example.commerce.application.point.PointRef
@@ -18,6 +19,7 @@ import io.micrometer.core.instrument.MeterRegistry
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -81,6 +83,9 @@ class OrderConsistencyTest
             support.reseed()
             clock.setKst(2026, 10, 9, 12, 0)
             whenever(pointGateway.cancelSpend(any(), any(), anyOrNull())).thenReturn(cancelled())
+            whenever(pointGateway.earnAmount(any(), any(), any(), anyOrNull())).thenAnswer {
+                PointEarnResult(applied = true, amount = it.getArgument(1))
+            }
         }
 
         @AfterEach
@@ -363,6 +368,79 @@ class OrderConsistencyTest
             // 다른 날은 대상이 아니다.
             assertEquals(0, pointReconcileService.reconcile(LocalDate.of(2026, 10, 7)).checked)
         }
+
+        @Test
+        fun `대사는 배송 완료 주문의 적립 누락과 금액 불일치를 찾고 누락에는 EARN 을 다시 만든다`() {
+            val (okId, _) = created(0)
+            val (missingId, missingNo) = created(0)
+            val (mismatchId, _) = created(0)
+            val (doneButMissingId, doneNo) = created(0)
+            listOf(okId, missingId, mismatchId, doneButMissingId).forEach { deliver(it) } // WELCOME 1% → 180P, 모두 DONE
+            // 누락: 아웃박스 이전처럼 행을 지운다. DONE 인데 원장에 없음: 행은 그대로 둔다.
+            jdbc.update("delete from point_outbox where kind = 'EARN' and ref_id = ?", "purchase:order:$missingId")
+            // 모두 2026-10-08(KST) 오전에 배송 완료.
+            val at = Timestamp.valueOf(TierClock.utc(2026, 10, 8, 10, 0))
+            jdbc.update("update orders set delivered_at = ? where id in (?, ?, ?, ?)", at, okId, missingId, mismatchId, doneButMissingId)
+            clock.setKst(2026, 10, 9, 4, 0)
+            whenever(pointGateway.findTransactions(any())).thenAnswer { inv ->
+                val refs = inv.getArgument<List<PointRef>>(0).map { it.refId }.toSet()
+                listOf(
+                    PointRefTransaction("11", "purchase:order:$okId", "EARN", 180, null),
+                    PointRefTransaction("11", "purchase:order:$mismatchId", "EARN", 100, null),
+                ).filter { it.refId in refs }
+            }
+            val before = listOf("earn_missing", "amount_mismatch").associateWith { anomalies(it) }
+
+            val report = pointReconcileService.reconcile(LocalDate.of(2026, 10, 8))
+
+            assertEquals(0, report.checked) // 포인트를 쓴 주문은 없다
+            assertEquals(4, report.earnChecked)
+            assertEquals(mapOf("earn_missing" to 2, "amount_mismatch" to 1), report.anomalies)
+            assertEquals(1, report.earnsQueued)
+            assertEquals(before.getValue("earn_missing") + 2, anomalies("earn_missing"))
+            assertEquals(before.getValue("amount_mismatch") + 1, anomalies("amount_mismatch"))
+            val refs = argumentCaptor<List<PointRef>>()
+            verify(pointGateway).findTransactions(refs.capture())
+            assertTrue(PointRef("11", "purchase:order:$missingId") in refs.firstValue)
+            val queued = requireNotNull(earnRow(missingId))
+            assertEquals(PointOutboxStatus.PENDING, queued.status)
+            assertEquals(180, queued.amount)
+            assertEquals(missingNo, queued.orderNo)
+            assertEquals(TierClock.utc(2026, 10, 9, 4, 0), queued.nextAttemptAt)
+            // DONE 인데 원장에 없는 건 행을 건드리지 않는다(ERROR 로그, 사람이 본다).
+            assertEquals(PointOutboxStatus.DONE, requireNotNull(earnRow(doneButMissingId)).status)
+            assertEquals(doneNo, requireNotNull(earnRow(doneButMissingId)).orderNo)
+        }
+
+        @Test
+        fun `대사는 배송 완료 1시간 미만의 적립 누락은 건너뛴다`() {
+            val (id, _) = created(0)
+            deliver(id)
+            jdbc.update("delete from point_outbox where kind = 'EARN'")
+            jdbc.update("update orders set delivered_at = ? where id = ?", Timestamp.valueOf(TierClock.utc(2026, 10, 8, 23, 30)), id)
+            clock.setKst(2026, 10, 9, 0, 10)
+            whenever(pointGateway.findTransactions(any())).thenReturn(emptyList())
+
+            val report = pointReconcileService.reconcile(LocalDate.of(2026, 10, 8))
+
+            assertEquals(1, report.earnChecked)
+            assertEquals(emptyMap<String, Int>(), report.anomalies)
+            assertEquals(0, report.earnsQueued)
+            assertNull(earnRow(id))
+        }
+
+        private fun deliver(id: Int) {
+            listOf("SHIPPING", "DELIVERED").forEach { next ->
+                mockMvc
+                    .patch("/api-admin/v1/orders/$id/status") {
+                        with(admin)
+                        contentType = MediaType.APPLICATION_JSON
+                        content = """{"status":"$next"}"""
+                    }.andExpect { status { isOk() } }
+            }
+        }
+
+        private fun earnRow(id: Int): PointOutbox? = outboxRepository.findByKindAndRefId(PointOutboxKind.EARN, "purchase:order:$id")
 
         private fun anomalies(type: String): Double =
             meterRegistry
