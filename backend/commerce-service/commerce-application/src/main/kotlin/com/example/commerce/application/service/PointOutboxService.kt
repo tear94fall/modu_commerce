@@ -11,7 +11,10 @@ import com.example.commerce.application.domain.repository.ro.PointOutboxRoReposi
 import com.example.commerce.application.domain.repository.rw.OrderRwRepository
 import com.example.commerce.application.domain.repository.rw.PointOutboxRwRepository
 import com.example.commerce.application.point.PointCancelResult
+import com.example.commerce.application.point.PointEarnRejectedException
 import com.example.commerce.application.point.PointGateway
+import com.example.commerce.application.usecase.result.OrderEarnResult
+import com.example.commerce.application.usecase.result.earnResultOf
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
@@ -38,7 +41,7 @@ data class PointOutboxTask(
 
 /**
  * 아웃박스의 DB 단계. 기본은 늘 새 트랜잭션(REQUIRES_NEW): 주문 트랜잭션이 롤백돼도 남아야 하는 표시(SPEND_GUARD)와
- * 커밋 뒤(afterCommit)의 상태 변경이 여기서 따로 커밋된다. 취소 환불(REFUND)만 취소와 같은 트랜잭션에 넣는다(MANDATORY).
+ * 커밋 뒤(afterCommit)의 상태 변경이 여기서 따로 커밋된다. 취소 환불(REFUND)은 취소와, 구매 적립(EARN)은 배송 완료와 같은 트랜잭션에 넣는다(MANDATORY).
  */
 @Service
 @Transactional(transactionManager = "rwTransactionManager", propagation = Propagation.REQUIRES_NEW)
@@ -59,6 +62,13 @@ class PointOutboxCommandService(
         return requireNotNull(pointOutboxRwRepository.saveAndFlush(PointOutbox.refund(order, now())).id)
     }
 
+    /** 구매 적립. 배송 완료와 같은 트랜잭션에서 넣는다(배송 완료가 커밋되면 반드시 남는다). 바로 보낼 수 있게 next_attempt_at = 지금. */
+    @Transactional(transactionManager = "rwTransactionManager", propagation = Propagation.MANDATORY)
+    fun enqueueEarn(order: Order): Long {
+        pointOutboxRwRepository.findByKindAndRefId(PointOutboxKind.EARN, order.purchaseEarnRefId())?.let { return requireNotNull(it.id) }
+        return requireNotNull(pointOutboxRwRepository.saveAndFlush(PointOutbox.earn(order, now())).id)
+    }
+
     /**
      * 대사가 찾은 "환불 없는 취소 주문" 에 REFUND 행이 없으면 만든다.
      * @return 지금 있는 행의 상태(새로 만들었으면 null)
@@ -68,9 +78,25 @@ class PointOutboxCommandService(
         orderNo: String,
         refId: String,
         amount: Long,
+    ): PointOutboxStatus? = ensure(PointOutboxKind.REFUND, userId, orderNo, refId, amount)
+
+    /** 대사가 찾은 "적립 없는 배송 완료 주문" 에 EARN 행이 없으면 만든다. @return 지금 있는 행의 상태(새로 만들었으면 null) */
+    fun ensureEarn(
+        userId: String,
+        orderNo: String,
+        refId: String,
+        amount: Long,
+    ): PointOutboxStatus? = ensure(PointOutboxKind.EARN, userId, orderNo, refId, amount)
+
+    private fun ensure(
+        kind: PointOutboxKind,
+        userId: String,
+        orderNo: String,
+        refId: String,
+        amount: Long,
     ): PointOutboxStatus? {
-        pointOutboxRwRepository.findByKindAndRefId(PointOutboxKind.REFUND, refId)?.let { return it.status }
-        pointOutboxRwRepository.saveAndFlush(PointOutbox(PointOutboxKind.REFUND, userId, orderNo, refId, amount, now()))
+        pointOutboxRwRepository.findByKindAndRefId(kind, refId)?.let { return it.status }
+        pointOutboxRwRepository.saveAndFlush(PointOutbox(kind, userId, orderNo, refId, amount, now()))
         return null
     }
 
@@ -112,26 +138,67 @@ class PointOutboxCommandService(
     }
 }
 
-/** 주문 응답의 포인트 환불 상태. 레플리카(조회 화면) 또는 master(취소 직후 응답)에서 읽는다. */
+/**
+ * 주문 응답의 아웃박스 상태(환불·적립). 레플리카(조회 화면) 또는 master(쓰기 직후 응답)에서 읽는다.
+ * 적립은 EARN 행 하나로 상태를 정하고, 행이 없는 예전 주문은 `orders.earn_status` 로 떨어진다([earnOf]).
+ */
 @Service
-class PointRefundStatusQueryService(
+class PointOutboxStatusQueryService(
     private val pointOutboxRoRepository: PointOutboxRoRepository,
     private val pointOutboxRwRepository: PointOutboxRwRepository,
 ) {
     @Transactional(transactionManager = "roTransactionManager", readOnly = true)
-    fun of(order: Order): PointRefundStatus =
-        if (order.pointAmount <= 0 || !order.isCancelled()) {
-            PointRefundStatus.NONE
-        } else {
-            PointRefundStatus.of(order, pointOutboxRoRepository.findByKindAndRefId(PointOutboxKind.REFUND, order.pointSpendRefId()))
-        }
+    fun refundOf(order: Order): PointRefundStatus = refund(order) { pointOutboxRoRepository.findByKindAndRefId(PointOutboxKind.REFUND, it) }
 
     @Transactional(transactionManager = "rwTransactionManager", readOnly = true)
-    fun ofMaster(order: Order): PointRefundStatus =
-        if (order.pointAmount <= 0 || !order.isCancelled()) {
+    fun refundOfMaster(order: Order): PointRefundStatus =
+        refund(order) { pointOutboxRwRepository.findByKindAndRefId(PointOutboxKind.REFUND, it) }
+
+    @Transactional(transactionManager = "roTransactionManager", readOnly = true)
+    fun earnOf(order: Order): OrderEarnResult? = earn(order) { pointOutboxRoRepository.findByKindAndRefId(PointOutboxKind.EARN, it) }
+
+    @Transactional(transactionManager = "rwTransactionManager", readOnly = true)
+    fun earnOfMaster(order: Order): OrderEarnResult? = earn(order) { pointOutboxRwRepository.findByKindAndRefId(PointOutboxKind.EARN, it) }
+
+    /** 목록 한 페이지. 적립이 정해진 주문의 EARN 행만 IN 한 번으로 읽는다. 주문 id → earn. */
+    @Transactional(transactionManager = "roTransactionManager", readOnly = true)
+    fun earnsOf(orders: List<Order>): Map<Long, OrderEarnResult?> {
+        val refIds = orders.filter { (it.earnPoints ?: 0) > 0 }.map { it.purchaseEarnRefId() }
+        val rows =
+            if (refIds.isEmpty()) {
+                emptyMap()
+            } else {
+                pointOutboxRoRepository
+                    .findByKindAndRefIdIn(
+                        PointOutboxKind.EARN,
+                        refIds,
+                    ).associateBy { it.refId }
+            }
+        return orders.associate { requireNotNull(it.id) to earnResultOf(it, rows[it.purchaseEarnRefId()]) }
+    }
+
+    private fun refund(
+        order: Order,
+        find: (String) -> PointOutbox?,
+    ): PointRefundStatus =
+        if (order.pointAmount <= 0 ||
+            !order.isCancelled()
+        ) {
             PointRefundStatus.NONE
         } else {
-            PointRefundStatus.of(order, pointOutboxRwRepository.findByKindAndRefId(PointOutboxKind.REFUND, order.pointSpendRefId()))
+            PointRefundStatus.of(order, find(order.pointSpendRefId()))
+        }
+
+    private fun earn(
+        order: Order,
+        find: (String) -> PointOutbox?,
+    ): OrderEarnResult? =
+        if ((order.earnPoints ?: 0) <=
+            0
+        ) {
+            earnResultOf(order, null)
+        } else {
+            earnResultOf(order, find(order.purchaseEarnRefId()))
         }
 }
 
@@ -142,6 +209,8 @@ class PointRefundStatusQueryService(
  *   PENDING 으로 남고, 2분 뒤 [relay] 가 주문이 없는 것을 보고 차감을 되돌린다(spend/cancel).
  * - 취소: [refundOnCancel] 이 취소 트랜잭션 안에 REFUND 를 넣고, 커밋 뒤 바로 한 번 보낸다. point-service 가 죽어 있어도 취소는 커밋되고
  *   [relay] 가 1분, 2분, 4분 … 최대 1시간 간격으로 다시 보낸다(20번 실패하면 FAILED).
+ * - 적립: [earnOnDelivered] 가 배송 완료 트랜잭션 안에 EARN 을 넣고, 커밋 뒤 바로 한 번 보낸다. 실패하면 [relay] 가 환불과 같은 간격으로 다시 보낸다.
+ *   DUPLICATE 는 이미 적립된 것이라 DONE, 거절(4xx)·미적용은 다시 보내도 같으니 FAILED(사람이 본다).
  */
 @Service
 class PointOutboxService(
@@ -161,6 +230,12 @@ class PointOutboxService(
         afterCommit { commandService.pendingTask(id)?.let { send(it) } }
     }
 
+    /** 배송 완료 트랜잭션 안에서(호출자가 [Order.decideEarn] 으로 금액을 정했다). 커밋 뒤 바로 한 번 보낸다. */
+    fun earnOnDelivered(order: Order) {
+        val id = commandService.enqueueEarn(order)
+        afterCommit { commandService.pendingTask(id)?.let { send(it) } }
+    }
+
     /** 보낼 차례인 줄을 보낸다. 끝낸(DONE) 수를 돌려준다. */
     fun relay(): Int = commandService.due().count { send(it) }
 
@@ -170,7 +245,13 @@ class PointOutboxService(
             when (task.kind) {
                 PointOutboxKind.SPEND_GUARD -> settleGuard(task)
                 PointOutboxKind.REFUND -> refund(task)
+                PointOutboxKind.EARN -> earn(task)
             }
+        } catch (e: PointEarnRejectedException) {
+            // 값이 잘못돼 거절됐다. 다시 보내도 같으니 사람이 본다.
+            commandService.failed(task.id, "REJECTED: ${e.message}")
+            logger.error { "point outbox ${task.kind} ${task.refId} rejected: ${e.message}" }
+            false
         } catch (e: Exception) {
             val error = "${e.javaClass.simpleName}: ${e.message}"
             if (commandService.retryLater(task.id, error)) {
@@ -207,6 +288,20 @@ class PointOutboxService(
         return true
     }
 
+    /** 구매 적립. 같은 키가 이미 적립됐다는 답(DUPLICATE)은 끝난 것. 그 밖의 미적용은 있을 수 없는 일이라 FAILED 로 두고 사람이 본다. */
+    private fun earn(task: PointOutboxTask): Boolean {
+        val result = pointGateway.earnAmount(task.userId, task.amount, task.refId, "구매 적립 · 주문 ${task.orderNo}")
+        if (result.applied || result.reason == DUPLICATE) {
+            commandService.done(task.id)
+            return true
+        }
+        commandService.failed(task.id, "NOT_APPLIED: ${result.reason}")
+        logger.error {
+            "point earn anomaly: not applied for delivered order ${task.orderNo} (${task.refId}, ${task.amount}P): ${result.reason}"
+        }
+        return false
+    }
+
     private fun afterCommit(action: () -> Unit) {
         val safe = {
             try {
@@ -225,5 +320,9 @@ class PointOutboxService(
                 override fun afterCommit() = safe()
             },
         )
+    }
+
+    companion object {
+        const val DUPLICATE = "DUPLICATE"
     }
 }

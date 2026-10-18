@@ -71,6 +71,7 @@ class PriceChangedException(
  * 포인트: DB 작업을 다 마친 뒤(커밋 직전) point-service 에 차감을 요청한다. 차감 직전에 아웃박스 SPEND_GUARD 를 따로 커밋해 두므로,
  * 차감 뒤 커밋이 실패해도(드묾) 릴레이가 주문이 없는 것을 보고 차감을 되돌린다. 취소 환불은 취소와 같은 트랜잭션의 REFUND 행으로 남기고
  * 커밋 뒤 보낸다 — point-service 가 죽어 있어도 취소는 된다([PointOutboxService]).
+ * 구매 적립은 배송 완료와 같은 트랜잭션의 EARN 행으로 남기고 커밋 뒤 보낸다([PurchaseEarnService]).
  *
  * 시각은 주입받은 [clock] 의 UTC, 주문번호 날짜는 한국 날짜다.
  */
@@ -174,8 +175,8 @@ class OrderCommandService(
             couponUseService.restore(order)
             refundPoints(order)
         }
-        // 배송 완료: 커밋 뒤 구매 적립(고객의 지금 등급 적립률).
-        if (next == OrderStatus.DELIVERED) purchaseEarnService.afterCommit(orderId)
+        // 배송 완료: 같은 트랜잭션에서 구매 적립을 확정한다(고객의 지금 등급 적립률). 보내기는 커밋 뒤(아웃박스).
+        if (next == OrderStatus.DELIVERED) purchaseEarnService.onDelivered(order)
         return order
     }
 

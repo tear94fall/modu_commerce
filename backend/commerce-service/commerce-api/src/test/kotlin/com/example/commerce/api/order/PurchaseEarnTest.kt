@@ -1,16 +1,24 @@
 package com.example.commerce.api.order
 
 import com.example.commerce.api.support.CatalogTestSupport
+import com.example.commerce.api.support.TierClock
+import com.example.commerce.application.domain.entity.OrderStatus
+import com.example.commerce.application.domain.entity.PointOutbox
+import com.example.commerce.application.domain.entity.PointOutboxKind
+import com.example.commerce.application.domain.entity.PointOutboxStatus
+import com.example.commerce.application.domain.repository.rw.PointOutboxRwRepository
 import com.example.commerce.application.point.PointEarnRejectedException
 import com.example.commerce.application.point.PointEarnResult
 import com.example.commerce.application.point.PointGateway
 import com.example.commerce.application.point.PointGatewayException
-import com.example.commerce.application.service.PurchaseEarnService
+import com.example.commerce.application.service.OrderCommandService
+import com.example.commerce.application.service.PointOutboxService
 import com.jayway.jsonpath.JsonPath
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.eq
@@ -22,6 +30,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.core.authority.SimpleGrantedAuthority
@@ -31,17 +40,28 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
+import java.time.Duration
 import javax.sql.DataSource
 
-/** 배송 완료 구매 적립. point-service 는 포트로 대신한다. */
+/**
+ * 배송 완료 구매 적립 — 포인트 아웃박스(EARN). point-service 는 포트로 대신하고, 시계(TierClock)를 옮겨 릴레이 대기 시간을 흉내 낸다.
+ * 설계: docs/superpowers/specs/2026-10-18-purchase-earn-outbox-design.md
+ */
 @SpringBootTest
 @AutoConfigureMockMvc
+@Import(TierClock.Config::class)
 class PurchaseEarnTest
     @Autowired
     constructor(
         private val mockMvc: MockMvc,
         private val support: CatalogTestSupport,
-        private val purchaseEarnService: PurchaseEarnService,
+        private val clock: TierClock,
+        private val outboxRepository: PointOutboxRwRepository,
+        private val pointOutboxService: PointOutboxService,
+        private val orderCommandService: OrderCommandService,
+        @Qualifier("rwTransactionManager") private val rwTransactionManager: PlatformTransactionManager,
         @Qualifier("rwDataSource") dataSource: DataSource,
     ) {
         @MockitoBean
@@ -57,6 +77,7 @@ class PurchaseEarnTest
 
         @BeforeEach
         fun points() {
+            clock.setKst(2026, 10, 18, 12, 0)
             whenever(pointGateway.earnAmount(any(), any(), any(), anyOrNull())).thenAnswer {
                 PointEarnResult(applied = true, amount = it.getArgument(1))
             }
@@ -102,8 +123,37 @@ class PurchaseEarnTest
                 content = """{"status":"$next"}"""
             }.andExpect { status { isOk() } }
 
+        private fun delivered(id: Int) {
+            status(id, "SHIPPING")
+            status(id, "DELIVERED")
+        }
+
+        private fun earnRow(id: Int): PointOutbox? = outboxRepository.findByKindAndRefId(PointOutboxKind.EARN, "purchase:order:$id")
+
+        private fun later(minutes: Long) {
+            clock.now = clock.now.plus(Duration.ofMinutes(minutes))
+        }
+
+        private fun earnColumns(id: Int): Map<String, Any?> =
+            jdbc.queryForMap("select earn_status, earn_points, earn_rate from orders where id = ?", id)
+
         @Test
-        fun `배송 완료되면 지금 등급 적립률로 적립하고 주문에 남긴다`() {
+        fun `적립이 적용되지 않았다는 답(DUPLICATE 아님)은 FAILED 로 두고 다시 보내지 않는다`() {
+            whenever(pointGateway.earnAmount(any(), any(), any(), anyOrNull()))
+                .thenReturn(PointEarnResult(applied = false, amount = 0, reason = "RULE_DISABLED"))
+            val (id, _) = order()
+            delivered(id)
+            val row = requireNotNull(earnRow(id))
+            assertThat(row.status).isEqualTo(PointOutboxStatus.FAILED)
+            assertThat(row.lastError).startsWith("NOT_APPLIED: RULE_DISABLED")
+            mockMvc.get("/api-public/v1/orders/$id") { with(me) }.andExpect { jsonPath("$.earn.status") { value("FAILED") } }
+            later(60)
+            assertThat(pointOutboxService.relay()).isZero()
+            verify(pointGateway, times(1)).earnAmount(any(), any(), any(), anyOrNull())
+        }
+
+        @Test
+        fun `배송 완료되면 그 시점 등급 적립률로 금액을 정해 EARN 행을 남기고 커밋 뒤 바로 적립한다`() {
             tier("GOLD")
             val (id, no) = order()
             mockMvc.get("/api-public/v1/orders/$id") { with(me) }.andExpect {
@@ -114,9 +164,21 @@ class PurchaseEarnTest
             status(id, "SHIPPING")
             mockMvc.get("/api-public/v1/orders") { with(me) }.andExpect { jsonPath("$.content[0].expectedEarn.points") { value(540) } }
             verify(pointGateway, never()).earnAmount(any(), any(), any(), anyOrNull())
+            assertThat(earnRow(id)).isNull()
 
-            status(id, "DELIVERED")
-            verify(pointGateway).earnAmount(eq("11"), eq(540L), eq("purchase:order:$id"), eq("구매 적립 · 주문 $no (골드 3%)"))
+            status(id, "DELIVERED").andExpect { jsonPath("$.earn.status") { value("DONE") } }
+            verify(pointGateway).earnAmount(eq("11"), eq(540L), eq("purchase:order:$id"), eq("구매 적립 · 주문 $no"))
+            val row = requireNotNull(earnRow(id))
+            assertThat(row.status).isEqualTo(PointOutboxStatus.DONE)
+            assertThat(row.amount).isEqualTo(540)
+            assertThat(row.orderNo).isEqualTo(no)
+            assertThat(row.attempts).isZero()
+            // 주문에는 금액·적립률만 남고, 예전 상태 컬럼은 더 쓰지 않는다.
+            val cols = earnColumns(id)
+            assertThat((cols["EARN_POINTS"] as Number).toLong()).isEqualTo(540)
+            assertThat((cols["EARN_RATE"] as Number).toInt()).isEqualTo(3)
+            assertThat(cols["EARN_STATUS"]).isEqualTo("NONE")
+
             mockMvc.get("/api-public/v1/orders/$id") { with(me) }.andExpect {
                 jsonPath("$.earn.status") { value("DONE") }
                 jsonPath("$.earn.points") { value(540) }
@@ -126,9 +188,8 @@ class PurchaseEarnTest
             }
             mockMvc.get("/api-public/v1/orders") { with(me) }.andExpect { jsonPath("$.content[0].earn.status") { value("DONE") } }
 
-            // 다시 불려도(같은 주문) 또 적립하지 않는다.
-            purchaseEarnService.earn(id.toLong())
-            assertThat(purchaseEarnService.retryPending()).isZero()
+            // 릴레이가 돌아도 DONE 행은 다시 보내지 않는다.
+            assertThat(pointOutboxService.relay()).isZero()
             verify(pointGateway, times(1)).earnAmount(any(), any(), any(), anyOrNull())
         }
 
@@ -136,15 +197,13 @@ class PurchaseEarnTest
         fun `적립은 결제 금액(포인트 뺀 금액) × 적립률을 내림하고 등급마다 다르다`() {
             tier("GOLD")
             val (gold, _) = order(usePoints = 1)
-            status(gold, "SHIPPING")
-            status(gold, "DELIVERED")
+            delivered(gold)
             // 17,999 × 3% = 539.97 → 539
             verify(pointGateway).earnAmount(eq("11"), eq(539L), eq("purchase:order:$gold"), anyOrNull())
 
             tier("WELCOME")
             val (welcome, _) = order()
-            status(welcome, "SHIPPING")
-            status(welcome, "DELIVERED")
+            delivered(welcome)
             verify(pointGateway).earnAmount(eq("11"), eq(180L), eq("purchase:order:$welcome"), anyOrNull())
 
             tier("VIP")
@@ -153,51 +212,129 @@ class PurchaseEarnTest
         }
 
         @Test
-        fun `포인트 서버 장애면 PENDING 으로 남고 재시도가 같은 키로 적립한다`() {
+        fun `point-service 가 죽어도 배송 완료는 커밋되고 적립은 PENDING 으로 남았다가 릴레이가 같은 키로 보낸다`() {
             whenever(pointGateway.earnAmount(any(), any(), any(), anyOrNull())).thenThrow(PointGatewayException())
             val (id, _) = order()
             status(id, "SHIPPING")
-            status(id, "DELIVERED")
+            status(id, "DELIVERED") // 200
             mockMvc.get("/api-public/v1/orders/$id") { with(me) }.andExpect {
+                jsonPath("$.status") { value("DELIVERED") }
                 jsonPath("$.earn.status") { value("PENDING") }
                 jsonPath("$.earn.points") { value(180) }
             }
-            // 아직 장애면 그대로 PENDING.
-            assertThat(purchaseEarnService.retryPending()).isZero()
+            val row = requireNotNull(earnRow(id))
+            assertThat(row.status).isEqualTo(PointOutboxStatus.PENDING)
+            assertThat(row.attempts).isEqualTo(1) // 커밋 뒤 바로 한 번 보냈다가 실패
+            assertThat(row.lastError).contains("PointGatewayException")
 
+            // 아직 1분이 안 됐다 → 릴레이는 건드리지 않는다. 1분 뒤 아직 장애면 attempts 2.
+            assertThat(pointOutboxService.relay()).isZero()
+            later(1)
+            assertThat(pointOutboxService.relay()).isZero()
+            assertThat(requireNotNull(earnRow(id)).attempts).isEqualTo(2)
+
+            // 살아난 뒤 다음 차례(2분)에 같은 키로 보내 DONE.
             whenever(pointGateway.earnAmount(any(), any(), any(), anyOrNull())).thenReturn(PointEarnResult(applied = true, amount = 180))
-            assertThat(purchaseEarnService.retryPending()).isEqualTo(1)
+            later(2)
+            assertThat(pointOutboxService.relay()).isEqualTo(1)
             verify(pointGateway, times(3)).earnAmount(eq("11"), eq(180L), eq("purchase:order:$id"), anyOrNull())
             mockMvc.get("/api-public/v1/orders/$id") { with(me) }.andExpect { jsonPath("$.earn.status") { value("DONE") } }
-            assertThat(purchaseEarnService.retryPending()).isZero()
+            assertThat(pointOutboxService.relay()).isZero()
         }
 
         @Test
-        fun `이미 적립된 키(DUPLICATE)는 DONE, 거절은 FAILED 로 끝나고 재시도하지 않는다`() {
+        fun `DUPLICATE 는 DONE 이고 거절(4xx)은 FAILED 로 끝나 릴레이가 다시 보내지 않는다`() {
             whenever(pointGateway.earnAmount(any(), any(), any(), anyOrNull()))
                 .thenReturn(PointEarnResult(applied = false, amount = 0, reason = "DUPLICATE"))
             val (dup, _) = order()
-            status(dup, "SHIPPING")
-            status(dup, "DELIVERED")
+            delivered(dup)
+            assertThat(requireNotNull(earnRow(dup)).status).isEqualTo(PointOutboxStatus.DONE)
             mockMvc.get("/api-public/v1/orders/$dup") { with(me) }.andExpect { jsonPath("$.earn.status") { value("DONE") } }
 
             whenever(pointGateway.earnAmount(any(), any(), any(), anyOrNull())).thenThrow(PointEarnRejectedException("bad"))
             val (bad, _) = order()
-            status(bad, "SHIPPING")
-            status(bad, "DELIVERED")
+            delivered(bad)
+            val failed = requireNotNull(earnRow(bad))
+            assertThat(failed.status).isEqualTo(PointOutboxStatus.FAILED)
+            assertThat(failed.lastError).contains("bad")
             mockMvc.get("/api-public/v1/orders/$bad") { with(me) }.andExpect { jsonPath("$.earn.status") { value("FAILED") } }
-            assertThat(purchaseEarnService.retryPending()).isZero()
+
+            later(60)
+            assertThat(pointOutboxService.relay()).isZero()
+            verify(pointGateway, times(2)).earnAmount(any(), any(), any(), anyOrNull())
         }
 
         @Test
-        fun `배송 완료 때 고객이 아니면 적립하지 않는다(NONE)`() {
+        fun `배송 완료 때 고객이 아니면 적립하지 않는다(NONE, 행 없음)`() {
             val (id, _) = order()
             status(id, "SHIPPING")
             jdbc.update("update commerce_customers set status = 'WITHDRAWN' where user_id = '11'")
             status(id, "DELIVERED")
             verify(pointGateway, never()).earnAmount(any(), any(), any(), anyOrNull())
-            val earn = jdbc.queryForMap("select earn_status, earn_points from orders where id = ?", id)
-            assertThat(earn["EARN_STATUS"]).isEqualTo("NONE")
-            assertThat((earn["EARN_POINTS"] as Number).toLong()).isZero()
+            assertThat(earnRow(id)).isNull()
+            val cols = earnColumns(id)
+            assertThat((cols["EARN_POINTS"] as Number).toLong()).isZero()
+            assertThat(cols["EARN_STATUS"]).isEqualTo("NONE")
+            mockMvc.get("/api-admin/v1/orders/$id") { with(admin) }.andExpect {
+                jsonPath("$.earn.status") { value("NONE") }
+                jsonPath("$.earn.points") { value(0) }
+            }
+        }
+
+        @Test
+        fun `배송 완료 트랜잭션이 롤백되면 적립 행도 금액도 남지 않는다`() {
+            val (id, _) = order()
+            status(id, "SHIPPING")
+
+            val tx = TransactionTemplate(rwTransactionManager)
+            assertThrows<IllegalStateException> {
+                tx.executeWithoutResult {
+                    orderCommandService.changeStatus(id.toLong(), OrderStatus.DELIVERED)
+                    throw IllegalStateException("커밋 직전에 터진다")
+                }
+            }
+
+            verify(pointGateway, never()).earnAmount(any(), any(), any(), anyOrNull())
+            assertThat(earnRow(id)).isNull()
+            assertThat(earnColumns(id)["EARN_POINTS"]).isNull()
+            mockMvc.get("/api-public/v1/orders/$id") { with(me) }.andExpect {
+                jsonPath("$.status") { value("SHIPPING") }
+                jsonPath("$.earn") { doesNotExist() }
+            }
+        }
+
+        @Test
+        fun `EARN 아웃박스 행이 있으면 주문의 적립 상태는 그 행에서 읽고, 없으면 예전 컬럼으로 떨어진다(백필 전)`() {
+            val (id, _) = order()
+            delivered(id)
+            mockMvc.get("/api-public/v1/orders/$id") { with(me) }.andExpect { jsonPath("$.earn.status") { value("DONE") } }
+
+            // 예전 경로의 주문처럼: 행을 지우고 컬럼만 남긴다.
+            jdbc.update("delete from point_outbox where kind = 'EARN' and ref_id = ?", "purchase:order:$id")
+            jdbc.update("update orders set earn_status = 'FAILED' where id = ?", id)
+            mockMvc.get("/api-public/v1/orders/$id") { with(me) }.andExpect { jsonPath("$.earn.status") { value("FAILED") } }
+            mockMvc.get("/api-admin/v1/orders/$id") { with(admin) }.andExpect { jsonPath("$.earn.status") { value("FAILED") } }
+        }
+
+        @Test
+        fun `목록은 주문마다 EARN 행의 상태를 붙인다`() {
+            whenever(pointGateway.earnAmount(any(), any(), any(), anyOrNull())).thenThrow(PointGatewayException())
+            val (a, _) = order()
+            delivered(a) // PENDING
+            whenever(pointGateway.earnAmount(any(), any(), any(), anyOrNull())).thenReturn(PointEarnResult(applied = true, amount = 180))
+            val (b, _) = order()
+            delivered(b) // DONE
+
+            // 최신순: b 가 먼저.
+            mockMvc.get("/api-public/v1/orders") { with(me) }.andExpect {
+                jsonPath("$.content[0].id") { value(b) }
+                jsonPath("$.content[0].earn.status") { value("DONE") }
+                jsonPath("$.content[1].id") { value(a) }
+                jsonPath("$.content[1].earn.status") { value("PENDING") }
+            }
+            mockMvc.get("/api-admin/v1/orders") { with(admin) }.andExpect {
+                jsonPath("$.content[0].earn.status") { value("DONE") }
+                jsonPath("$.content[1].earn.status") { value("PENDING") }
+            }
         }
     }

@@ -5,7 +5,7 @@ import com.example.commerce.application.domain.entity.OrderStatus
 import com.example.commerce.application.service.CustomerQueryService
 import com.example.commerce.application.service.OrderCommandService
 import com.example.commerce.application.service.OrderQueryService
-import com.example.commerce.application.service.PointRefundStatusQueryService
+import com.example.commerce.application.service.PointOutboxStatusQueryService
 import com.example.commerce.application.service.ReviewQueryService
 import com.example.commerce.application.usecase.command.CreateOrderCommand
 import com.example.commerce.application.usecase.result.CreateOrderOutcome
@@ -27,6 +27,7 @@ import org.springframework.transaction.support.TransactionTemplate
 @Component
 class CreateOrderUseCase(
     private val orderCommandService: OrderCommandService,
+    private val outboxStatus: PointOutboxStatusQueryService,
     @Qualifier("rwTransactionManager") transactionManager: PlatformTransactionManager,
 ) {
     private val tx = TransactionTemplate(transactionManager)
@@ -51,7 +52,10 @@ class CreateOrderUseCase(
     private fun existing(
         userId: String,
         key: String,
-    ): OrderDetailResult? = orderCommandService.readByIdempotencyKey(userId, key) { OrderDetailResult.from(it) }
+    ): OrderDetailResult? =
+        orderCommandService.readByIdempotencyKey(userId, key) {
+            OrderDetailResult.from(it, earn = outboxStatus.earnOfMaster(it))
+        }
 }
 
 /**
@@ -60,7 +64,7 @@ class CreateOrderUseCase(
 @Component
 class CancelOrderUseCase(
     private val orderCommandService: OrderCommandService,
-    private val pointRefundStatusQueryService: PointRefundStatusQueryService,
+    private val outboxStatus: PointOutboxStatusQueryService,
     @Qualifier("rwTransactionManager") transactionManager: PlatformTransactionManager,
 ) {
     private val tx = TransactionTemplate(transactionManager)
@@ -71,7 +75,7 @@ class CancelOrderUseCase(
     ): OrderDetailResult {
         tx.executeWithoutResult { orderCommandService.cancel(userId, orderId) }
         return orderCommandService.readOwn(userId, orderId) {
-            OrderDetailResult.from(it, pointRefundStatus = pointRefundStatusQueryService.ofMaster(it))
+            OrderDetailResult.from(it, pointRefundStatus = outboxStatus.refundOfMaster(it), earn = outboxStatus.earnOfMaster(it))
         }
     }
 }
@@ -80,6 +84,7 @@ class CancelOrderUseCase(
 class GetOrdersUseCase(
     private val orderQueryService: OrderQueryService,
     private val customerQueryService: CustomerQueryService,
+    private val outboxStatus: PointOutboxStatusQueryService,
 ) {
     @Transactional(transactionManager = "roTransactionManager", readOnly = true)
     fun execute(
@@ -88,7 +93,9 @@ class GetOrdersUseCase(
         size: Int,
     ): PageResult<OrderSummaryResult> {
         val tier = customerQueryService.currentTier(userId)
-        return PageResult.from(orderQueryService.page(userId, page, size)) { OrderSummaryResult.from(it, tier) }
+        val page = orderQueryService.page(userId, page, size)
+        val earns = outboxStatus.earnsOf(page.content)
+        return PageResult.from(page) { OrderSummaryResult.from(it, tier, earns[requireNotNull(it.id)]) }
     }
 }
 
@@ -98,7 +105,7 @@ class GetOrderUseCase(
     private val orderCommandService: OrderCommandService,
     private val reviewQueryService: ReviewQueryService,
     private val customerQueryService: CustomerQueryService,
-    private val pointRefundStatusQueryService: PointRefundStatusQueryService,
+    private val outboxStatus: PointOutboxStatusQueryService,
 ) {
     /**
      * 레플리카에서 읽고, 없으면 master 에서 한 번 더 본다. 앱은 결제하자마자 이 주문 상세로 넘어오는데
@@ -123,13 +130,15 @@ class GetOrderUseCase(
             order,
             reviewQueryService.reviewIdsOf(order.items.map { requireNotNull(it.id) }),
             customerQueryService.currentTier(userId),
-            pointRefundStatusQueryService.of(order),
+            outboxStatus.refundOf(order),
+            outboxStatus.earnOf(order),
         )
 }
 
 @Component
 class SearchAdminOrdersUseCase(
     private val orderQueryService: OrderQueryService,
+    private val outboxStatus: PointOutboxStatusQueryService,
 ) {
     @Transactional(transactionManager = "roTransactionManager", readOnly = true)
     fun execute(
@@ -137,24 +146,30 @@ class SearchAdminOrdersUseCase(
         orderNo: String?,
         page: Int,
         size: Int,
-    ): PageResult<OrderSummaryResult> = PageResult.from(orderQueryService.adminPage(status, orderNo, page, size), OrderSummaryResult::from)
+    ): PageResult<OrderSummaryResult> {
+        val page = orderQueryService.adminPage(status, orderNo, page, size)
+        val earns = outboxStatus.earnsOf(page.content)
+        return PageResult.from(page) { OrderSummaryResult.from(it, null, earns[requireNotNull(it.id)]) }
+    }
 }
 
 @Component
 class GetAdminOrderUseCase(
     private val orderQueryService: OrderQueryService,
-    private val pointRefundStatusQueryService: PointRefundStatusQueryService,
+    private val outboxStatus: PointOutboxStatusQueryService,
 ) {
     @Transactional(transactionManager = "roTransactionManager", readOnly = true)
     fun execute(orderId: Long): OrderDetailResult =
-        orderQueryService.find(orderId).let { OrderDetailResult.from(it, pointRefundStatus = pointRefundStatusQueryService.of(it)) }
+        orderQueryService.find(orderId).let {
+            OrderDetailResult.from(it, pointRefundStatus = outboxStatus.refundOf(it), earn = outboxStatus.earnOf(it))
+        }
 }
 
-/** 관리자 상태 변경. 취소면 커밋 뒤 환불을 바로 보내므로 응답은 커밋 뒤 master 에서 다시 읽는다([CancelOrderUseCase] 와 같다). */
+/** 관리자 상태 변경. 취소면 환불을, 배송 완료면 적립을 커밋 뒤 바로 보내므로 응답은 커밋 뒤 master 에서 다시 읽는다([CancelOrderUseCase] 와 같다). */
 @Component
 class ChangeOrderStatusUseCase(
     private val orderCommandService: OrderCommandService,
-    private val pointRefundStatusQueryService: PointRefundStatusQueryService,
+    private val outboxStatus: PointOutboxStatusQueryService,
     @Qualifier("rwTransactionManager") transactionManager: PlatformTransactionManager,
 ) {
     private val tx = TransactionTemplate(transactionManager)
@@ -166,6 +181,6 @@ class ChangeOrderStatusUseCase(
         tx.executeWithoutResult { orderCommandService.changeStatus(orderId, next) }
         return orderCommandService.read(
             orderId,
-        ) { OrderDetailResult.from(it, pointRefundStatus = pointRefundStatusQueryService.ofMaster(it)) }
+        ) { OrderDetailResult.from(it, pointRefundStatus = outboxStatus.refundOfMaster(it), earn = outboxStatus.earnOfMaster(it)) }
     }
 }

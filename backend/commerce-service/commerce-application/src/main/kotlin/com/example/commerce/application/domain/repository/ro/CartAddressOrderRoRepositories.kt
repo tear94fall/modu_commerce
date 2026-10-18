@@ -72,6 +72,13 @@ interface OrderRoRepository :
         @Param("userId") userId: String,
     ): List<OrderStatusStat>
 
+    /** 적립 대사 대상: 적립액이 있는 주문 중 [from, to)(UTC)에 배송 완료된 것. delivered_at 에 인덱스는 없다(하루 한 번 전날 범위). */
+    @Query("select o from Order o where o.earnPoints > 0 and o.deliveredAt >= :from and o.deliveredAt < :to order by o.id")
+    fun findEarnOrdersBetween(
+        @Param("from") from: LocalDateTime,
+        @Param("to") to: LocalDateTime,
+    ): List<Order>
+
     /** 포인트 대사 대상: 포인트를 쓴 주문 중 [from, to)(UTC)에 만들었거나 취소한 것. */
     @Query(
         "select o from Order o where o.pointAmount > 0 and " +

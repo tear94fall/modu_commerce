@@ -12,6 +12,12 @@ interface PointOutboxRwRepository : RwRepository<PointOutbox, Long> {
         refId: String,
     ): PointOutbox?
 
+    /** 주문 목록의 적립 상태를 한 번에 읽는다. */
+    fun findByKindAndRefIdIn(
+        kind: PointOutboxKind,
+        refIds: Collection<String>,
+    ): List<PointOutbox>
+
     /** 릴레이 대상: 지금 보낼 PENDING 을 오래된 순으로 최대 100건. */
     fun findTop100ByStatusAndNextAttemptAtLessThanEqualOrderByNextAttemptAtAsc(
         status: PointOutboxStatus,

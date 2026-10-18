@@ -14,6 +14,12 @@ interface PointOutboxRoRepository : RoRepository<PointOutbox, Long> {
         refId: String,
     ): PointOutbox?
 
+    /** 주문 목록의 적립 상태를 한 번에 읽는다. */
+    fun findByKindAndRefIdIn(
+        kind: PointOutboxKind,
+        refIds: Collection<String>,
+    ): List<PointOutbox>
+
     /** 지표(commerce_point_outbox_pending). */
     fun countByStatus(status: PointOutboxStatus): Long
 

@@ -21,7 +21,8 @@ import java.time.Duration
  * 포인트 아웃박스 지표.
  * - commerce_point_outbox_pending: PENDING 행 수(SPEND_GUARD 는 주문 커밋 직후 DONE 이 되므로 잠깐만 센다)
  * - commerce_point_outbox_oldest_pending_seconds: 가장 오래된 PENDING 의 나이(초). 계속 크면 point-service 장애·FAILED 직전
- * - commerce_point_reconcile_anomalies_total{type}: 대사가 찾은 이상(spend_missing, refund_missing, amount_mismatch)
+ * - commerce_point_outbox_failed: FAILED 행 수(재시도 소진·거절·이상 응답 — 사람이 봐야 한다. 적립은 배송 완료마다 생겨 환불보다 많다)
+ * - commerce_point_reconcile_anomalies_total{type}: 대사가 찾은 이상(spend_missing, refund_missing, earn_missing, amount_mismatch)
  * 게이지는 긁을 때마다 레플리카에서 센다(status, next_attempt_at 인덱스).
  */
 @Configuration
@@ -38,6 +39,10 @@ class PointOutboxMetricsConfig(
         Gauge
             .builder("commerce.point.outbox.oldest.pending.seconds") { oldestPendingSeconds() }
             .description("Age of the oldest PENDING point outbox row in seconds (0 when none)")
+            .register(meterRegistry)
+        Gauge
+            .builder("commerce.point.outbox.failed") { failed() }
+            .description("FAILED point outbox rows (need a human)")
             .register(meterRegistry)
     }
 
@@ -62,9 +67,11 @@ class PointOutboxMetricsConfig(
             .coerceAtLeast(0)
             .toDouble()
     }
+
+    private fun failed(): Double = pointOutboxRoRepository.countByStatus(PointOutboxStatus.FAILED).toDouble()
 }
 
-/** 1분마다 PENDING 아웃박스를 보낸다(차감 되돌리기·취소 환불). 파드가 여러 개여도 한 곳에서만 돈다(SchedulerLockConfig). */
+/** 1분마다 PENDING 아웃박스를 보낸다(구매 적립·취소 환불·차감 되돌리기). 파드가 여러 개여도 한 곳에서만 돈다(SchedulerLockConfig). */
 @Configuration
 @EnableScheduling
 @ConditionalOnProperty(prefix = "modu.point.outbox", name = ["relay-enabled"], havingValue = "true", matchIfMissing = true)

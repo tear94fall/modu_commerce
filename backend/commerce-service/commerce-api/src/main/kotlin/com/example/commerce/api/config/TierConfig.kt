@@ -9,14 +9,13 @@ import org.springframework.scheduling.annotation.EnableScheduling
 import org.springframework.scheduling.annotation.Scheduled
 
 /**
- * 회원 등급 스케줄러.
- * [schedulerEnabled]: 매월 1일 00:10(KST) 등급 산정 + 매월 쿠폰. [earnRetryEnabled]: 10분마다 PENDING 구매 적립 재시도.
- * 테스트는 둘 다 끄고 서비스를 직접 부른다. 회차는 [JobRunner] 로 돌린다(수동 실행 `/api-internal/v1/jobs` 와 같은 길).
+ * 회원 등급 스케줄러. [schedulerEnabled]: 매월 1일 00:10(KST) 등급 산정 + 매월 쿠폰.
+ * 테스트는 끄고 서비스를 직접 부른다. 회차는 [JobRunner] 로 돌린다(수동 실행 `/api-internal/v1/jobs` 와 같은 길).
+ * 구매 적립 재시도는 없다 — 적립은 포인트 아웃박스 릴레이(PointOutboxRelayConfig)가 보낸다.
  */
 @ConfigurationProperties("modu.tier")
 data class ModuTierProperties(
     val schedulerEnabled: Boolean = true,
-    val earnRetryEnabled: Boolean = true,
 )
 
 @Configuration
@@ -30,19 +29,5 @@ class TierSchedulingConfig(
     @SchedulerLock(name = "commerce:tier-monthly-run", lockAtLeastFor = "PT30S", lockAtMostFor = "PT30M")
     fun monthlyTierRun() {
         jobRunner.runIfIdle("tier-monthly-run")
-    }
-}
-
-@Configuration
-@EnableScheduling
-@ConditionalOnProperty(prefix = "modu.tier", name = ["earn-retry-enabled"], havingValue = "true", matchIfMissing = true)
-class PurchaseEarnRetryConfig(
-    private val jobRunner: JobRunner,
-) {
-    // 파드가 여러 개여도 한 곳에서만 돈다(SchedulerLockConfig). 재시도는 짧으니 최대 5분.
-    @Scheduled(fixedDelay = 600_000, initialDelay = 120_000)
-    @SchedulerLock(name = "commerce:purchase-earn-retry", lockAtLeastFor = "PT30S", lockAtMostFor = "PT5M")
-    fun retryPendingEarns() {
-        jobRunner.runIfIdle("purchase-earn-retry")
     }
 }

@@ -3,7 +3,6 @@ package com.example.commerce.api.job
 import com.example.commerce.application.domain.entity.TierRunStatus
 import com.example.commerce.application.service.PointOutboxService
 import com.example.commerce.application.service.PointReconcileService
-import com.example.commerce.application.service.PurchaseEarnService
 import com.example.commerce.application.service.PushCampaignSendService
 import com.example.commerce.application.service.TierRunService
 import org.springframework.stereotype.Component
@@ -28,17 +27,6 @@ class TierMonthlyRunJob(
     }
 }
 
-/** PENDING 구매 적립을 다시 시도한다. */
-@Component
-class PurchaseEarnRetryJob(
-    private val purchaseEarnService: PurchaseEarnService,
-) : Job {
-    override val name = "purchase-earn-retry"
-    override val description = "PENDING 구매 적립 재시도"
-
-    override fun run(): Map<String, Any?> = mapOf("credited" to purchaseEarnService.retryPending())
-}
-
 /** 예약 시각이 지난 푸시 캠페인을 보낸다. */
 @Component
 class PushCampaignsJob(
@@ -50,24 +38,24 @@ class PushCampaignsJob(
     override fun run(): Map<String, Any?> = mapOf("sent" to pushCampaignSendService.runDue())
 }
 
-/** PENDING 포인트 아웃박스(차감 되돌리기·취소 환불)를 point-service 로 보낸다. */
+/** PENDING 포인트 아웃박스(구매 적립·취소 환불·차감 되돌리기)를 point-service 로 보낸다. */
 @Component
 class PointOutboxRelayJob(
     private val pointOutboxService: PointOutboxService,
 ) : Job {
     override val name = "point-outbox-relay"
-    override val description = "포인트 아웃박스 릴레이(되돌리기·환불)"
+    override val description = "포인트 아웃박스 릴레이(적립·환불·되돌리기)"
 
     override fun run(): Map<String, Any?> = mapOf("relayed" to pointOutboxService.relay())
 }
 
-/** 전날(KST) 포인트 사용 주문을 point-service 원장과 맞춰 본다. */
+/** 전날(KST) 포인트 사용 주문과 배송 완료 적립 주문을 point-service 원장과 맞춰 본다. */
 @Component
 class PointReconcileJob(
     private val pointReconcileService: PointReconcileService,
 ) : Job {
     override val name = "point-reconcile"
-    override val description = "전날 포인트 사용 주문 대사"
+    override val description = "전날 포인트 사용·배송 완료 적립 주문 대사"
 
     override fun run(): Map<String, Any?> {
         val report = pointReconcileService.reconcileYesterday()
@@ -76,6 +64,8 @@ class PointReconcileJob(
             "checked" to report.checked,
             "anomalies" to report.anomalies,
             "refundsQueued" to report.refundsQueued,
+            "earnChecked" to report.earnChecked,
+            "earnsQueued" to report.earnsQueued,
         )
     }
 }
