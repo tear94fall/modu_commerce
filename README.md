@@ -94,7 +94,7 @@
 |---|---|
 | `cart_items` | 고객별 장바구니(SKU + 수량) |
 | `addresses` | 배송지, 기본 배송지 표시 |
-| `orders` | 주문. 상태(PAID→SHIPPING→DELIVERED / CANCELLED), 결제 금액·포인트 사용·쿠폰 할인, 배송 완료 시각, 구매 적립 확정 금액(`earn_points`·`earn_rate`; 진행 상태는 `point_outbox` EARN 행. 예전 `earn_status`·`earned_at` 컬럼은 2026-10-19 에 지웠다), 배송지 스냅샷 |
+| `orders` | 주문. 상태(PAID→SHIPPING→DELIVERED / CANCELLED), 결제 금액·포인트 사용·쿠폰 할인, 배송 완료 시각, 구매 적립 확정 금액(`earn_points`·`earn_rate`; 진행 상태는 `point_outbox` EARN 행. 예전 `earn_status`·`earned_at` 컬럼은 2026-10-19 부터 코드가 읽지도 쓰지도 않으며 DBA 가 gh-ost 로 지운다 — modu_infra `2026-10-19-orders-drop-earn-status.sql`), 배송지 스냅샷 |
 | `order_items` | 주문 상품(SKU·수량·단가 스냅샷) |
 | `reviews` | 리뷰(주문 상품당 1건, 별점 1~5, 작성자 이름 스냅샷, 숨김/소프트 삭제) |
 | `wishlists` | 찜(고객–상품) |
