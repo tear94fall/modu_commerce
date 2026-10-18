@@ -150,15 +150,6 @@ class Order(
     var earnRate: Int? = null
         protected set
 
-    /**
-     * 예전 경로(2026-10-18 이전)의 적립 진행 상태. 새 코드는 쓰지 않고(기본값 NONE 으로 들어간다), EARN 아웃박스 행이 없는 예전 주문의
-     * 응답에만 읽는다. 백필 뒤 매핑과 컬럼을 지운다(설계 §4.5).
-     */
-    @Enumerated(EnumType.STRING)
-    @Column(name = "earn_status", nullable = false, length = 10, columnDefinition = "varchar(10) not null default 'NONE'")
-    var earnStatus: EarnStatus = EarnStatus.NONE
-        protected set
-
     @OneToMany(mappedBy = "order", cascade = [CascadeType.ALL], orphanRemoval = true)
     @OrderBy("id ASC")
     val items: MutableList<OrderItem> = mutableListOf()

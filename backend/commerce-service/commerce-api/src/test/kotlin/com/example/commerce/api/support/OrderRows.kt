@@ -28,8 +28,8 @@ class OrderRows(
         val at = Timestamp.valueOf(deliveredAtUtc ?: LocalDateTime.of(2026, 1, 1, 0, 0))
         jdbc.update(
             "insert into orders (created_at, updated_at, address1, order_no, paid_at, payment_method, phone, recipient, status, " +
-                "total_amount, user_id, zip_code, point_amount, coupon_discount, earn_status, delivered_at) " +
-                "values (?, ?, '서울', ?, ?, 'MOCK', '010-0000-0000', '테스트', ?, ?, ?, '06236', ?, ?, 'NONE', ?)",
+                "total_amount, user_id, zip_code, point_amount, coupon_discount, delivered_at) " +
+                "values (?, ?, '서울', ?, ?, 'MOCK', '010-0000-0000', '테스트', ?, ?, ?, '06236', ?, ?, ?)",
             at,
             at,
             no.take(20),

@@ -134,8 +134,7 @@ class PurchaseEarnTest
             clock.now = clock.now.plus(Duration.ofMinutes(minutes))
         }
 
-        private fun earnColumns(id: Int): Map<String, Any?> =
-            jdbc.queryForMap("select earn_status, earn_points, earn_rate from orders where id = ?", id)
+        private fun earnColumns(id: Int): Map<String, Any?> = jdbc.queryForMap("select earn_points, earn_rate from orders where id = ?", id)
 
         @Test
         fun `적립이 적용되지 않았다는 답(DUPLICATE 아님)은 FAILED 로 두고 다시 보내지 않는다`() {
@@ -173,11 +172,10 @@ class PurchaseEarnTest
             assertThat(row.amount).isEqualTo(540)
             assertThat(row.orderNo).isEqualTo(no)
             assertThat(row.attempts).isZero()
-            // 주문에는 금액·적립률만 남고, 예전 상태 컬럼은 더 쓰지 않는다.
+            // 주문에는 금액·적립률만 남는다(진행 상태는 EARN 행).
             val cols = earnColumns(id)
             assertThat((cols["EARN_POINTS"] as Number).toLong()).isEqualTo(540)
             assertThat((cols["EARN_RATE"] as Number).toInt()).isEqualTo(3)
-            assertThat(cols["EARN_STATUS"]).isEqualTo("NONE")
 
             mockMvc.get("/api-public/v1/orders/$id") { with(me) }.andExpect {
                 jsonPath("$.earn.status") { value("DONE") }
@@ -272,9 +270,7 @@ class PurchaseEarnTest
             status(id, "DELIVERED")
             verify(pointGateway, never()).earnAmount(any(), any(), any(), anyOrNull())
             assertThat(earnRow(id)).isNull()
-            val cols = earnColumns(id)
-            assertThat((cols["EARN_POINTS"] as Number).toLong()).isZero()
-            assertThat(cols["EARN_STATUS"]).isEqualTo("NONE")
+            assertThat((earnColumns(id)["EARN_POINTS"] as Number).toLong()).isZero()
             mockMvc.get("/api-admin/v1/orders/$id") { with(admin) }.andExpect {
                 jsonPath("$.earn.status") { value("NONE") }
                 jsonPath("$.earn.points") { value(0) }
@@ -304,16 +300,15 @@ class PurchaseEarnTest
         }
 
         @Test
-        fun `EARN 아웃박스 행이 있으면 주문의 적립 상태는 그 행에서 읽고, 없으면 예전 컬럼으로 떨어진다(백필 전)`() {
+        fun `적립액이 있는데 EARN 행이 없으면(있을 수 없는 상태) PENDING 으로 보여 준다`() {
             val (id, _) = order()
             delivered(id)
             mockMvc.get("/api-public/v1/orders/$id") { with(me) }.andExpect { jsonPath("$.earn.status") { value("DONE") } }
 
-            // 예전 경로의 주문처럼: 행을 지우고 컬럼만 남긴다.
+            // 행은 배송 완료와 같은 트랜잭션에 생기므로 없을 수 없다. 혹시 지워졌다면 대사(ensureEarn)가 다시 만들 때까지 PENDING.
             jdbc.update("delete from point_outbox where kind = 'EARN' and ref_id = ?", "purchase:order:$id")
-            jdbc.update("update orders set earn_status = 'FAILED' where id = ?", id)
-            mockMvc.get("/api-public/v1/orders/$id") { with(me) }.andExpect { jsonPath("$.earn.status") { value("FAILED") } }
-            mockMvc.get("/api-admin/v1/orders/$id") { with(admin) }.andExpect { jsonPath("$.earn.status") { value("FAILED") } }
+            mockMvc.get("/api-public/v1/orders/$id") { with(me) }.andExpect { jsonPath("$.earn.status") { value("PENDING") } }
+            mockMvc.get("/api-admin/v1/orders/$id") { with(admin) }.andExpect { jsonPath("$.earn.status") { value("PENDING") } }
         }
 
         @Test

@@ -93,9 +93,9 @@ class GetOrdersUseCase(
         size: Int,
     ): PageResult<OrderSummaryResult> {
         val tier = customerQueryService.currentTier(userId)
-        val page = orderQueryService.page(userId, page, size)
-        val earns = outboxStatus.earnsOf(page.content)
-        return PageResult.from(page) { OrderSummaryResult.from(it, tier, earns[requireNotNull(it.id)]) }
+        val result = orderQueryService.page(userId, page, size)
+        val earns = outboxStatus.earnsOf(result.content)
+        return PageResult.from(result) { OrderSummaryResult.from(it, tier, earns[requireNotNull(it.id)]) }
     }
 }
 
@@ -147,9 +147,9 @@ class SearchAdminOrdersUseCase(
         page: Int,
         size: Int,
     ): PageResult<OrderSummaryResult> {
-        val page = orderQueryService.adminPage(status, orderNo, page, size)
-        val earns = outboxStatus.earnsOf(page.content)
-        return PageResult.from(page) { OrderSummaryResult.from(it, null, earns[requireNotNull(it.id)]) }
+        val result = orderQueryService.adminPage(status, orderNo, page, size)
+        val earns = outboxStatus.earnsOf(result.content)
+        return PageResult.from(result) { OrderSummaryResult.from(it, null, earns[requireNotNull(it.id)]) }
     }
 }
 
