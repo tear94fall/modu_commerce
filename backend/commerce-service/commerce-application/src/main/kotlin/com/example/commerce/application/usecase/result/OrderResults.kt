@@ -2,9 +2,12 @@ package com.example.commerce.application.usecase.result
 
 import com.example.commerce.application.domain.entity.Address
 import com.example.commerce.application.domain.entity.CartItem
+import com.example.commerce.application.domain.entity.EarnStatus
 import com.example.commerce.application.domain.entity.Order
 import com.example.commerce.application.domain.entity.OrderItem
 import com.example.commerce.application.domain.entity.OrderStatus
+import com.example.commerce.application.domain.entity.PointOutbox
+import com.example.commerce.application.domain.entity.PointOutboxStatus
 import com.example.commerce.application.domain.entity.PointRefundStatus
 import com.example.commerce.application.domain.entity.Review
 import com.example.commerce.application.domain.entity.Tier
@@ -126,12 +129,11 @@ data class OrderSummaryResult(
     val expectedEarn: ExpectedEarnResult?,
 ) {
     companion object {
-        fun from(o: Order): OrderSummaryResult = from(o, null)
-
-        /** [tier] 는 주문한 고객의 지금 등급(앱 목록). 결제완료·배송중 주문의 적립 예정에 쓴다. */
+        /** [tier] 는 주문한 고객의 지금 등급(앱 목록). [earn] 은 [com.example.commerce.application.service.PointOutboxStatusQueryService.earnsOf] 가 읽은 값. */
         fun from(
             o: Order,
             tier: Tier?,
+            earn: OrderEarnResult?,
         ): OrderSummaryResult {
             val first = o.items.firstOrNull()
             return OrderSummaryResult(
@@ -148,7 +150,7 @@ data class OrderSummaryResult(
                 firstItemName = first?.productName.orEmpty(),
                 firstImageUrl = first?.imageUrl,
                 createdAt = o.createdAt,
-                earn = earnOf(o),
+                earn = earn,
                 expectedEarn = expectedEarnOf(o, tier),
             )
         }
@@ -185,13 +187,15 @@ data class OrderDetailResult(
         /**
          * [reviewIds] 는 orderItemId → reviewId. 앱 주문 상세만 넘기고 어드민·생성 응답은 비워 둔다.
          * [tier] 는 주문한 고객의 지금 등급(앱). 결제완료·배송중 주문의 적립 예정에 쓴다.
-         * [pointRefundStatus] 는 [com.example.commerce.application.service.PointRefundStatusQueryService] 가 읽은 값.
+         * [pointRefundStatus]·[earn] 은 [com.example.commerce.application.service.PointOutboxStatusQueryService] 가 읽은 값.
+         * 생성 응답은 배송 완료 전이라 [earn] 이 늘 null 이다.
          */
         fun from(
             o: Order,
             reviewIds: Map<Long, Long> = emptyMap(),
             tier: Tier? = null,
             pointRefundStatus: PointRefundStatus = PointRefundStatus.NONE,
+            earn: OrderEarnResult? = null,
         ) = OrderDetailResult(
             id = requireNotNull(o.id),
             orderNo = o.orderNo,
@@ -213,7 +217,7 @@ data class OrderDetailResult(
             createdAt = o.createdAt,
             deliveredAt = o.deliveredAt,
             items = o.items.map { OrderItemResult.from(it, reviewIds[it.id]) },
-            earn = earnOf(o),
+            earn = earn,
             expectedEarn = expectedEarnOf(o, tier),
             pointRefundStatus = pointRefundStatus,
         )
@@ -226,8 +230,26 @@ data class CreateOrderOutcome(
     val created: Boolean,
 )
 
-/** 적립이 정해진 주문만(배송 완료 뒤). */
-fun earnOf(o: Order): OrderEarnResult? = o.earnPoints?.let { OrderEarnResult(o.earnStatus, it, o.earnRate ?: 0) }
+/**
+ * 적립이 정해진 주문(배송 완료 뒤)의 적립 상태. 진행 상태는 EARN 아웃박스 [row] 가 갖는다.
+ * 행이 없고 적립액이 있으면 예전 경로의 주문(백필 전)이라 `orders.earn_status` 를 그대로 쓴다 — 설계 §2.3·§4.5.
+ */
+fun earnResultOf(
+    o: Order,
+    row: PointOutbox?,
+): OrderEarnResult? {
+    val points = o.earnPoints ?: return null
+    val rate = o.earnRate ?: 0
+    if (points <= 0) return OrderEarnResult(EarnStatus.NONE, points, rate)
+    val status =
+        when (row?.status) {
+            PointOutboxStatus.PENDING -> EarnStatus.PENDING
+            PointOutboxStatus.DONE -> EarnStatus.DONE
+            PointOutboxStatus.FAILED -> EarnStatus.FAILED
+            null -> o.earnStatus
+        }
+    return OrderEarnResult(status, points, rate)
+}
 
 /** 결제완료·배송중 주문의 적립 예정(고객의 지금 등급). 고객이 아니면 null. */
 fun expectedEarnOf(

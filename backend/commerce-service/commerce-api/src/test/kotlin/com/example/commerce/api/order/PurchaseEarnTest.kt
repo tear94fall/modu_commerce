@@ -200,4 +200,52 @@ class PurchaseEarnTest
             assertThat(earn["EARN_STATUS"]).isEqualTo("NONE")
             assertThat((earn["EARN_POINTS"] as Number).toLong()).isZero()
         }
+
+        @Test
+        fun `EARN 아웃박스 행이 있으면 주문의 적립 상태는 그 행에서 읽는다`() {
+            val (id, no) = order()
+            status(id, "SHIPPING")
+            status(id, "DELIVERED") // 지금 경로는 earn_status = DONE 으로 적는다
+            mockMvc.get("/api-public/v1/orders/$id") { with(me) }.andExpect { jsonPath("$.earn.status") { value("DONE") } }
+
+            // 행이 있으면 행이 이긴다(컬럼은 DONE 인데 행은 PENDING).
+            jdbc.update(
+                "insert into point_outbox " +
+                    "(created_at, updated_at, kind, status, user_id, order_no, ref_id, amount, attempts, next_attempt_at) " +
+                    "values (now(), now(), 'EARN', 'PENDING', '11', ?, ?, 180, 0, now())",
+                no,
+                "purchase:order:$id",
+            )
+            mockMvc.get("/api-public/v1/orders/$id") { with(me) }.andExpect { jsonPath("$.earn.status") { value("PENDING") } }
+            mockMvc.get("/api-admin/v1/orders/$id") { with(admin) }.andExpect { jsonPath("$.earn.status") { value("PENDING") } }
+        }
+
+        @Test
+        fun `목록은 주문마다 EARN 행의 상태를 붙인다`() {
+            val (a, aNo) = order()
+            status(a, "SHIPPING")
+            status(a, "DELIVERED")
+            val (b, _) = order()
+            status(b, "SHIPPING")
+            status(b, "DELIVERED")
+            jdbc.update(
+                "insert into point_outbox " +
+                    "(created_at, updated_at, kind, status, user_id, order_no, ref_id, amount, attempts, next_attempt_at) " +
+                    "values (now(), now(), 'EARN', 'FAILED', '11', ?, ?, 180, 0, now())",
+                aNo,
+                "purchase:order:$a",
+            )
+
+            // 최신순: b 가 먼저.
+            mockMvc.get("/api-public/v1/orders") { with(me) }.andExpect {
+                jsonPath("$.content[0].id") { value(b) }
+                jsonPath("$.content[0].earn.status") { value("DONE") }
+                jsonPath("$.content[1].id") { value(a) }
+                jsonPath("$.content[1].earn.status") { value("FAILED") }
+            }
+            mockMvc.get("/api-admin/v1/orders") { with(admin) }.andExpect {
+                jsonPath("$.content[0].earn.status") { value("DONE") }
+                jsonPath("$.content[1].earn.status") { value("FAILED") }
+            }
+        }
     }

@@ -12,6 +12,8 @@ import com.example.commerce.application.domain.repository.rw.OrderRwRepository
 import com.example.commerce.application.domain.repository.rw.PointOutboxRwRepository
 import com.example.commerce.application.point.PointCancelResult
 import com.example.commerce.application.point.PointGateway
+import com.example.commerce.application.usecase.result.OrderEarnResult
+import com.example.commerce.application.usecase.result.earnResultOf
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
@@ -112,26 +114,67 @@ class PointOutboxCommandService(
     }
 }
 
-/** 주문 응답의 포인트 환불 상태. 레플리카(조회 화면) 또는 master(취소 직후 응답)에서 읽는다. */
+/**
+ * 주문 응답의 아웃박스 상태(환불·적립). 레플리카(조회 화면) 또는 master(쓰기 직후 응답)에서 읽는다.
+ * 적립은 EARN 행 하나로 상태를 정하고, 행이 없는 예전 주문은 `orders.earn_status` 로 떨어진다([earnOf]).
+ */
 @Service
-class PointRefundStatusQueryService(
+class PointOutboxStatusQueryService(
     private val pointOutboxRoRepository: PointOutboxRoRepository,
     private val pointOutboxRwRepository: PointOutboxRwRepository,
 ) {
     @Transactional(transactionManager = "roTransactionManager", readOnly = true)
-    fun of(order: Order): PointRefundStatus =
-        if (order.pointAmount <= 0 || !order.isCancelled()) {
-            PointRefundStatus.NONE
-        } else {
-            PointRefundStatus.of(order, pointOutboxRoRepository.findByKindAndRefId(PointOutboxKind.REFUND, order.pointSpendRefId()))
-        }
+    fun refundOf(order: Order): PointRefundStatus = refund(order) { pointOutboxRoRepository.findByKindAndRefId(PointOutboxKind.REFUND, it) }
 
     @Transactional(transactionManager = "rwTransactionManager", readOnly = true)
-    fun ofMaster(order: Order): PointRefundStatus =
-        if (order.pointAmount <= 0 || !order.isCancelled()) {
+    fun refundOfMaster(order: Order): PointRefundStatus =
+        refund(order) { pointOutboxRwRepository.findByKindAndRefId(PointOutboxKind.REFUND, it) }
+
+    @Transactional(transactionManager = "roTransactionManager", readOnly = true)
+    fun earnOf(order: Order): OrderEarnResult? = earn(order) { pointOutboxRoRepository.findByKindAndRefId(PointOutboxKind.EARN, it) }
+
+    @Transactional(transactionManager = "rwTransactionManager", readOnly = true)
+    fun earnOfMaster(order: Order): OrderEarnResult? = earn(order) { pointOutboxRwRepository.findByKindAndRefId(PointOutboxKind.EARN, it) }
+
+    /** 목록 한 페이지. 적립이 정해진 주문의 EARN 행만 IN 한 번으로 읽는다. 주문 id → earn. */
+    @Transactional(transactionManager = "roTransactionManager", readOnly = true)
+    fun earnsOf(orders: List<Order>): Map<Long, OrderEarnResult?> {
+        val refIds = orders.filter { (it.earnPoints ?: 0) > 0 }.map { it.purchaseEarnRefId() }
+        val rows =
+            if (refIds.isEmpty()) {
+                emptyMap()
+            } else {
+                pointOutboxRoRepository
+                    .findByKindAndRefIdIn(
+                        PointOutboxKind.EARN,
+                        refIds,
+                    ).associateBy { it.refId }
+            }
+        return orders.associate { requireNotNull(it.id) to earnResultOf(it, rows[it.purchaseEarnRefId()]) }
+    }
+
+    private fun refund(
+        order: Order,
+        find: (String) -> PointOutbox?,
+    ): PointRefundStatus =
+        if (order.pointAmount <= 0 ||
+            !order.isCancelled()
+        ) {
             PointRefundStatus.NONE
         } else {
-            PointRefundStatus.of(order, pointOutboxRwRepository.findByKindAndRefId(PointOutboxKind.REFUND, order.pointSpendRefId()))
+            PointRefundStatus.of(order, find(order.pointSpendRefId()))
+        }
+
+    private fun earn(
+        order: Order,
+        find: (String) -> PointOutbox?,
+    ): OrderEarnResult? =
+        if ((order.earnPoints ?: 0) <=
+            0
+        ) {
+            earnResultOf(order, null)
+        } else {
+            earnResultOf(order, find(order.purchaseEarnRefId()))
         }
 }
 
