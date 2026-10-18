@@ -28,6 +28,7 @@
 
 - **커머스 고객**은 모두 계정(`user_id`)으로 식별합니다. 회원 정보(이름·이메일·프로필)는 모두의 채팅 member-service 가 갖고, 커머스는 가입(약관 동의)·등급·주문 같은 커머스 쪽 데이터만 둡니다.
 - **포인트**는 커머스 DB 에 없습니다. modu_chat 의 point-service(`modu-point` 스키마)가 원장을 갖고, 커머스는 내부 API 로 적립·사용·환불만 요청합니다.
+- **포인트 아웃박스**(`point_outbox`): point-service 호출과 주문 트랜잭션의 어긋남을 메웁니다. `SPEND_GUARD`(결제 차감 되돌리기), `REFUND`(취소 환불), `EARN`(구매 적립 — 배송 완료와 같은 트랜잭션에 넣고 커밋 뒤 보냄). 커밋 뒤 한 번 보내고, 실패하면 `point-outbox-relay`가 1·2·4분 … 최대 1시간 간격으로 20번까지 다시 보냅니다. `commerce_point_outbox_pending`·`oldest_pending_seconds`·`failed` 게이지, 매일 04:00 KST `point-reconcile`가 전날 차감·환불·적립을 원장과 맞춥니다. 설계: `docs/superpowers/specs/2026-10-18-purchase-earn-outbox-design.md`.
 - 다대다 관계(기획전–상품, 기획전–쿠폰, 옵션 값–SKU)는 모두의 채팅과 같은 원칙으로 연관 테이블(`promotion_products`, `promotion_coupons`, `sku_option_values`)을 두어 1대다·1대다로 풀었습니다. `@ManyToMany` 는 쓰지 않습니다.
 
 ### 설계 메모
@@ -37,8 +38,8 @@
 - **스냅샷 컬럼**: 주문 상품(`product_name`, `option_label`, `unit_price`), 리뷰(`product_name`, `author_name`), 주문(`recipient`, `address1`…)은 주문 시점 값을 복사해 둡니다. 원본이 바뀌어도 주문 내역은 그대로입니다.
 - **시각**: 서버는 UTC `datetime(6)` 로 저장하고 앱이 한국 시간으로 바꿉니다. 기획전 기간·쿠폰 유효 기간·등급 산정 기간은 한국 달력 날짜(`date`)입니다.
 - **읽기·쓰기 분리**: 쓰기는 `mysql-commerce`(소스), 읽기는 GTID 복제 레플리카 `mysql-commerce-replica` 에 SELECT 전용 계정(`commerce_ro`)으로 붙습니다. 쓰기 직후 다시 읽는 조회(장바구니·배송지·결제 직후 주문·가입 확인 등)는 소스에서 읽습니다.
-- **스케줄러 잠금**: 월 등급 산정·구매 적립 재시도·푸시 캠페인 발송은 ShedLock(`shedlock` 테이블, rw 풀)으로 잠가 파드가 여러 개여도 한 곳에서만 돕니다.
-- **배치 잡**: 스케줄 작업 5개(`tier-monthly-run`·`purchase-earn-retry`·`push-campaigns`·`point-outbox-relay`·`point-reconcile`)는 `api/job/`의 `Job` 구현이고, 스케줄러(`@Scheduled`)와 내부 API가 같은 `JobRunner`로 한 회차를 돌립니다. `GET /api-internal/v1/jobs`(목록), `POST /api-internal/v1/jobs/{name}/run`(실행, X-Internal-Token) — 응답은 `{job, outcome: ok|failed, durationMs, requestId, result|error}`(성공 200·실패 500, 모르는 잡 404, 돌고 있으면 409). 잡당 동시 실행은 하나. 회차마다 `job.run` 이벤트 한 줄이라 OpenSearch에서 `attributes.requestId:"job-…"`로 그 회차의 로그를 모두 봅니다. `requestId`는 batch-service가 보낸 `X-Request-Id`(회차 id, `job-` 접두)를 그대로 쓰고, 그 접두가 아닌 요청 id(헤더 없이 부른 경우)면 `job-` id를 새로 만듭니다. `tier-monthly-run`은 산정 실행이 FAILED로 끝나면 잡도 `failed`로 보고하고, 다른 실행이 돌고 있어 건너뛰면 `{"runId":null,"skipped":true}`입니다. 스케줄러는 `JobRunner.runIfIdle`을 써서 같은 잡이 돌고 있으면(전환 기간에 batch-service 회차와 겹칠 때) WARN 한 줄로 건너뜁니다. 모두 시스템 콘솔에서 주기·실행·이력을 관리하는 batch-service(modu_platform)가 이 API를 부릅니다(설계: modu_platform `docs/superpowers/specs/2026-10-17-batch-platform-design.md`). 스케줄은 `modu.tier.scheduler-enabled`·`modu.tier.earn-retry-enabled`·`modu.push.scheduler-enabled`·`modu.point.outbox.relay-enabled`·`modu.point.outbox.reconcile-enabled`로 끕니다.
+- **스케줄러 잠금**: 월 등급 산정·푸시 캠페인 발송·포인트 아웃박스 릴레이·대사는 ShedLock(`shedlock` 테이블, rw 풀)으로 잠가 파드가 여러 개여도 한 곳에서만 돕니다.
+- **배치 잡**: 스케줄 작업 4개(`tier-monthly-run`·`push-campaigns`·`point-outbox-relay`·`point-reconcile`)는 `api/job/`의 `Job` 구현이고, 스케줄러(`@Scheduled`)와 내부 API가 같은 `JobRunner`로 한 회차를 돌립니다. `GET /api-internal/v1/jobs`(목록), `POST /api-internal/v1/jobs/{name}/run`(실행, X-Internal-Token) — 응답은 `{job, outcome: ok|failed, durationMs, requestId, result|error}`(성공 200·실패 500, 모르는 잡 404, 돌고 있으면 409). 잡당 동시 실행은 하나. 회차마다 `job.run` 이벤트 한 줄이라 OpenSearch에서 `attributes.requestId:"job-…"`로 그 회차의 로그를 모두 봅니다. `requestId`는 batch-service가 보낸 `X-Request-Id`(회차 id, `job-` 접두)를 그대로 쓰고, 그 접두가 아닌 요청 id(헤더 없이 부른 경우)면 `job-` id를 새로 만듭니다. `tier-monthly-run`은 산정 실행이 FAILED로 끝나면 잡도 `failed`로 보고하고, 다른 실행이 돌고 있어 건너뛰면 `{"runId":null,"skipped":true}`입니다. 스케줄러는 `JobRunner.runIfIdle`을 써서 같은 잡이 돌고 있으면(전환 기간에 batch-service 회차와 겹칠 때) WARN 한 줄로 건너뜁니다. 모두 시스템 콘솔에서 주기·실행·이력을 관리하는 batch-service(modu_platform)가 이 API를 부릅니다(설계: modu_platform `docs/superpowers/specs/2026-10-17-batch-platform-design.md`). 스케줄은 `modu.tier.scheduler-enabled`·`modu.push.scheduler-enabled`·`modu.point.outbox.relay-enabled`·`modu.point.outbox.reconcile-enabled`로 끕니다.
 - **서비스 주소**: 서비스 디스커버리(Eureka)는 쓰지 않습니다. 게이트웨이가 commerce-service 를 부르는 주소와 commerce-service 가 부르는 point-service·member-service 주소는 모두 modu_platform config-repo 의 `modu.services.*`(`http://<컨테이너 이름>:<포트>`)에서 받습니다. 쿠버네티스에선 같은 이름·포트의 Service 로 맞춥니다.
 
 ### 스키마 관리
@@ -93,7 +94,7 @@
 |---|---|
 | `cart_items` | 고객별 장바구니(SKU + 수량) |
 | `addresses` | 배송지, 기본 배송지 표시 |
-| `orders` | 주문. 상태(PAID→SHIPPING→DELIVERED / CANCELLED), 결제 금액·포인트 사용·쿠폰 할인, 배송 완료 시각, 구매 적립 상태(`earn_*`), 배송지 스냅샷 |
+| `orders` | 주문. 상태(PAID→SHIPPING→DELIVERED / CANCELLED), 결제 금액·포인트 사용·쿠폰 할인, 배송 완료 시각, 구매 적립 확정 금액(`earn_points`·`earn_rate`; 진행 상태는 `point_outbox` EARN 행. `earn_status`·`earned_at` 은 예전 경로 — 백필 뒤 삭제 예정), 배송지 스냅샷 |
 | `order_items` | 주문 상품(SKU·수량·단가 스냅샷) |
 | `reviews` | 리뷰(주문 상품당 1건, 별점 1~5, 작성자 이름 스냅샷, 숨김/소프트 삭제) |
 | `wishlists` | 찜(고객–상품) |

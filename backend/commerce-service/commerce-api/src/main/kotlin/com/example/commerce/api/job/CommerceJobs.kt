@@ -55,7 +55,7 @@ class PointReconcileJob(
     private val pointReconcileService: PointReconcileService,
 ) : Job {
     override val name = "point-reconcile"
-    override val description = "전날 포인트 사용 주문 대사"
+    override val description = "전날 포인트 사용·배송 완료 적립 주문 대사"
 
     override fun run(): Map<String, Any?> {
         val report = pointReconcileService.reconcileYesterday()
