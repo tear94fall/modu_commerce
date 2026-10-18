@@ -32,4 +32,39 @@ class PointOutboxTest {
         assertEquals(20, row.attempts)
         assertEquals(300, row.lastError?.length)
     }
+
+    @Test
+    fun `EARN 행은 적립 멱등 키 purchase order id 와 적립 포인트를 든다`() {
+        val address = Address(userId = "u1", recipient = "임준섭", phone = "010-0000-0000", zipCode = "06236", address1 = "서울")
+        val order = Order.create("u1", address, "20261018-AAAAAA", now)
+        setId(order, 42L)
+        order.decideEarn(540, 3)
+
+        val row = PointOutbox.earn(order, now)
+
+        assertEquals(PointOutboxKind.EARN, row.kind)
+        assertEquals("purchase:order:42", row.refId)
+        assertEquals("20261018-AAAAAA", row.orderNo)
+        assertEquals("u1", row.userId)
+        assertEquals(540, row.amount)
+        assertEquals(PointOutboxStatus.PENDING, row.status)
+        assertEquals(now, row.nextAttemptAt)
+    }
+
+    /** id 는 JPA 가 넣는다. 단위 테스트는 BaseEntity.id 를 직접 넣는다. */
+    private fun setId(
+        entity: Any,
+        id: Long,
+    ) {
+        var type: Class<*>? = entity.javaClass
+        while (type != null) {
+            type.declaredFields.firstOrNull { it.name == "id" }?.let {
+                it.isAccessible = true
+                it.set(entity, id)
+                return
+            }
+            type = type.superclass
+        }
+        error("no id field")
+    }
 }

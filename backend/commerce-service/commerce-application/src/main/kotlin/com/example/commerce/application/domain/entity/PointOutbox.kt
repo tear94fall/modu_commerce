@@ -15,14 +15,16 @@ import java.time.LocalDateTime
  * - SPEND_GUARD: 주문 결제에서 포인트를 차감하기 "전에" 남기는 표시. 주문이 커밋되면 DONE, 커밋되지 않았으면(롤백·장애)
  *   릴레이가 주문이 없는 것을 보고 point-service 에 차감 취소(spend/cancel)를 보낸다.
  * - REFUND: 주문 취소의 포인트 환불. 취소와 같은 트랜잭션에 넣고, 커밋 뒤 바로 한 번 보낸다. 실패하면 릴레이가 다시 보낸다.
+ * - EARN: 구매 적립. 배송 완료와 같은 트랜잭션에 넣고(금액은 그 시점 등급으로 확정), 커밋 뒤 바로 한 번 보낸다. 실패하면 릴레이가 다시 보낸다.
  */
-enum class PointOutboxKind { SPEND_GUARD, REFUND }
+enum class PointOutboxKind { SPEND_GUARD, REFUND, EARN }
 
 /** PENDING = 보낼 것(또는 확인할 것), DONE = 끝, FAILED = 사람이 봐야 함(재시도 소진·이상 응답). */
 enum class PointOutboxStatus { PENDING, DONE, FAILED }
 
 /**
- * 포인트 아웃박스 한 줄. [refId] 는 원래 차감 키(`order:<주문번호>`)라 종류마다 한 줄뿐이다(kind+ref_id 유니크).
+ * 포인트 아웃박스 한 줄. [refId] 는 point-service 멱등 키 — SPEND_GUARD·REFUND 는 차감 키(`order:<주문번호>`), EARN 은 적립 키
+ * (`purchase:order:<주문 id>`). 종류마다 한 줄뿐이다(kind+ref_id 유니크).
  * 시각은 모두 UTC. 스키마는 DBA 가 만든다(modu_infra data/mysql/schema/changes/2026-10-09-point-outbox.sql).
  */
 @Entity
@@ -42,7 +44,7 @@ class PointOutbox(
     val userId: String,
     @Column(name = "order_no", nullable = false, length = 20)
     val orderNo: String,
-    /** 원래 차감 키 `order:<주문번호>`. 취소(spend/cancel)도 이 키로 보낸다. */
+    /** 멱등 키. 차감·환불은 `order:<주문번호>`, 적립은 `purchase:order:<주문 id>`. */
     @Column(name = "ref_id", nullable = false, length = 128)
     val refId: String,
     @Column(name = "amount", nullable = false)
@@ -123,6 +125,19 @@ class PointOutbox(
             order: Order,
             nextAttemptAt: LocalDateTime,
         ) = PointOutbox(PointOutboxKind.REFUND, order.userId, order.orderNo, order.pointSpendRefId(), order.pointAmount, nextAttemptAt)
+
+        /** 구매 적립. 호출자가 [Order.decideEarn] 으로 금액을 정한 뒤 부른다. */
+        fun earn(
+            order: Order,
+            nextAttemptAt: LocalDateTime,
+        ) = PointOutbox(
+            PointOutboxKind.EARN,
+            order.userId,
+            order.orderNo,
+            order.purchaseEarnRefId(),
+            requireNotNull(order.earnPoints),
+            nextAttemptAt,
+        )
     }
 }
 

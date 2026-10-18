@@ -170,6 +170,7 @@ class PointOutboxService(
             when (task.kind) {
                 PointOutboxKind.SPEND_GUARD -> settleGuard(task)
                 PointOutboxKind.REFUND -> refund(task)
+                PointOutboxKind.EARN -> earn(task)
             }
         } catch (e: Exception) {
             val error = "${e.javaClass.simpleName}: ${e.message}"
@@ -203,6 +204,13 @@ class PointOutboxService(
             logger.error { "point refund anomaly: no spend for cancelled order ${task.orderNo} (${task.refId}, ${task.amount}P)" }
             return false
         }
+        commandService.done(task.id)
+        return true
+    }
+
+    /** 구매 적립. 호출자가 [Order.decideEarn] 으로 금액을 정한 뒤 아웃박스에 넣고, 커밋 뒤 한 번 보낸다. */
+    private fun earn(task: PointOutboxTask): Boolean {
+        pointGateway.earnAmount(task.userId, task.amount, task.refId, "구매 적립 ${task.orderNo}")
         commandService.done(task.id)
         return true
     }
