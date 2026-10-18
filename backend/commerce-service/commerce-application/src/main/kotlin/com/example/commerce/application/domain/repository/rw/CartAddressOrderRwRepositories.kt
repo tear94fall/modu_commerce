@@ -103,10 +103,6 @@ interface OrderRwRepository : RwRepository<Order, Long> {
         @Param("to") to: LocalDateTime,
     ): List<UserAmount>
 
-    /** 적립 재시도 대상. */
-    @Query("select o.id from Order o where o.earnStatus = com.example.commerce.application.domain.entity.EarnStatus.PENDING order by o.id")
-    fun findPendingEarnIds(): List<Long>
-
     /** 관리자 상태 변경·구매 적립. 주문 행을 잠근다. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints(QueryHint(name = LOCK_TIMEOUT_HINT, value = LOCK_TIMEOUT_MS))

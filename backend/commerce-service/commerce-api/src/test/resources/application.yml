@@ -75,7 +75,6 @@ modu:
     async-send: false
   customer:
     terms-version: "2026-10"
-  # 등급 스케줄러·적립 재시도는 끄고 테스트가 서비스를 직접 부른다.
+  # 등급 스케줄러는 끄고 테스트가 서비스를 직접 부른다.
   tier:
     scheduler-enabled: false
-    earn-retry-enabled: false

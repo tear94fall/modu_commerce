@@ -64,7 +64,7 @@ class PointOutboxMetricsConfig(
     }
 }
 
-/** 1분마다 PENDING 아웃박스를 보낸다(차감 되돌리기·취소 환불). 파드가 여러 개여도 한 곳에서만 돈다(SchedulerLockConfig). */
+/** 1분마다 PENDING 아웃박스를 보낸다(구매 적립·취소 환불·차감 되돌리기). 파드가 여러 개여도 한 곳에서만 돈다(SchedulerLockConfig). */
 @Configuration
 @EnableScheduling
 @ConditionalOnProperty(prefix = "modu.point.outbox", name = ["relay-enabled"], havingValue = "true", matchIfMissing = true)

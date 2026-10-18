@@ -38,13 +38,13 @@ class PushCampaignsJob(
     override fun run(): Map<String, Any?> = mapOf("sent" to pushCampaignSendService.runDue())
 }
 
-/** PENDING 포인트 아웃박스(차감 되돌리기·취소 환불)를 point-service 로 보낸다. */
+/** PENDING 포인트 아웃박스(구매 적립·취소 환불·차감 되돌리기)를 point-service 로 보낸다. */
 @Component
 class PointOutboxRelayJob(
     private val pointOutboxService: PointOutboxService,
 ) : Job {
     override val name = "point-outbox-relay"
-    override val description = "포인트 아웃박스 릴레이(되돌리기·환불)"
+    override val description = "포인트 아웃박스 릴레이(적립·환불·되돌리기)"
 
     override fun run(): Map<String, Any?> = mapOf("relayed" to pointOutboxService.relay())
 }

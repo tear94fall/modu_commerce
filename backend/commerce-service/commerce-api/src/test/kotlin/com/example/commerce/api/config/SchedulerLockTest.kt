@@ -25,7 +25,6 @@ import java.time.Instant
 @SpringBootTest(
     properties = [
         "modu.tier.scheduler-enabled=true",
-        "modu.tier.earn-retry-enabled=true",
         "modu.push.scheduler-enabled=true",
     ],
 )
@@ -34,7 +33,6 @@ class SchedulerLockTest
     constructor(
         private val lockProvider: LockProvider,
         private val tierScheduling: TierSchedulingConfig,
-        private val earnRetry: PurchaseEarnRetryConfig,
         private val pushScheduling: PushSchedulingConfig,
     ) {
         @MockitoBean

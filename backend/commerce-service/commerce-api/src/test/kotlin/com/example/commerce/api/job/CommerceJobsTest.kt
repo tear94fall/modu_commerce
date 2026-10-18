@@ -15,7 +15,7 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
 import java.time.LocalDate
 
-/** 잡 5개는 기존 서비스 메서드를 감싸고 결과 요약(건수)을 Map 으로 돌려준다. 이름은 JobMdc 에 쓰던 그대로. */
+/** 잡 4개는 기존 서비스 메서드를 감싸고 결과 요약(건수)을 Map 으로 돌려준다. 이름은 JobMdc 에 쓰던 그대로. */
 class CommerceJobsTest {
     @Test
     fun `등급 월 산정 잡은 run id 와 상태를 결과로, 건너뛴 회차는 skipped 를 명시한다`() {
@@ -41,7 +41,7 @@ class CommerceJobsTest {
     }
 
     @Test
-    fun `건수를 돌려주는 잡 셋 — 적립 재시도·푸시 캠페인·아웃박스 릴레이`() {
+    fun `건수를 돌려주는 잡 둘 — 푸시 캠페인·아웃박스 릴레이`() {
         val push = mock(PushCampaignSendService::class.java)
         `when`(push.runDue()).thenReturn(2)
         val outbox = mock(PointOutboxService::class.java)
@@ -50,6 +50,7 @@ class CommerceJobsTest {
         assertEquals("push-campaigns", PushCampaignsJob(push).name)
         assertEquals(mapOf("sent" to 2), PushCampaignsJob(push).run())
         assertEquals("point-outbox-relay", PointOutboxRelayJob(outbox).name)
+        assertEquals("포인트 아웃박스 릴레이(적립·환불·되돌리기)", PointOutboxRelayJob(outbox).description)
         assertEquals(mapOf("relayed" to 5), PointOutboxRelayJob(outbox).run())
     }
 
