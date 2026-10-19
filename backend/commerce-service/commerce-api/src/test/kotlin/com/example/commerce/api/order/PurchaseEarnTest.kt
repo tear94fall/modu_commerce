@@ -6,6 +6,7 @@ import com.example.commerce.application.domain.entity.OrderStatus
 import com.example.commerce.application.domain.entity.PointOutbox
 import com.example.commerce.application.domain.entity.PointOutboxKind
 import com.example.commerce.application.domain.entity.PointOutboxStatus
+import com.example.commerce.application.domain.repository.ro.PointOutboxRoRepository
 import com.example.commerce.application.domain.repository.rw.PointOutboxRwRepository
 import com.example.commerce.application.point.PointEarnRejectedException
 import com.example.commerce.application.point.PointEarnResult
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
+import org.mockito.kotlin.clearInvocations
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.never
 import org.mockito.kotlin.times
@@ -36,6 +38,7 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
 import org.springframework.test.context.bean.override.mockito.MockitoBean
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
@@ -66,6 +69,10 @@ class PurchaseEarnTest
     ) {
         @MockitoBean
         private lateinit var pointGateway: PointGateway
+
+        /** 목록이 아웃박스를 페이지당 한 번만 읽는지 세려고 감싼다(동작은 그대로). */
+        @MockitoSpyBean
+        private lateinit var outboxRoRepository: PointOutboxRoRepository
 
         private val jdbc = JdbcTemplate(dataSource)
         private val me = jwt().jwt { it.subject("11") }
@@ -320,13 +327,16 @@ class PurchaseEarnTest
             val (b, _) = order()
             delivered(b) // DONE
 
-            // 최신순: b 가 먼저.
+            // 최신순: b 가 먼저. 아웃박스는 페이지당 IN 한 번(주문마다 묻지 않는다).
+            clearInvocations(outboxRoRepository)
             mockMvc.get("/api-public/v1/orders") { with(me) }.andExpect {
                 jsonPath("$.content[0].id") { value(b) }
                 jsonPath("$.content[0].earn.status") { value("DONE") }
                 jsonPath("$.content[1].id") { value(a) }
                 jsonPath("$.content[1].earn.status") { value("PENDING") }
             }
+            verify(outboxRoRepository, times(1)).findByKindAndRefIdIn(eq(PointOutboxKind.EARN), any())
+            verify(outboxRoRepository, never()).findByKindAndRefId(eq(PointOutboxKind.EARN), any())
             mockMvc.get("/api-admin/v1/orders") { with(admin) }.andExpect {
                 jsonPath("$.content[0].earn.status") { value("DONE") }
                 jsonPath("$.content[1].earn.status") { value("PENDING") }

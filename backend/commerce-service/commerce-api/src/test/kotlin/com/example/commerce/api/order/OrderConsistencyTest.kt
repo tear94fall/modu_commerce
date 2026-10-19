@@ -7,6 +7,7 @@ import com.example.commerce.application.domain.entity.PointOutboxKind
 import com.example.commerce.application.domain.entity.PointOutboxStatus
 import com.example.commerce.application.domain.repository.rw.PointOutboxRwRepository
 import com.example.commerce.application.point.PointCancelResult
+import com.example.commerce.application.point.PointEarnRejectedException
 import com.example.commerce.application.point.PointEarnResult
 import com.example.commerce.application.point.PointGateway
 import com.example.commerce.application.point.PointGatewayException
@@ -441,6 +442,34 @@ class OrderConsistencyTest
         }
 
         private fun earnRow(id: Int): PointOutbox? = outboxRepository.findByKindAndRefId(PointOutboxKind.EARN, "purchase:order:$id")
+
+        @Test
+        fun `대사는 적립 누락인데 EARN 행이 PENDING 이면 기다리고 FAILED 면 손대지 않는다`() {
+            whenever(pointGateway.earnAmount(any(), any(), any(), anyOrNull())).thenThrow(PointGatewayException())
+            val (pendingId, _) = created(0)
+            deliver(pendingId) // 커밋 뒤 전송 실패 → PENDING, attempts 1
+            whenever(pointGateway.earnAmount(any(), any(), any(), anyOrNull())).thenThrow(PointEarnRejectedException("bad"))
+            val (failedId, _) = created(0)
+            deliver(failedId) // 거절 → FAILED
+            assertEquals(PointOutboxStatus.PENDING, requireNotNull(earnRow(pendingId)).status)
+            assertEquals(PointOutboxStatus.FAILED, requireNotNull(earnRow(failedId)).status)
+            val at = Timestamp.valueOf(TierClock.utc(2026, 10, 8, 10, 0))
+            jdbc.update("update orders set delivered_at = ? where id in (?, ?)", at, pendingId, failedId)
+            clock.setKst(2026, 10, 9, 4, 0)
+            whenever(pointGateway.findTransactions(any())).thenReturn(emptyList())
+            val before = anomalies("earn_missing")
+
+            val report = pointReconcileService.reconcile(LocalDate.of(2026, 10, 8))
+
+            assertEquals(2, report.earnChecked)
+            assertEquals(mapOf("earn_missing" to 2), report.anomalies)
+            assertEquals(0, report.earnsQueued) // 둘 다 행이 이미 있어 새로 만들지 않는다
+            assertEquals(before + 2, anomalies("earn_missing"))
+            val pending = requireNotNull(earnRow(pendingId))
+            assertEquals(PointOutboxStatus.PENDING, pending.status)
+            assertEquals(1, pending.attempts) // 대사는 보내지 않는다 — 릴레이가 보낸다
+            assertEquals(PointOutboxStatus.FAILED, requireNotNull(earnRow(failedId)).status)
+        }
 
         private fun anomalies(type: String): Double =
             meterRegistry

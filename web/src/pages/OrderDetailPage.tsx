@@ -148,13 +148,15 @@ export default function OrderDetailPage() {
 
 /**
  * 구매 적립 한 줄. 적립이 정해졌으면(배송 완료) 그 상태를, 아니면 결제완료·배송중의 예상 적립을 보여 준다.
- * 적립 없음(NONE)·취소 주문은 줄을 숨긴다.
+ * PENDING 은 서버가 다시 보내는 중, FAILED 는 사람이 봐야 하는 상태라 문구를 나눈다. 적립 없음(NONE)·취소 주문은 줄을 숨긴다.
  */
 function EarnLine({ order }: { order: OrderDetail }) {
   const { earn, expectedEarn } = order
   let text: string | null = null
   if (earn && earn.status === 'DONE') text = `${formatPoints(earn.points ?? 0)} 적립 완료`
-  else if (earn && (earn.status === 'PENDING' || earn.status === 'FAILED')) text = '적립 처리 중'
+  else if (earn && earn.status === 'PENDING') text = '적립 처리 중'
+  // FAILED 는 다시 시도하지 않는 종결 상태(서버가 사람 확인을 기다린다) — "처리 중"으로 보이면 안 된다.
+  else if (earn && earn.status === 'FAILED') text = '적립 확인 중 · 고객센터에 문의해 주세요'
   else if (!earn && expectedEarn && expectedEarn.points > 0) text = `배송 완료 시 ${expectedEarn.rate}% 적립 예정 · ${formatPoints(expectedEarn.points)}`
   if (!text) return null
   return (
