@@ -26,8 +26,8 @@ android {
         versionCode = 2
         versionName = "1.0.0"
 
-        // 모두의 채팅과 같은 개발 게이트웨이. auth-service 는 게이트웨이 경유로 부른다.
-        buildConfigField("String", "API_BASE_URL", "\"http://192.168.0.3:8000/\"")
+        // 모두의 채팅과 같은 개발 게이트웨이(Cloudflare Tunnel — LAN 밖에서도 같은 주소). auth-service 는 게이트웨이 경유로 부른다.
+        buildConfigField("String", "API_BASE_URL", "\"https://dev-api.joonsublim.com/\"")
     }
 
     buildFeatures {
@@ -37,14 +37,17 @@ android {
 
     buildTypes {
         // 커머스 화면(web/) 주소. 디버그는 Mac 의 Vite dev 서버(LAN, HMR — `cd web && npm run dev -- --host`)를 열어 저장 즉시 반영되고,
-        // 릴리스는 dev k8s 의 nginx 정적 빌드(modu_infra k8s, :8082)를 연다. 평소 폰에는 릴리스를 깐다(dev 서버 없이도 돈다).
+        // 릴리스는 dev k8s 의 nginx 정적 빌드를 Cloudflare Tunnel 주소로 연다(LAN 밖에서도 됨). 평소 폰에는 릴리스를 깐다(dev 서버 없이도 돈다).
+        // Vite 는 http 라 디버그만 cleartext 를 허용한다(usesCleartext 플레이스홀더).
         debug {
             buildConfigField("String", "WEB_URL", "\"http://192.168.0.3:5174/\"")
+            manifestPlaceholders["usesCleartext"] = "true"
         }
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            buildConfigField("String", "WEB_URL", "\"http://192.168.0.3:8082/\"")
+            buildConfigField("String", "WEB_URL", "\"https://dev-shop.joonsublim.com/\"")
+            manifestPlaceholders["usesCleartext"] = "false"
             // 배포용 키가 없어 디버그 키로 서명한다(개인 dev). 스토어 배포 때는 signingConfigs 를 따로 둔다.
             signingConfig = signingConfigs.getByName("debug")
         }
