@@ -38,8 +38,7 @@
 - **스냅샷 컬럼**: 주문 상품(`product_name`, `option_label`, `unit_price`), 리뷰(`product_name`, `author_name`), 주문(`recipient`, `address1`…)은 주문 시점 값을 복사해 둡니다. 원본이 바뀌어도 주문 내역은 그대로입니다.
 - **시각**: 서버는 UTC `datetime(6)` 로 저장하고 앱이 한국 시간으로 바꿉니다. 기획전 기간·쿠폰 유효 기간·등급 산정 기간은 한국 달력 날짜(`date`)입니다.
 - **읽기·쓰기 분리**: 쓰기는 `mysql-commerce`(소스), 읽기는 GTID 복제 레플리카 `mysql-commerce-replica` 에 SELECT 전용 계정(`commerce_ro`)으로 붙습니다. 쓰기 직후 다시 읽는 조회(장바구니·배송지·결제 직후 주문·가입 확인 등)는 소스에서 읽습니다.
-- **스케줄러 잠금**: 월 등급 산정·푸시 캠페인 발송·포인트 아웃박스 릴레이·대사는 ShedLock(`shedlock` 테이블, rw 풀)으로 잠가 파드가 여러 개여도 한 곳에서만 돕니다.
-- **배치 잡**: 스케줄 작업 4개(`tier-monthly-run`·`push-campaigns`·`point-outbox-relay`·`point-reconcile`)는 `api/job/`의 `Job` 구현이고, 스케줄러(`@Scheduled`)와 내부 API가 같은 `JobRunner`로 한 회차를 돌립니다. `GET /api-internal/v1/jobs`(목록), `POST /api-internal/v1/jobs/{name}/run`(실행, X-Internal-Token) — 응답은 `{job, outcome: ok|failed, durationMs, requestId, result|error}`(성공 200·실패 500, 모르는 잡 404, 돌고 있으면 409). 잡당 동시 실행은 하나. 회차마다 `job.run` 이벤트 한 줄이라 OpenSearch에서 `attributes.requestId:"job-…"`로 그 회차의 로그를 모두 봅니다. `requestId`는 batch-service가 보낸 `X-Request-Id`(회차 id, `job-` 접두)를 그대로 쓰고, 그 접두가 아닌 요청 id(헤더 없이 부른 경우)면 `job-` id를 새로 만듭니다. `tier-monthly-run`은 산정 실행이 FAILED로 끝나면 잡도 `failed`로 보고하고, 다른 실행이 돌고 있어 건너뛰면 `{"runId":null,"skipped":true}`입니다. 스케줄러는 `JobRunner.runIfIdle`을 써서 같은 잡이 돌고 있으면(전환 기간에 batch-service 회차와 겹칠 때) WARN 한 줄로 건너뜁니다. 모두 시스템 콘솔에서 주기·실행·이력을 관리하는 batch-service(modu_platform)가 이 API를 부릅니다(설계: modu_platform `docs/superpowers/specs/2026-10-17-batch-platform-design.md`). 스케줄은 `modu.tier.scheduler-enabled`·`modu.push.scheduler-enabled`·`modu.point.outbox.relay-enabled`·`modu.point.outbox.reconcile-enabled`로 끕니다.
+- **배치 잡**: 스케줄 작업 4개(`tier-monthly-run`·`push-campaigns`·`point-outbox-relay`·`point-reconcile`)는 `api/job/`의 `Job` 구현이고, 내부 API가 `JobRunner`로 한 회차를 돌립니다. 서비스 안에 `@Scheduled`·ShedLock 은 없습니다 — 트리거는 전부 batch-service 입니다(2026-10-19 에 스케줄 코드와 `shedlock` 테이블을 지웠다). `GET /api-internal/v1/jobs`(목록), `POST /api-internal/v1/jobs/{name}/run`(실행, X-Internal-Token) — 응답은 `{job, outcome: ok|failed, durationMs, requestId, result|error}`(성공 200·실패 500, 모르는 잡 404, 돌고 있으면 409). 잡당 동시 실행은 하나. 회차마다 `job.run` 이벤트 한 줄이라 OpenSearch에서 `attributes.requestId:"job-…"`로 그 회차의 로그를 모두 봅니다. `requestId`는 batch-service가 보낸 `X-Request-Id`(회차 id, `job-` 접두)를 그대로 쓰고, 그 접두가 아닌 요청 id(헤더 없이 부른 경우)면 `job-` id를 새로 만듭니다. `tier-monthly-run`은 산정 실행이 FAILED로 끝나면 잡도 `failed`로 보고하고, 다른 실행이 돌고 있어 건너뛰면 `{"runId":null,"skipped":true}`입니다. 모두 시스템 콘솔에서 주기·실행·이력을 관리하는 batch-service(modu_platform)가 이 API를 부릅니다(설계: modu_platform `docs/superpowers/specs/2026-10-17-batch-platform-design.md`).
 - **서비스 주소**: 서비스 디스커버리(Eureka)는 쓰지 않습니다. 게이트웨이가 commerce-service 를 부르는 주소와 commerce-service 가 부르는 point-service·member-service 주소는 모두 modu_platform config-repo 의 `modu.services.*`(`http://<컨테이너 이름>:<포트>`)에서 받습니다. 쿠버네티스에선 같은 이름·포트의 Service 로 맞춥니다.
 
 ### 스키마 관리
@@ -48,7 +47,7 @@
 - 스키마 기준선과 변경 이력은 `modu_infra/data/mysql/schema` 에 있습니다. 엔티티를 바꾸면 거기에 DDL 을 같이 올립니다.
 - 변경은 DBA 가 gh-ost 로 적용합니다(절차: `modu_infra/data/mysql/DBA.md`). 코드 배포는 스키마 적용 뒤에 합니다.
 - 외래 키는 두지 않습니다. 정합성은 UseCase(삭제 순서·존재 검증)와 고아 행 점검 쿼리로 지킵니다.
-- 테스트(H2)는 `update` 그대로라 Hibernate 가 외래 키를 만듭니다. `shedlock` 테이블만 `src/test/resources/schema-shedlock.sql` 로 만듭니다.
+- 테스트(H2)는 `update` 그대로라 Hibernate 가 외래 키를 만듭니다.
 
 ### 이미지와 배포
 

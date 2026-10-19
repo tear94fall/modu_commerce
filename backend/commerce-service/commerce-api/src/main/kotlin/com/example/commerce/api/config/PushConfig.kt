@@ -1,6 +1,5 @@
 package com.example.commerce.api.config
 
-import com.example.commerce.api.job.JobRunner
 import com.example.commerce.api.push.FirebasePushSender
 import com.example.commerce.api.push.LoggingPushSender
 import com.example.commerce.application.common.logger
@@ -10,13 +9,9 @@ import com.google.auth.oauth2.ServiceAccountCredentials
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.messaging.FirebaseMessaging
-import net.javacrumbs.shedlock.spring.annotation.SchedulerLock
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.scheduling.annotation.EnableScheduling
-import org.springframework.scheduling.annotation.Scheduled
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.util.Base64
@@ -31,8 +26,6 @@ import java.util.Base64
 data class ModuPushProperties(
     val firebaseCredentialsBase64: String = "",
     val firebaseCredentials: String = "",
-    /** 1분마다 예약 캠페인을 보내는 스케줄러. 테스트는 끄고 PushCampaignSendService.runDue 를 직접 부른다. */
-    val schedulerEnabled: Boolean = true,
 )
 
 @Configuration
@@ -84,20 +77,5 @@ class PushConfig {
     companion object {
         /** 기본 앱 이름을 쓰지 않는다(다른 라이브러리가 기본 FirebaseApp 을 만들어도 부딪치지 않게). */
         const val APP_NAME = "commerce"
-    }
-}
-
-/** 예약 캠페인 스케줄러. `modu.push.scheduler-enabled=false` 면 스케줄링 자체를 켜지 않는다. */
-@Configuration
-@EnableScheduling
-@ConditionalOnProperty(prefix = "modu.push", name = ["scheduler-enabled"], havingValue = "true", matchIfMissing = true)
-class PushSchedulingConfig(
-    private val jobRunner: JobRunner,
-) {
-    // 파드가 여러 개여도 같은 캠페인을 두 번 보내지 않게 한 곳에서만 돈다(SchedulerLockConfig). 한 번의 발송은 최대 5분.
-    @Scheduled(fixedDelay = 60_000, initialDelay = 30_000)
-    @SchedulerLock(name = "commerce:push-campaigns", lockAtLeastFor = "PT30S", lockAtMostFor = "PT5M")
-    fun sendDueCampaigns() {
-        jobRunner.runIfIdle("push-campaigns")
     }
 }
