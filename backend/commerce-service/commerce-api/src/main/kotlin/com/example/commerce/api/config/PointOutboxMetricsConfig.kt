@@ -1,6 +1,5 @@
 package com.example.commerce.api.config
 
-import com.example.commerce.api.job.JobRunner
 import com.example.commerce.application.common.TierPeriods
 import com.example.commerce.application.domain.entity.PointOutboxStatus
 import com.example.commerce.application.domain.repository.ro.PointOutboxRoRepository
@@ -8,12 +7,8 @@ import com.example.commerce.application.point.PointAnomalyRecorder
 import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.MeterRegistry
-import net.javacrumbs.shedlock.spring.annotation.SchedulerLock
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.scheduling.annotation.EnableScheduling
-import org.springframework.scheduling.annotation.Scheduled
 import java.time.Clock
 import java.time.Duration
 
@@ -69,32 +64,4 @@ class PointOutboxMetricsConfig(
     }
 
     private fun failed(): Double = pointOutboxRoRepository.countByStatus(PointOutboxStatus.FAILED).toDouble()
-}
-
-/** 1분마다 PENDING 아웃박스를 보낸다(구매 적립·취소 환불·차감 되돌리기). 파드가 여러 개여도 한 곳에서만 돈다(SchedulerLockConfig). */
-@Configuration
-@EnableScheduling
-@ConditionalOnProperty(prefix = "modu.point.outbox", name = ["relay-enabled"], havingValue = "true", matchIfMissing = true)
-class PointOutboxRelayConfig(
-    private val jobRunner: JobRunner,
-) {
-    @Scheduled(fixedDelay = 60_000, initialDelay = 60_000)
-    @SchedulerLock(name = "commerce:point-outbox-relay", lockAtLeastFor = "PT10S", lockAtMostFor = "PT5M")
-    fun relay() {
-        jobRunner.runIfIdle("point-outbox-relay")
-    }
-}
-
-/** 매일 04:00(KST) 전날 포인트 사용 주문을 point-service 원장과 맞춰 본다. */
-@Configuration
-@EnableScheduling
-@ConditionalOnProperty(prefix = "modu.point.outbox", name = ["reconcile-enabled"], havingValue = "true", matchIfMissing = true)
-class PointReconcileConfig(
-    private val jobRunner: JobRunner,
-) {
-    @Scheduled(cron = "0 0 4 * * *", zone = "Asia/Seoul")
-    @SchedulerLock(name = "commerce:point-reconcile", lockAtLeastFor = "PT1M", lockAtMostFor = "PT30M")
-    fun reconcile() {
-        jobRunner.runIfIdle("point-reconcile")
-    }
 }

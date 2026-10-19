@@ -30,11 +30,10 @@ class JobAlreadyRunningException(
 ) : RuntimeException("job already running")
 
 /**
- * 이름으로 [Job] 을 찾아 한 회차를 돌린다. 스케줄러(`@Scheduled`)와 `/api-internal/v1/jobs/{name}/run` 이 같은 길을 쓴다.
+ * 이름으로 [Job] 을 찾아 한 회차를 돌린다. batch-service 가 `/api-internal/v1/jobs/{name}/run` 으로 부른다(서비스 안 스케줄러는 없다).
  * - [JobMdc.run] 안에서 돌려 `job.run` 이벤트 한 줄과 `job-` requestId 가 그대로 남는다.
  * - 잡당 동시 실행은 하나다. 돌고 있는 잡을 다시 부르면 [JobAlreadyRunningException].
- * - 잡의 예외는 여기서 잡아 `outcome=failed` 로 돌려준다(ERROR 로그와 스택은 JobMdc 가 이미 남겼다). 스케줄러는 그래서 try/catch 가 필요 없다.
- * - 스케줄러는 [runIfIdle] 을 쓴다 — 같은 파드에서 batch-service 의 HTTP 회차가 돌고 있으면(전환 기간) 던지지 않고 WARN 한 줄로 건너뛴다.
+ * - 잡의 예외는 여기서 잡아 `outcome=failed` 로 돌려준다(ERROR 로그와 스택은 JobMdc 가 이미 남겼다).
  */
 @Component
 class JobRunner(
@@ -70,15 +69,6 @@ class JobRunner(
             running.remove(name)
         }
     }
-
-    /** 스케줄러용: 돌고 있으면 null(WARN 한 줄). 모르는 잡은 [run] 과 같이 [UnknownJobException]. */
-    fun runIfIdle(name: String): JobRun? =
-        try {
-            run(name)
-        } catch (e: JobAlreadyRunningException) {
-            log.warn("job {} skipped by the scheduler: already running (batch-service run in progress?)", name)
-            null
-        }
 
     /** 건수가 0 이거나 비어 있으면 조용히(1분 주기 잡이 매번 한 줄씩 남기지 않게). */
     private fun didSomething(result: Map<String, Any?>): Boolean =
