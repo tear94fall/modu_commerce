@@ -126,6 +126,13 @@ describe('OrderDetailPage', () => {
       expect(await screen.findByText('적립 처리 중')).toBeInTheDocument()
     })
 
+    it('asks the customer to check with us when the earn failed', async () => {
+      vi.spyOn(orders, 'getOrder').mockResolvedValue(order({ status: 'DELIVERED', earn: { status: 'FAILED', points: 1200, rate: 3 }, expectedEarn: null }))
+      renderOrder()
+      expect(await screen.findByText('적립 확인 중 · 고객센터에 문의해 주세요')).toBeInTheDocument()
+      expect(screen.queryByText('적립 처리 중')).not.toBeInTheDocument()
+    })
+
     it('shows nothing for no earn or an older server without the fields', async () => {
       vi.spyOn(orders, 'getOrder').mockResolvedValueOnce(order({ status: 'DELIVERED', earn: { status: 'NONE', points: 0, rate: 0 }, expectedEarn: null }))
       const { unmount } = renderOrder()
