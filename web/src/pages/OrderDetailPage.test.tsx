@@ -31,7 +31,7 @@ describe('OrderDetailPage', () => {
 
   it('shows the order and cancels it after confirmation', async () => {
     vi.spyOn(orders, 'getOrder').mockResolvedValue(order())
-    const cancel = vi.spyOn(orders, 'cancelOrder').mockResolvedValue(order({ status: 'CANCELLED', cancelledAt: '2026-09-19T14:30:00' }))
+    const cancel = vi.spyOn(orders, 'cancelOrder').mockResolvedValue(order({ status: 'CANCELLED', cancelledBy: 'CUSTOMER', cancelReason: '단순 변심', cancelledAt: '2026-09-19T14:30:00' }))
     render(
       <MemoryRouter initialEntries={['/orders/77']}>
         <Routes>
@@ -47,7 +47,7 @@ describe('OrderDetailPage', () => {
 
     await userEvent.click(screen.getByRole('button', { name: '주문 취소' }))
     await userEvent.click(screen.getByRole('dialog').querySelector('.actions button:last-child')!)
-    expect(cancel).toHaveBeenCalledWith(77)
+    expect(cancel).toHaveBeenCalledWith(77, '단순 변심')
     expect(await screen.findByText(/^취소 2026\.09\.19 /)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '주문 취소' })).not.toBeInTheDocument()
   })
@@ -145,5 +145,46 @@ describe('OrderDetailPage', () => {
       expect(await screen.findByText('주문번호 20260919-ABC123')).toBeInTheDocument()
       expect(screen.queryByText(/적립/)).not.toBeInTheDocument()
     })
+  })
+
+  it('shows the carrier, tracking number and the progress timeline once shipped', async () => {
+    vi.spyOn(orders, 'getOrder').mockResolvedValue(
+      order({
+        status: 'SHIPPING',
+        carrier: 'CJ대한통운',
+        trackingNo: '1234-5678',
+        shippedAt: '2026-09-20T01:00:00',
+        events: [
+          { id: 1, fromStatus: null, toStatus: 'PAID', actorType: 'CUSTOMER', reason: null, carrier: null, trackingNo: null, at: '2026-09-19T14:22:00' },
+          { id: 2, fromStatus: 'PAID', toStatus: 'SHIPPING', actorType: 'STAFF', reason: null, carrier: 'CJ대한통운', trackingNo: '1234-5678', at: '2026-09-20T01:00:00' },
+        ],
+      }),
+    )
+    render(
+      <MemoryRouter initialEntries={['/orders/77']}>
+        <Routes>
+          <Route path="/orders/:id" element={<OrderDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    const shipping = await screen.findByRole('region', { name: '배송' })
+    expect(shipping).toHaveTextContent('CJ대한통운')
+    expect(shipping).toHaveTextContent('1234-5678')
+    const steps = screen.getByRole('region', { name: '진행' })
+    expect(steps).toHaveTextContent('주문 완료')
+    expect(steps).toHaveTextContent('배송 시작')
+    expect(screen.queryByRole('button', { name: '주문 취소' })).not.toBeInTheDocument()
+  })
+
+  it('shows who cancelled and why', async () => {
+    vi.spyOn(orders, 'getOrder').mockResolvedValue(order({ status: 'CANCELLED', cancelledAt: '2026-09-20T02:00:00', cancelledBy: 'STAFF', cancelReason: '재고 부족' }))
+    render(
+      <MemoryRouter initialEntries={['/orders/77']}>
+        <Routes>
+          <Route path="/orders/:id" element={<OrderDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    expect(await screen.findByText(/판매자 취소 · 재고 부족/)).toBeInTheDocument()
   })
 })

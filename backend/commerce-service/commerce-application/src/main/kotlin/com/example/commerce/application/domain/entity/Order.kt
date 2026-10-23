@@ -140,6 +140,29 @@ class Order(
     var deliveredAt: LocalDateTime? = null
         protected set
 
+    /** 배송 시작 시각(UTC)과 택배사·송장번호. 어드민이 배송중으로 바꿀 때 같이 적는다. 택배사는 코드(CJ, HANJIN …)가 아니라 보이는 이름 그대로. */
+    @Column(name = "shipped_at")
+    var shippedAt: LocalDateTime? = null
+        protected set
+
+    @Column(name = "carrier", length = 30)
+    var carrier: String? = null
+        protected set
+
+    @Column(name = "tracking_no", length = 40)
+    var trackingNo: String? = null
+        protected set
+
+    /** 취소 사유와 누가 취소했나(고객 / 직원). 고객 취소는 사유가 없을 수 있다. */
+    @Column(name = "cancel_reason", length = 200)
+    var cancelReason: String? = null
+        protected set
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "cancelled_by", length = 20)
+    var cancelledBy: OrderActorType? = null
+        protected set
+
     /** 구매 적립 포인트. null 이면 아직 정하지 않았다(배송 완료 전). 배송 완료 트랜잭션에서 그 시점 등급으로 확정한다. */
     @Column(name = "earn_points")
     var earnPoints: Long? = null
@@ -204,9 +227,38 @@ class Order(
 
     fun pointRefundRefId(): String = "refund:order:$orderNo"
 
-    /** 사용자 취소. 결제 완료 상태에서만. 재고 복구는 호출자가 한다. [now] 는 UTC. */
-    fun cancel(now: LocalDateTime) {
+    /** 취소. 결제 완료 상태에서만. 재고 복구는 호출자가 한다. [now] 는 UTC. [reason] 은 다듬어서 200자까지, 비면 null. */
+    fun cancel(
+        now: LocalDateTime,
+        by: OrderActorType,
+        reason: String? = null,
+    ) {
         transition(OrderStatus.CANCELLED, now)
+        cancelledBy = by
+        cancelReason =
+            reason?.trim()?.takeIf { it.isNotEmpty() }?.also {
+                require(
+                    it.length <= CANCEL_REASON_MAX,
+                ) { "취소 사유는 ${CANCEL_REASON_MAX}자까지입니다." }
+            }
+    }
+
+    /** 배송 시작. 결제 완료 상태에서만. 택배사·송장번호는 필수. [now] 는 UTC. */
+    fun ship(
+        carrier: String?,
+        trackingNo: String?,
+        now: LocalDateTime,
+    ) {
+        val c = carrier?.trim().orEmpty()
+        val t = trackingNo?.trim().orEmpty()
+        require(c.isNotEmpty()) { "택배사를 적어 주세요." }
+        require(t.isNotEmpty()) { "송장번호를 적어 주세요." }
+        require(c.length <= CARRIER_MAX) { "택배사는 ${CARRIER_MAX}자까지입니다." }
+        require(t.length <= TRACKING_NO_MAX) { "송장번호는 ${TRACKING_NO_MAX}자까지입니다." }
+        transition(OrderStatus.SHIPPING, now)
+        this.carrier = c
+        this.trackingNo = t
+        shippedAt = now
     }
 
     /** 관리자 상태 변경. 허용된 전이만. [now] 는 UTC(취소·배송 완료 시각). */
@@ -236,6 +288,9 @@ class Order(
 
     companion object {
         const val PAYMENT_MOCK = "MOCK"
+        const val CANCEL_REASON_MAX = 200
+        const val CARRIER_MAX = 30
+        const val TRACKING_NO_MAX = 40
         private val random = SecureRandom()
         private const val ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 

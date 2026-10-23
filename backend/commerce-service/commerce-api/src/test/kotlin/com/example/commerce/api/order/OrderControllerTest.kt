@@ -173,7 +173,7 @@ class OrderControllerTest
                 mockMvc.patch("/api-admin/v1/orders/$orderId/status") {
                     with(admin)
                     contentType = MediaType.APPLICATION_JSON
-                    content = """{"status":"$status"}"""
+                    content = """{"status":"$status","carrier":"테스트택배","trackingNo":"T-1","reason":"테스트 취소"}"""
                 }
             change("DELIVERED").andExpect {
                 status { isBadRequest() }
@@ -202,7 +202,7 @@ class OrderControllerTest
                 .patch("/api-admin/v1/orders/$second/status") {
                     with(admin)
                     contentType = MediaType.APPLICATION_JSON
-                    content = """{"status":"CANCELLED"}"""
+                    content = """{"status":"CANCELLED","reason":"테스트 취소"}"""
                 }.andExpect { jsonPath("$.status") { value("CANCELLED") } }
             assertEquals(42, support.stockOf("모두 머그컵 세트"))
             mockMvc

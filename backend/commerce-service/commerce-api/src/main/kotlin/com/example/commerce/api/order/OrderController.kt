@@ -83,6 +83,12 @@ data class CreateOrderRequest(
         )
 }
 
+@Schema(description = "주문 취소 본문(선택).")
+data class CancelOrderRequest(
+    @field:Schema(description = "취소 사유(선택). 200자까지", example = "단순 변심")
+    val reason: String? = null,
+)
+
 @Tag(
     name = "주문 (앱)",
     description =
@@ -157,7 +163,8 @@ class OrderController(
         @AuthenticationPrincipal jwt: Jwt,
         @Parameter(description = "주문 id", example = "10")
         @PathVariable id: Long,
-    ): ResponseEntity<OrderDetailResult> = ResponseEntity.ok(cancelOrderUseCase.execute(jwt.userId(), id))
+        @RequestBody(required = false) request: CancelOrderRequest?,
+    ): ResponseEntity<OrderDetailResult> = ResponseEntity.ok(cancelOrderUseCase.execute(jwt.userId(), id, request?.reason))
 
     companion object {
         const val IDEMPOTENCY_KEY_HEADER = "Idempotency-Key"

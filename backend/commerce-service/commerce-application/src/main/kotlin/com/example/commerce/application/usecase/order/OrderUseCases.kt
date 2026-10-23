@@ -3,6 +3,7 @@ package com.example.commerce.application.usecase.order
 import com.example.commerce.application.domain.entity.Order
 import com.example.commerce.application.domain.entity.OrderStatus
 import com.example.commerce.application.service.CustomerQueryService
+import com.example.commerce.application.service.OrderActor
 import com.example.commerce.application.service.OrderCommandService
 import com.example.commerce.application.service.OrderQueryService
 import com.example.commerce.application.service.PointOutboxStatusQueryService
@@ -54,7 +55,7 @@ class CreateOrderUseCase(
         key: String,
     ): OrderDetailResult? =
         orderCommandService.readByIdempotencyKey(userId, key) {
-            OrderDetailResult.from(it, earn = outboxStatus.earnOfMaster(it))
+            OrderDetailResult.from(it, earn = outboxStatus.earnOfMaster(it), events = orderCommandService.events(it))
         }
 }
 
@@ -72,10 +73,16 @@ class CancelOrderUseCase(
     fun execute(
         userId: String,
         orderId: Long,
+        reason: String? = null,
     ): OrderDetailResult {
-        tx.executeWithoutResult { orderCommandService.cancel(userId, orderId) }
+        tx.executeWithoutResult { orderCommandService.cancel(userId, orderId, reason) }
         return orderCommandService.readOwn(userId, orderId) {
-            OrderDetailResult.from(it, pointRefundStatus = outboxStatus.refundOfMaster(it), earn = outboxStatus.earnOfMaster(it))
+            OrderDetailResult.from(
+                it,
+                pointRefundStatus = outboxStatus.refundOfMaster(it),
+                earn = outboxStatus.earnOfMaster(it),
+                events = orderCommandService.events(it),
+            )
         }
     }
 }
@@ -132,6 +139,7 @@ class GetOrderUseCase(
             customerQueryService.currentTier(userId),
             outboxStatus.refundOf(order),
             outboxStatus.earnOf(order),
+            events = orderCommandService.events(order),
         )
 }
 
@@ -161,7 +169,12 @@ class GetAdminOrderUseCase(
     @Transactional(transactionManager = "roTransactionManager", readOnly = true)
     fun execute(orderId: Long): OrderDetailResult =
         orderQueryService.find(orderId).let {
-            OrderDetailResult.from(it, pointRefundStatus = outboxStatus.refundOf(it), earn = outboxStatus.earnOf(it))
+            OrderDetailResult.from(
+                it,
+                pointRefundStatus = outboxStatus.refundOf(it),
+                earn = outboxStatus.earnOf(it),
+                events = orderQueryService.events(it),
+            )
         }
 }
 
@@ -177,10 +190,21 @@ class ChangeOrderStatusUseCase(
     fun execute(
         orderId: Long,
         next: OrderStatus,
+        staffId: String?,
+        reason: String? = null,
+        carrier: String? = null,
+        trackingNo: String? = null,
     ): OrderDetailResult {
-        tx.executeWithoutResult { orderCommandService.changeStatus(orderId, next) }
+        tx.executeWithoutResult { orderCommandService.changeStatus(orderId, next, OrderActor.staff(staffId), reason, carrier, trackingNo) }
         return orderCommandService.read(
             orderId,
-        ) { OrderDetailResult.from(it, pointRefundStatus = outboxStatus.refundOfMaster(it), earn = outboxStatus.earnOfMaster(it)) }
+        ) {
+            OrderDetailResult.from(
+                it,
+                pointRefundStatus = outboxStatus.refundOfMaster(it),
+                earn = outboxStatus.earnOfMaster(it),
+                events = orderCommandService.events(it),
+            )
+        }
     }
 }

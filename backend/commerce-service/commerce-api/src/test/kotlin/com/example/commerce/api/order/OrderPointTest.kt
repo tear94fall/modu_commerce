@@ -112,7 +112,7 @@ class OrderPointTest
                 .patch("/api-admin/v1/orders/$orderId/status") {
                     with(admin)
                     contentType = MediaType.APPLICATION_JSON
-                    content = """{"status":"CANCELLED"}"""
+                    content = """{"status":"CANCELLED","reason":"테스트 취소"}"""
                 }.andExpect {
                     status { isOk() }
                     jsonPath("$.pointRefundStatus") { value("DONE") }

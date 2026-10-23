@@ -696,3 +696,19 @@ a.coupon-get { background: var(--surface); color: var(--brand); border: 1px soli
 .legal-doc h2 { margin: 18px 0 4px; font-size: 15px; }
 .legal-doc p { margin: 0; color: #444; }
 .legal-doc ul { margin: 0; padding-left: 18px; color: #444; }
+
+/* 주문 상세: 진행 이력(결제 → 배송 → 완료/취소)과 취소 사유 고르기 */
+.order-steps { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid #e5e7eb; }
+.order-step { position: relative; padding: 0 0 12px 12px; font-size: 14px; display: grid; grid-template-columns: 1fr auto; gap: 0 8px; }
+.order-step:last-child { padding-bottom: 2px; }
+.order-step::before { content: ''; position: absolute; left: -21px; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: #9ca3af; border: 2px solid #fff; }
+.order-step.PAID::before { background: #2563eb; }
+.order-step.SHIPPING::before { background: #d97706; }
+.order-step.DELIVERED::before { background: #16a34a; }
+.order-step.CANCELLED::before { background: #dc2626; }
+.order-step-label { font-weight: 600; }
+.order-step-time { color: #6b7280; font-size: 12px; }
+.order-step-note { grid-column: 1 / -1; color: #6b7280; font-size: 12px; }
+.dialog-field { display: grid; gap: 6px; margin: -6px 0 14px; font-size: 13px; color: #444; }
+.dialog-field select { padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 8px; font: inherit; background: #fff; }
+
