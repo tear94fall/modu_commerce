@@ -10,6 +10,9 @@ dependencies {
     kapt("jakarta.persistence:jakarta.persistence-api")
 
     runtimeOnly("com.mysql:mysql-connector-j")
+
+    // 통계 유스케이스 단위 테스트(GetAdminStatsUseCaseTest)가 리포지토리를 목으로 쓴다 — commerce-api 와 같은 판.
+    testImplementation("org.mockito.kotlin:mockito-kotlin:6.4.0")
 }
 
 kapt {
