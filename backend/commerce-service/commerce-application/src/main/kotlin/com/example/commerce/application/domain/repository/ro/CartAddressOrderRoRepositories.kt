@@ -49,6 +49,19 @@ interface OrderRoRepository :
 
     fun findById(id: Long): Order?
 
+    /**
+     * 백오피스 통계용 — 결제 시각이 [from, to) 거나 취소 시각이 [from, to) 인 주문의 [paidAt, status, totalAmount, couponDiscount, pointAmount,
+     * userCouponId, cancelledAt]. 시각은 UTC. 날짜로 묶는 일은 호출 쪽(DayWindow)이 한다.
+     */
+    @Query(
+        "select o.paidAt, o.status, o.totalAmount, o.couponDiscount, o.pointAmount, o.userCouponId, o.cancelledAt from Order o " +
+            "where (o.paidAt >= :from and o.paidAt < :to) or (o.cancelledAt >= :from and o.cancelledAt < :to)",
+    )
+    fun findStatsRowsBetween(
+        @Param("from") from: LocalDateTime,
+        @Param("to") to: LocalDateTime,
+    ): List<Array<Any?>>
+
     /** 배송 완료 결제 금액(상품 − 쿠폰 − 포인트)의 회원별 합. 기간은 [from, to) UTC. */
     @Query(
         "select new com.example.commerce.application.domain.repository.ro.UserAmount(o.userId, " +
