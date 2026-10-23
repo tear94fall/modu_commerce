@@ -23,6 +23,8 @@ import com.example.commerce.application.usecase.result.AttendanceResult
 import com.example.commerce.application.usecase.result.CouponOfferResult
 import com.example.commerce.application.usecase.result.PromotionBannerResult
 import com.example.commerce.application.usecase.result.PromotionDetailResult
+import com.example.commerce.application.usecase.result.PromotionPerformanceResult
+import com.example.commerce.application.usecase.stats.GetPromotionPerformanceUseCase
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.media.Schema
@@ -105,7 +107,19 @@ class AdminPromotionController(
     private val getAdminPromotionUseCase: GetAdminPromotionUseCase,
     private val savePromotionUseCase: SavePromotionUseCase,
     private val getPromotionAttendancesUseCase: GetPromotionAttendancesUseCase,
+    private val getPromotionPerformanceUseCase: GetPromotionPerformanceUseCase,
 ) {
+    @Operation(
+        summary = "기획전·이벤트 성과",
+        description =
+            "기획전은 기간 안 결제 주문 중 기획전 상품이 든 주문 수·판매 수량·상품 매출과 상품별 내역(취소 제외), " +
+                "출석 이벤트는 참여자·출석 수·지급 포인트·날짜별 출석, 쿠폰 받기 이벤트는 쿠폰별 발급·사용 장 수. 종류에 맞는 항목만 채운다.",
+    )
+    @GetMapping("/{id}/performance")
+    fun performance(
+        @Parameter(description = "기획전·이벤트 id", example = "1") @PathVariable id: Long,
+    ): ResponseEntity<PromotionPerformanceResult> = ResponseEntity.ok(getPromotionPerformanceUseCase.execute(id))
+
     @Operation(
         summary = "기획전·이벤트 목록 검색",
         description =

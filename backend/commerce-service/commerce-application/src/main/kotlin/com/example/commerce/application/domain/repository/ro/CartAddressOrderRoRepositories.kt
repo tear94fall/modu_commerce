@@ -62,6 +62,29 @@ interface OrderRoRepository :
         @Param("to") to: LocalDateTime,
     ): List<Array<Any?>>
 
+    /** 이 쿠폰을 쓴 주문의 [status, totalAmount, couponDiscount, pointAmount] — 백오피스 쿠폰 성과. */
+    @Query(
+        "select o.status, o.totalAmount, o.couponDiscount, o.pointAmount from Order o " +
+            "where o.userCouponId in (select uc.id from UserCoupon uc where uc.coupon.id = :couponId)",
+    )
+    fun findCouponOrderRows(
+        @Param("couponId") couponId: Long,
+    ): List<Array<Any?>>
+
+    /**
+     * 기획전 상품이 들어간 주문 줄 — 결제 시각이 [from, to)(UTC)인 주문의 [orderId, status, productId, productName, quantity, unitPrice].
+     * 백오피스 기획전 성과.
+     */
+    @Query(
+        "select o.id, o.status, i.product.id, i.productName, i.quantity, i.unitPrice from OrderItem i join i.order o " +
+            "where i.product.id in :productIds and o.paidAt >= :from and o.paidAt < :to",
+    )
+    fun findPromotionItemRows(
+        @Param("productIds") productIds: Collection<Long>,
+        @Param("from") from: LocalDateTime,
+        @Param("to") to: LocalDateTime,
+    ): List<Array<Any?>>
+
     /** 배송 완료 결제 금액(상품 − 쿠폰 − 포인트)의 회원별 합. 기간은 [from, to) UTC. */
     @Query(
         "select new com.example.commerce.application.domain.repository.ro.UserAmount(o.userId, " +

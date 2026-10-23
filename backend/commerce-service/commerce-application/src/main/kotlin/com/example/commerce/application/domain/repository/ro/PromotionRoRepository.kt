@@ -58,4 +58,10 @@ interface AttendanceCheckRoRepository : RoRepository<AttendanceCheck, Long> {
     fun countByPromotionIds(
         @Param("ids") ids: Collection<Long>,
     ): List<PromotionCount>
+
+    /** 출석 이벤트의 모든 출석 [userId, checkDate, rewardPoints] — 백오피스 성과(참여자·날짜별·지급 포인트). */
+    @Query("select a.userId, a.checkDate, a.rewardPoints from AttendanceCheck a where a.promotion.id = :promotionId")
+    fun findRows(
+        @Param("promotionId") promotionId: Long,
+    ): List<Array<Any>>
 }

@@ -1,5 +1,6 @@
 package com.example.commerce.api.coupon
 
+import com.example.commerce.api.common.AdminZone
 import com.example.commerce.api.common.CustomerRequired
 import com.example.commerce.api.common.PageResponse
 import com.example.commerce.api.common.userId
@@ -18,7 +19,9 @@ import com.example.commerce.application.usecase.result.AdminCouponSummaryResult
 import com.example.commerce.application.usecase.result.CouponClaimResult
 import com.example.commerce.application.usecase.result.CouponGrantResult
 import com.example.commerce.application.usecase.result.CouponOfferResult
+import com.example.commerce.application.usecase.result.CouponPerformanceResult
 import com.example.commerce.application.usecase.result.MyCouponResult
+import com.example.commerce.application.usecase.stats.GetCouponPerformanceUseCase
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.media.Schema
@@ -182,7 +185,21 @@ data class ApplicableRequest(
 @RequestMapping("/api-admin/v1/coupons")
 class AdminCouponController(
     private val adminCouponUseCase: AdminCouponUseCase,
+    private val getCouponPerformanceUseCase: GetCouponPerformanceUseCase,
 ) {
+    @Operation(
+        summary = "쿠폰 성과",
+        description =
+            "발급·사용·만료 장 수와 경로별 발급, 이 쿠폰을 쓴 주문 수·할인 총액·실결제액(취소 제외), " +
+                "표시 시간대(zone) 날짜로 묶은 최근 days 일(1~92)의 사용 장 수. 없거나 지운 쿠폰이면 404.",
+    )
+    @GetMapping("/{id}/performance")
+    fun performance(
+        @Parameter(description = "쿠폰 id", example = "1") @PathVariable id: Long,
+        @Parameter(description = "사용 추이 며칠 치(오늘 포함). 1~92", example = "14") @RequestParam(defaultValue = "14") days: Int,
+        @Parameter(description = "날짜를 묶을 시간대(IANA)", example = "Asia/Seoul") @RequestParam(defaultValue = "Asia/Seoul") zone: String,
+    ): ResponseEntity<CouponPerformanceResult> = ResponseEntity.ok(getCouponPerformanceUseCase.execute(id, days, AdminZone.parse(zone)))
+
     @Operation(
         summary = "쿠폰 목록 검색",
         description = "지우지 않은 쿠폰을 최신 순(id 내림차순)으로 한 페이지 돌려준다. 쿠폰마다 적용 범위 문구와 발급·사용 수가 붙는다.",

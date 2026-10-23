@@ -2,12 +2,14 @@ package com.example.commerce.application.domain.repository.ro
 
 import com.example.commerce.application.config.RoRepository
 import com.example.commerce.application.domain.entity.Coupon
+import com.example.commerce.application.domain.entity.CouponSource
 import com.example.commerce.application.domain.entity.UserCoupon
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 /** 쿠폰별 개수 한 줄. */
 data class CouponCount(
@@ -100,4 +102,43 @@ interface UserCouponRoRepository : RoRepository<UserCoupon, Long> {
         @Param("userId") userId: String,
         @Param("today") today: LocalDate,
     ): UserCouponCounts
+
+    /** 쿠폰 하나의 받은 장 수를 상태별로(오늘 기준) — 백오피스 성과. */
+    @Query(
+        "select new com.example.commerce.application.domain.repository.ro.UserCouponCounts(" +
+            "sum(case when uc.usedAt is null and uc.expiresOn >= :today then 1L else 0L end), " +
+            "sum(case when uc.usedAt is not null then 1L else 0L end), " +
+            "sum(case when uc.usedAt is null and uc.expiresOn < :today then 1L else 0L end)) " +
+            "from UserCoupon uc where uc.coupon.id = :couponId",
+    )
+    fun countsForCoupon(
+        @Param("couponId") couponId: Long,
+        @Param("today") today: LocalDate,
+    ): UserCouponCounts
+
+    /** 발급 경로별 장 수. 각 행은 [source, count]. */
+    @Query("select uc.source, count(uc) from UserCoupon uc where uc.coupon.id = :couponId group by uc.source")
+    fun countBySource(
+        @Param("couponId") couponId: Long,
+    ): List<Array<Any>>
+
+    /** 쓴 시각만(UTC). [from, to). 백오피스 성과의 사용 추이. */
+    @Query(
+        "select uc.usedAt from UserCoupon uc where uc.coupon.id = :couponId and uc.usedAt >= :from and uc.usedAt < :to",
+    )
+    fun findUsedAtBetween(
+        @Param("couponId") couponId: Long,
+        @Param("from") from: LocalDateTime,
+        @Param("to") to: LocalDateTime,
+    ): List<LocalDateTime>
+
+    /** 쿠폰 받기 이벤트로 나간 장 수와 그중 쓴 장 수(쿠폰별, source 로 거른다). 각 행은 [couponId, issued, used]. */
+    @Query(
+        "select uc.coupon.id, count(uc), sum(case when uc.usedAt is not null then 1L else 0L end) " +
+            "from UserCoupon uc where uc.coupon.id in :couponIds and uc.source = :source group by uc.coupon.id",
+    )
+    fun countEventIssues(
+        @Param("couponIds") couponIds: Collection<Long>,
+        @Param("source") source: CouponSource,
+    ): List<Array<Any>>
 }
