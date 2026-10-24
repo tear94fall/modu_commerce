@@ -12,6 +12,7 @@ import com.example.commerce.application.point.PointEarnRejectedException
 import com.example.commerce.application.point.PointEarnResult
 import com.example.commerce.application.point.PointGateway
 import com.example.commerce.application.point.PointGatewayException
+import com.example.commerce.application.service.OrderActor
 import com.example.commerce.application.service.OrderCommandService
 import com.example.commerce.application.service.PointOutboxService
 import com.jayway.jsonpath.JsonPath
@@ -127,7 +128,7 @@ class PurchaseEarnTest
             .patch("/api-admin/v1/orders/$id/status") {
                 with(admin)
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"status":"$next"}"""
+                content = """{"status":"$next","carrier":"테스트택배","trackingNo":"T-1","reason":"테스트 취소"}"""
             }.andExpect { status { isOk() } }
 
         private fun delivered(id: Int) {
@@ -292,7 +293,7 @@ class PurchaseEarnTest
             val tx = TransactionTemplate(rwTransactionManager)
             assertThrows<IllegalStateException> {
                 tx.executeWithoutResult {
-                    orderCommandService.changeStatus(id.toLong(), OrderStatus.DELIVERED)
+                    orderCommandService.changeStatus(id.toLong(), OrderStatus.DELIVERED, OrderActor.staff("test-staff"))
                     throw IllegalStateException("커밋 직전에 터진다")
                 }
             }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { ApiError } from '../api/client'
-import { cancelOrder, fullAddress, getOrder, paymentLabel, statusLabel, type OrderDetail } from '../api/orders'
+import { CANCEL_REASONS, cancelOrder, eventLabel, fullAddress, getOrder, paymentLabel, statusLabel, type OrderDetail } from '../api/orders'
 import { formatPoints } from '../api/points'
 import { ErrorBox, Loading } from '../components/Boxes'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -17,6 +17,7 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<OrderDetail | null>(null)
   const [status, setStatus] = useState<'loading' | 'ok' | 'notFound' | 'error'>('loading')
   const [confirm, setConfirm] = useState(false)
+  const [reason, setReason] = useState<string>(CANCEL_REASONS[0])
   const [working, setWorking] = useState(false)
   const [message, setMessage] = useState<string | null>((location.state as { justOrdered?: boolean } | null)?.justOrdered ? '주문이 완료됐습니다' : null)
 
@@ -38,7 +39,7 @@ export default function OrderDetailPage() {
     if (working) return
     setWorking(true)
     try {
-      setOrder(await cancelOrder(orderId))
+      setOrder(await cancelOrder(orderId, reason))
       setMessage('주문을 취소했습니다')
     } catch (e) {
       setMessage(e instanceof ApiError && (e.status === 400 || e.status === 503) && !e.message.startsWith('HTTP ') ? e.message : '주문을 취소하지 못했습니다')
@@ -68,8 +69,37 @@ export default function OrderDetailPage() {
           <span className={`status ${order.status}`}>{statusLabel(order.status)}</span>
           <span className="date">{formatDateTime(order.paidAt)}</span>
         </div>
-        {order.cancelledAt && <div className="cancelled">취소 {formatDateTime(order.cancelledAt)}</div>}
+        {order.cancelledAt && (
+          <div className="cancelled">
+            취소 {formatDateTime(order.cancelledAt)}
+            {order.cancelledBy === 'STAFF' ? ' · 판매자 취소' : ''}
+            {order.cancelReason ? ` · ${order.cancelReason}` : ''}
+          </div>
+        )}
       </div>
+      {order.trackingNo && (
+        <section className="block" aria-label="배송">
+          <div className="block-head">
+            <h2>배송</h2>
+          </div>
+          <div className="kv">
+            <span>{order.carrier}</span>
+            <span className="v">{order.trackingNo}</span>
+          </div>
+          {order.shippedAt && (
+            <div className="kv muted">
+              <span>배송 시작</span>
+              <span>{formatDateTime(order.shippedAt)}</span>
+            </div>
+          )}
+          {order.deliveredAt && (
+            <div className="kv muted">
+              <span>배송 완료</span>
+              <span>{formatDateTime(order.deliveredAt)}</span>
+            </div>
+          )}
+        </section>
+      )}
       <section className="block">
         <div className="block-head">
           <h2>주문 상품</h2>
@@ -133,6 +163,22 @@ export default function OrderDetailPage() {
         </div>
         <EarnLine order={order} />
       </section>
+      {(order.events?.length ?? 0) > 0 && (
+        <section className="block" aria-label="진행">
+          <div className="block-head">
+            <h2>진행</h2>
+          </div>
+          <ol className="order-steps">
+            {order.events!.map((e) => (
+              <li key={e.id} className={`order-step ${e.toStatus}`}>
+                <span className="order-step-label">{eventLabel(e)}</span>
+                <span className="order-step-time">{formatDateTime(e.at ?? '')}</span>
+                {(e.carrier || e.reason) && <span className="order-step-note">{e.carrier ? `${e.carrier} ${e.trackingNo ?? ''}` : e.reason}</span>}
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
       {cancellable && (
         <div className="bottom-bar">
           <button type="button" className="btn outline" disabled={working} onClick={() => setConfirm(true)}>
@@ -140,7 +186,18 @@ export default function OrderDetailPage() {
           </button>
         </div>
       )}
-      <ConfirmDialog open={confirm} title="주문 취소" message="주문을 취소할까요? 결제 금액은 즉시 환불(모의)됩니다." confirmLabel="주문 취소" onConfirm={cancel} onClose={() => setConfirm(false)} />
+      <ConfirmDialog open={confirm} title="주문 취소" message="주문을 취소할까요? 결제 금액은 즉시 환불(모의)됩니다." confirmLabel="주문 취소" onConfirm={cancel} onClose={() => setConfirm(false)}>
+        <label className="dialog-field">
+          <span>취소 사유</span>
+          <select aria-label="취소 사유" value={reason} onChange={(e) => setReason(e.target.value)}>
+            {CANCEL_REASONS.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        </label>
+      </ConfirmDialog>
       <Toast message={message} onDone={clearMessage} />
     </Screen>
   )

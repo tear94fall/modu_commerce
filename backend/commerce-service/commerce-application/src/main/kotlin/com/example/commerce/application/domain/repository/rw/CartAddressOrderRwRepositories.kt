@@ -4,6 +4,7 @@ import com.example.commerce.application.config.RwRepository
 import com.example.commerce.application.domain.entity.Address
 import com.example.commerce.application.domain.entity.CartItem
 import com.example.commerce.application.domain.entity.Order
+import com.example.commerce.application.domain.entity.OrderEvent
 import com.example.commerce.application.domain.entity.ProductSku
 import com.example.commerce.application.domain.repository.ro.UserAmount
 import jakarta.persistence.LockModeType
@@ -127,4 +128,9 @@ interface ProductSkuRwRepository : RwRepository<ProductSku, Long> {
     fun lockStock(
         @Param("id") id: Long,
     ): Int?
+}
+
+/** 주문 처리 이력 쓰기 + master 읽기(상태를 바꾼 직후 응답에 실을 때). */
+interface OrderEventRwRepository : RwRepository<OrderEvent, Long> {
+    fun findAllByOrderIdOrderByIdAsc(orderId: Long): List<OrderEvent>
 }

@@ -2,6 +2,7 @@ package com.example.commerce.application.domain.repository.ro
 
 import com.example.commerce.application.config.RoRepository
 import com.example.commerce.application.domain.entity.Order
+import com.example.commerce.application.domain.entity.OrderEvent
 import com.example.commerce.application.domain.entity.OrderStatus
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
@@ -131,4 +132,9 @@ interface OrderRoRepository :
         itemId: Long,
         userId: String,
     ): Order?
+}
+
+/** 주문 처리 이력 읽기(replica) — 주문 상세 타임라인. */
+interface OrderEventRoRepository : RoRepository<OrderEvent, Long> {
+    fun findAllByOrderIdOrderByIdAsc(orderId: Long): List<OrderEvent>
 }

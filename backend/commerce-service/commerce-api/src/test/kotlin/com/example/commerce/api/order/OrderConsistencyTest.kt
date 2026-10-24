@@ -311,7 +311,7 @@ class OrderConsistencyTest
                 .patch("/api-admin/v1/orders/$id/status") {
                     with(admin)
                     contentType = MediaType.APPLICATION_JSON
-                    content = """{"status":"CANCELLED"}"""
+                    content = """{"status":"CANCELLED","reason":"테스트 취소"}"""
                 }.andExpect {
                     status { isOk() }
                     jsonPath("$.pointRefundStatus") { value("FAILED") }
@@ -436,7 +436,7 @@ class OrderConsistencyTest
                     .patch("/api-admin/v1/orders/$id/status") {
                         with(admin)
                         contentType = MediaType.APPLICATION_JSON
-                        content = """{"status":"$next"}"""
+                        content = """{"status":"$next","carrier":"테스트택배","trackingNo":"T-1","reason":"테스트 취소"}"""
                     }.andExpect { status { isOk() } }
             }
         }

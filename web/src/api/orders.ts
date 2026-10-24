@@ -112,7 +112,35 @@ export interface OrderDetail {
   expectedEarn?: ExpectedEarn | null
   /** 취소 주문의 포인트 환불 상태. 포인트를 안 썼거나 취소가 아니면 NONE(옛 서버는 없음). */
   pointRefundStatus?: PointRefundStatus
+  /** 배송 시작 시각·택배사·송장번호(배송중 이후). 옛 서버는 없음. */
+  shippedAt?: string | null
+  carrier?: string | null
+  trackingNo?: string | null
+  deliveredAt?: string | null
+  /** 취소 사유·주체(CUSTOMER = 내가, STAFF = 판매자). */
+  cancelReason?: string | null
+  cancelledBy?: 'CUSTOMER' | 'STAFF' | 'SYSTEM' | null
+  /** 처리 이력(오래된 것부터). */
+  events?: OrderEvent[]
 }
+
+export interface OrderEvent {
+  id: number
+  fromStatus: OrderStatus | null
+  toStatus: OrderStatus
+  actorType: 'CUSTOMER' | 'STAFF' | 'SYSTEM'
+  reason: string | null
+  carrier: string | null
+  trackingNo: string | null
+  at: string | null
+}
+
+/** 고객 취소 사유 보기. 서버는 자유 문자열(200자). */
+export const CANCEL_REASONS = ['단순 변심', '주문 실수', '배송 지연', '다른 상품 구매'] as const
+
+/** 이력 한 줄을 사람 말로. */
+export const eventLabel = (e: OrderEvent): string =>
+  e.fromStatus === null ? '주문 완료' : e.toStatus === 'SHIPPING' ? '배송 시작' : e.toStatus === 'DELIVERED' ? '배송 완료' : e.toStatus === 'CANCELLED' ? (e.actorType === 'CUSTOMER' ? '주문 취소' : '판매자 취소') : statusLabel(e.toStatus)
 
 export interface OrderLine {
   skuId: number
@@ -156,8 +184,8 @@ export const createOrder = (addressId: number, items: OrderLine[], cartItemIds: 
 export const getOrders = (page = 0, size = 20) => api<Page<OrderSummary>>(`/api-public/v1/orders?page=${page}&size=${size}`)
 /** 줄마다 방금 쓴·지운 리뷰를 반영한다(레플리카가 늦어도 '리뷰 쓰기'가 다시 뜨지 않는다). */
 export const getOrder = (id: number) => api<OrderDetail>(`/api-public/v1/orders/${id}`).then(withRecentReviews)
-export const cancelOrder = (id: number) =>
-  api<OrderDetail>(`/api-public/v1/orders/${id}/cancel`, { method: 'POST' }).then((o) => {
+export const cancelOrder = (id: number, reason?: string) =>
+  api<OrderDetail>(`/api-public/v1/orders/${id}/cancel`, { method: 'POST', body: JSON.stringify({ reason: reason ?? null }) }).then((o) => {
     forgetCouponsOfOrder(id)
     return withRecentReviews(o)
   })

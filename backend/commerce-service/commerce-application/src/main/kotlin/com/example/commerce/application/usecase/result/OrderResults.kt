@@ -4,6 +4,8 @@ import com.example.commerce.application.domain.entity.Address
 import com.example.commerce.application.domain.entity.CartItem
 import com.example.commerce.application.domain.entity.EarnStatus
 import com.example.commerce.application.domain.entity.Order
+import com.example.commerce.application.domain.entity.OrderActorType
+import com.example.commerce.application.domain.entity.OrderEvent
 import com.example.commerce.application.domain.entity.OrderItem
 import com.example.commerce.application.domain.entity.OrderStatus
 import com.example.commerce.application.domain.entity.PointOutbox
@@ -177,7 +179,16 @@ data class OrderDetailResult(
     val cancelledAt: LocalDateTime?,
     val createdAt: LocalDateTime?,
     val deliveredAt: LocalDateTime?,
+    /** 배송 시작 시각·택배사·송장번호(배송중 이후). */
+    val shippedAt: LocalDateTime?,
+    val carrier: String?,
+    val trackingNo: String?,
+    /** 취소 사유와 취소한 주체(CUSTOMER / STAFF). 취소가 아니면 null. */
+    val cancelReason: String?,
+    val cancelledBy: OrderActorType?,
     val items: List<OrderItemResult>,
+    /** 처리 이력(오래된 것부터). 목록 응답·생성 응답은 비어 있을 수 있다. */
+    val events: List<OrderEventResult> = emptyList(),
     val earn: OrderEarnResult?,
     val expectedEarn: ExpectedEarnResult?,
     /** 취소 주문의 포인트 환불 상태(아웃박스). 포인트를 안 썼거나 취소가 아니면 NONE. */
@@ -196,6 +207,7 @@ data class OrderDetailResult(
             tier: Tier? = null,
             pointRefundStatus: PointRefundStatus = PointRefundStatus.NONE,
             earn: OrderEarnResult? = null,
+            events: List<OrderEvent> = emptyList(),
         ) = OrderDetailResult(
             id = requireNotNull(o.id),
             orderNo = o.orderNo,
@@ -216,7 +228,13 @@ data class OrderDetailResult(
             cancelledAt = o.cancelledAt,
             createdAt = o.createdAt,
             deliveredAt = o.deliveredAt,
+            shippedAt = o.shippedAt,
+            carrier = o.carrier,
+            trackingNo = o.trackingNo,
+            cancelReason = o.cancelReason,
+            cancelledBy = o.cancelledBy,
             items = o.items.map { OrderItemResult.from(it, reviewIds[it.id]) },
+            events = events.map(OrderEventResult::from),
             earn = earn,
             expectedEarn = expectedEarnOf(o, tier),
             pointRefundStatus = pointRefundStatus,
@@ -260,3 +278,43 @@ fun expectedEarnOf(
     if (tier == null || (o.status != OrderStatus.PAID && o.status != OrderStatus.SHIPPING)) return null
     return ExpectedEarnResult(tier.earnFor(o.paymentAmount()), tier.earnRate)
 }
+
+/** 주문 처리 이력 한 줄. [at] 은 UTC. */
+data class OrderEventResult(
+    val id: Long,
+    val fromStatus: OrderStatus?,
+    val toStatus: OrderStatus,
+    val actorType: OrderActorType,
+    val actorId: String?,
+    val reason: String?,
+    val carrier: String?,
+    val trackingNo: String?,
+    val at: LocalDateTime?,
+) {
+    companion object {
+        fun from(e: OrderEvent) =
+            OrderEventResult(
+                requireNotNull(e.id),
+                e.fromStatus,
+                e.toStatus,
+                e.actorType,
+                e.actorId,
+                e.reason,
+                e.carrier,
+                e.trackingNo,
+                e.createdAt,
+            )
+    }
+}
+
+/** 여러 주문 배송 처리의 건별 결과. 실패해도 나머지는 처리된다. */
+data class ShipOrdersResult(
+    val results: List<ShipOrderOutcome>,
+)
+
+data class ShipOrderOutcome(
+    val orderId: Long,
+    val ok: Boolean,
+    val message: String?,
+    val status: OrderStatus?,
+)

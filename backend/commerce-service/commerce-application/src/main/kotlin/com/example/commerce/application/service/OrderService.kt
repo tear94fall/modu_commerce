@@ -3,9 +3,13 @@ package com.example.commerce.application.service
 import com.example.commerce.application.common.TierPeriods
 import com.example.commerce.application.common.logger
 import com.example.commerce.application.domain.entity.Order
+import com.example.commerce.application.domain.entity.OrderActorType
+import com.example.commerce.application.domain.entity.OrderEvent
 import com.example.commerce.application.domain.entity.OrderStatus
 import com.example.commerce.application.domain.entity.ProductStatus
+import com.example.commerce.application.domain.repository.ro.OrderEventRoRepository
 import com.example.commerce.application.domain.repository.ro.OrderRoRepository
+import com.example.commerce.application.domain.repository.rw.OrderEventRwRepository
 import com.example.commerce.application.domain.repository.rw.OrderRwRepository
 import com.example.commerce.application.domain.repository.rw.ProductSkuRwRepository
 import com.example.commerce.application.point.PointGateway
@@ -22,6 +26,7 @@ import java.time.LocalDate
 @Transactional(transactionManager = "roTransactionManager", readOnly = true)
 class OrderQueryService(
     private val orderRoRepository: OrderRoRepository,
+    private val orderEventRoRepository: OrderEventRoRepository,
 ) {
     fun page(
         userId: String,
@@ -43,6 +48,9 @@ class OrderQueryService(
     ): Page<Order> = orderRoRepository.searchAdminPage(status, orderNo, pageOf(page, size))
 
     fun find(id: Long): Order = orderRoRepository.findById(id) ?: throw notFound(id)
+
+    /** 주문 처리 이력(오래된 것부터). */
+    fun events(order: Order): List<OrderEvent> = orderEventRoRepository.findAllByOrderIdOrderByIdAsc(requireNotNull(order.id))
 
     private fun pageOf(
         page: Int,
@@ -86,6 +94,7 @@ class OrderCommandService(
     private val pointOutboxService: PointOutboxService,
     private val couponUseService: CouponUseService,
     private val purchaseEarnService: PurchaseEarnService,
+    private val orderEventRwRepository: OrderEventRwRepository,
     private val clock: Clock,
 ) {
     fun create(
@@ -114,6 +123,7 @@ class OrderCommandService(
             if (expected != order.paymentAmount()) throw PriceChangedException(order.paymentAmount())
         }
         val saved = orderRwRepository.saveAndFlush(order)
+        record(saved, null, OrderActor(OrderActorType.CUSTOMER, userId))
         coupon?.let { couponUseService.markUsed(it, saved) }
         cartCommandService.removeAll(userId, command.cartItemIds)
         if (saved.pointAmount > 0) {
@@ -152,32 +162,85 @@ class OrderCommandService(
         map: (Order) -> T,
     ): T = map(orderRwRepository.findById(orderId).orElse(null) ?: throw OrderQueryService.notFound(orderId))
 
+    /** 고객 취소. 사유는 선택. */
     fun cancel(
         userId: String,
         orderId: Long,
+        reason: String? = null,
     ): Order {
         val order = orderRwRepository.findByIdAndUserIdForUpdate(orderId, userId) ?: throw OrderQueryService.notFound(orderId)
-        order.cancel(TierPeriods.utcNow(clock))
+        val from = order.status
+        order.cancel(TierPeriods.utcNow(clock), OrderActorType.CUSTOMER, reason)
         restock(order)
         couponUseService.restore(order)
         refundPoints(order)
+        record(order, from, OrderActor(OrderActorType.CUSTOMER, userId), reason = order.cancelReason)
         return order
     }
 
+    /**
+     * 어드민 상태 변경. 배송중으로 갈 땐 택배사·송장번호가, 취소엔 사유가 필수(직원 취소는 고객이 봐야 하니까). 허용된 전이만.
+     * 이력 한 줄을 같은 트랜잭션에 남긴다.
+     */
     fun changeStatus(
         orderId: Long,
         next: OrderStatus,
+        actor: OrderActor,
+        reason: String? = null,
+        carrier: String? = null,
+        trackingNo: String? = null,
     ): Order {
         val order = orderRwRepository.findByIdForUpdate(orderId) ?: throw OrderQueryService.notFound(orderId)
-        order.transition(next, TierPeriods.utcNow(clock))
-        if (next == OrderStatus.CANCELLED) {
-            restock(order)
-            couponUseService.restore(order)
-            refundPoints(order)
+        val from = order.status
+        val now = TierPeriods.utcNow(clock)
+        when (next) {
+            OrderStatus.SHIPPING -> {
+                order.ship(carrier, trackingNo, now)
+            }
+
+            OrderStatus.CANCELLED -> {
+                require(!reason.isNullOrBlank()) { "취소 사유를 적어 주세요." }
+                order.cancel(now, actor.type, reason)
+                restock(order)
+                couponUseService.restore(order)
+                refundPoints(order)
+            }
+
+            else -> {
+                order.transition(next, now)
+            }
         }
         // 배송 완료: 같은 트랜잭션에서 구매 적립을 확정한다(고객의 지금 등급 적립률). 보내기는 커밋 뒤(아웃박스).
         if (next == OrderStatus.DELIVERED) purchaseEarnService.onDelivered(order)
+        record(
+            order,
+            from,
+            actor,
+            reason = order.cancelReason.takeIf { next == OrderStatus.CANCELLED },
+            carrier =
+                order.carrier.takeIf {
+                    next ==
+                        OrderStatus.SHIPPING
+                },
+            trackingNo = order.trackingNo.takeIf { next == OrderStatus.SHIPPING },
+        )
         return order
+    }
+
+    /** 처리 이력(master). 상태를 바꾼 직후의 응답에 싣는다. */
+    fun events(order: Order): List<OrderEvent> = orderEventRwRepository.findAllByOrderIdOrderByIdAsc(requireNotNull(order.id))
+
+    private fun record(
+        order: Order,
+        from: OrderStatus?,
+        actor: OrderActor,
+        reason: String? = null,
+        carrier: String? = null,
+        trackingNo: String? = null,
+    ) {
+        orderEventRwRepository.save(
+            OrderEvent(requireNotNull(order.id), from, order.status, actor.type, actor.id, reason, carrier, trackingNo),
+        )
     }
 
     /** 결제에 쓴 포인트를 돌려준다. 취소 트랜잭션 안에 REFUND 행만 넣고, 보내기는 커밋 뒤에 한다. */
@@ -211,5 +274,15 @@ class OrderCommandService(
             }
             throw IllegalStateException("주문번호를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.")
         }
+    }
+}
+
+/** 주문을 바꾸는 주체. 어드민이면 STAFF + 직원 userId(토큰 sub), 고객이면 CUSTOMER + userId. */
+data class OrderActor(
+    val type: OrderActorType,
+    val id: String?,
+) {
+    companion object {
+        fun staff(id: String?) = OrderActor(OrderActorType.STAFF, id)
     }
 }
