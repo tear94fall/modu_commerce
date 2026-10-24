@@ -59,14 +59,16 @@ class OrderEntityTest {
         val order = newOrder()
         assertThrows(IllegalArgumentException::class.java) { order.transition(OrderStatus.DELIVERED, now) }
         order.transition(OrderStatus.SHIPPING, now)
-        assertThrows(IllegalArgumentException::class.java) { order.cancel(now) }
+        assertThrows(IllegalArgumentException::class.java) { order.cancel(now, OrderActorType.CUSTOMER) }
         order.transition(OrderStatus.DELIVERED, now)
         assertFalse(order.status.canTransitionTo(OrderStatus.CANCELLED))
 
         val fresh = newOrder()
-        fresh.cancel(now)
+        fresh.cancel(now, OrderActorType.STAFF, "재고 부족")
         assertTrue(fresh.isCancelled())
         assertEquals(now, fresh.cancelledAt)
+        assertEquals(OrderActorType.STAFF, fresh.cancelledBy)
+        assertEquals("재고 부족", fresh.cancelReason)
     }
 
     @Test
