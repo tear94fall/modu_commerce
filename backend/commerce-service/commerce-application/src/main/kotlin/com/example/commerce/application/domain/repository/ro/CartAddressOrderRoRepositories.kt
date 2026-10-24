@@ -38,6 +38,16 @@ interface OrderCustomRepository {
 interface OrderRoRepository :
     RoRepository<Order, Long>,
     OrderCustomRepository {
+    /** [from](저장 시각, UTC) 이후 결제돼 취소되지 않은 주문의 SKU 별 판매 수량. [skuId, sum(quantity)] */
+    @Query(
+        "select i.sku.id, sum(i.quantity) from OrderItem i join i.order o " +
+            "where o.paidAt >= :from and o.status <> :cancelled group by i.sku.id",
+    )
+    fun findSoldQuantityBySku(
+        @Param("from") from: LocalDateTime,
+        @Param("cancelled") cancelled: OrderStatus,
+    ): List<Array<Any?>>
+
     fun findAllByUserIdOrderByIdDesc(
         userId: String,
         pageable: Pageable,
